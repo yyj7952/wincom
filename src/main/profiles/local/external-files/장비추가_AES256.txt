@@ -1,0 +1,5 @@
+IMCS 내재화 장비 추가 및 OS 재 설처 시 주의
+: JAVA HOME 하위 /jre/lib/security (개발기 및 상용기 경로 : /usr/local/java/jdk1.7.0_80/jre/lib/security)에 있는 
+기존 장비의 US_export_policy.jar 와 local_policy.jar파일을 덮어 씌워준다.
+java 정책상 jdk 기본 security는 AES128만 지원 됨.
+위 2개 파일 적용 시 AES256 사용 가능.

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSPageList.GetNSPageListDao">
+	
+	<!-- 테스트 계정 유무조회 -->
+	<select id="testSbc" parameterType="GetNSPageListRequestVO" resultType="String" >
+		SELECT CASE WHEN TEST_SBC = 'Y' THEN TEST_SBC ELSE 'N' END AS TEST_SBC
+		  FROM PT_VO_CUSTOM_ID
+	 	 WHERE SA_ID = #{saId}
+  	 	   AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	<!-- 컨텐츠리스트 조회 -->
+	<select id="getContList" parameterType="GetNSPageListRequestVO" resultType="GetNSPageListResponseVO" timeout="10">
+	<if test="!selectAll.equals('Y'.toString())">
+	SELECT * FROM ( 
+	</if>
+	SELECT NVL(M.CONTENTS_ID, '') AS ALBUM_ID,
+	       M.SERIES_NO,
+	       CAT_NAME,
+	       ROWNUM ORD_NUM,
+	       COUNT(*) OVER() TOT_CNT
+	  FROM (
+	    SELECT A.CONTENTS_ID,
+	           A.SERIES_NO,
+	           A.RANK_NO,
+	           B.VOD_CATEGORY_NAME AS CAT_NAME
+	      FROM PT_VO_CATEGORY_MAP A,
+	           PT_VO_CATEGORY_UNITED_NSC B,
+	           (SELECT NSC_ALBUM_ID, MAX(ADI_PRODUCT_ID) ADI_PRODUCT_ID FROM IMCSUSER.PT_LA_PACKAGE_ASSET
+	             WHERE NSC_ALBUM_ID IN (SELECT CONTENTS_ID FROM PT_VO_CATEGORY_MAP WHERE CATEGORY_ID = #{catId})
+	             GROUP BY NSC_ALBUM_ID) P,
+	          IMCSUSER.PT_LA_CONTENT_ASSET C,
+	          IMCSUSER.PT_LA_ALBUM_MST D
+	     WHERE A.CATEGORY_ID = B.VOD_CATEGORY_ID
+	       AND A.CONTENTS_ID = P.NSC_ALBUM_ID
+	       AND A.CONTENTS_ID = D.ADI_ALBUM_ID(+)
+	       AND P.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID
+	       AND A.CATEGORY_ID = #{catId}
+	       AND ( NVL(A.viewing_flag, 'V') in ('V', #{viewFlag1}, #{viewFlag2}) OR NVL(D.preview_flag, 'N') IN ('R', 'P', 'X') )
+		<if test="closeYn.equals('Y'.toString())">
+		 ORDER BY NVL(A.RANK_NO, 0) DESC ) M
+		</if>
+		<if test="!closeYn.equals('Y'.toString())">
+		 ORDER BY NVL(A.RANK_NO, 0) ) M
+		</if>
+		
+	<if test="!selectAll.equals('Y'.toString())">
+	) X
+	WHERE ord_num <![CDATA[>=]]> #{startNo}
+	  AND ord_num <![CDATA[<=]]> #{endNo}   
+	</if>
+	</select>
+	
+	<!-- 컨텐츠 상세정보 조회 -->
+	<select id="getContDesc" parameterType="GetNSPageListRequestVO" resultType="GetNSPageListResponseVO">
+		SELECT A.ADI_ALBUM_NAME ALBUM_NAME, A.ONAIR_DATE ONAIR_DATE, A.SERIES_NO SERIES_DESC, C.RATING PR_INFO, MIN(TO_NUMBER(E.IMCS_PRODUCT_TYPE)) CONTS_TYPE,  
+		       MAX((SELECT MAX(NVL(CONTENT_VALUE, '')) CONTENT_VALUE FROM IMCSUSER.PT_LA_POSTER_ASSET K  
+		       WHERE K.ADI_PRODUCT_ID = B.ADI_PRODUCT_ID AND K.POSTER_TYPE = #{posterType})) OVER (PARTITION BY B.ADI_ALBUM_ID) IMG_FILE_NAME, 
+				F.COM_CD TERR_CH, SUBSTR(C.RUN_TIME,1,6) AS RUN_TIME, REPLACE(REPLACE(TRIM(NVL(SUBSTRB(C.SUMMARY_LONG, 1, 1024), '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n') AS SYNOPSIS
+		FROM IMCSUSER.PT_LA_ALBUM_MST A, 
+		     IMCSUSER.PT_LA_PACKAGE_ASSET B, 
+		     IMCSUSER.PT_LA_TITLE_ASSET C, 
+		     IMCSUSER.PT_PD_PACKAGE_DETAIL D,  
+		     IMCSUSER.PT_PD_PACKAGE_UNITED E, 
+		     (SELECT COM_CD, COM_NAME  FROM IMCSUSER.PT_CD_COM_CD   WHERE GRP_ID = 'PUBLICCH') F 
+		WHERE A.ADI_ALBUM_ID = #{contsId}
+		  AND A.ADI_ALBUM_ID = B.NSC_ALBUM_ID  
+		  AND B.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID  
+		  AND B.ASSET_ID = D.CONTENTS_ID  
+		  AND D.PRODUCT_ID = E.IMCS_PRODUCT_ID 
+		  AND C.CATEGORY = F.COM_NAME(+) 
+		  AND ROWNUM = 1
+		GROUP BY B.ADI_PRODUCT_ID, A.ADI_ALBUM_NAME, A.ONAIR_DATE, A.SERIES_NO, C.RATING, B.ADI_ALBUM_ID, F.COM_CD, C.RUN_TIME, C.SUMMARY_LONG
+	</select>
+	
+	<!-- 썸네일 이미지명 조회 -->
+	<select id="getThumbnailImage" parameterType="GetNSPageListRequestVO" resultType="StillImageVO">
+	SELECT A.MAIN_IMG_FILE_NAME AS IMG_FILE_NAME
+	  FROM IMCSUSER.PT_LA_ALBUM_IMG A
+	 WHERE A.ADI_ALBUM_ID = #{contsId}
+	   AND A.IMG_FLAG = 'N'
+	 ORDER BY TO_NUMBER(ADI_ALBUM_SEQ)
+	</select>
+	
+
+</mapper> 

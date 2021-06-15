@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSAlertList.GetNSAlertListDao">
+
+	<!-- 채널코드 정보 조회 -->
+	<select id="getChnlCode" parameterType="GetNSAlertListRequestVO" resultType="String">
+		SELECT NVL(TRIM(PVS_ATRT_CHNL_DV_CD), '') AS PVS_ATRT_CHNL_DV_CD
+		  FROM NSCN_SBC_TBL
+ 		 WHERE PVS_SBC_CONT_NO = #{saId}
+   		   AND PVS_MAC_ADDR = #{stbMac}
+	</select>
+
+	<!-- 알람받기 리스트 조회1 (채널코드가 없는 경우) -->
+	<select id="getAlertListInfo1" parameterType="GetNSAlertListRequestVO" resultType="GetNSAlertListResponseVO">
+	<if test="!pageNo.equals('A'.toString()) and !pageCnt.equals('A'.toString())">
+	SELECT * FROM (  
+	</if>
+		SELECT SRC_FLAG AS CHECK_VALUE, ALERT_IDX AS IDX, ALBUM_ID AS ADI_ALBUM_ID, CONTS_ID AS CONTSID, CONTENTS_NAME AS CONTENTSNAME, REG_UPDATE AS REGDATE,
+		       SUM(1) OVER(PARTITION BY 0) AS TOTALCNT, ROWNUM ORD_NUM 
+		  FROM (
+		     SELECT 10 SRC_FLAG, A.ALERT_IDX, A.CONTENTS_ID ALBUM_ID, A.CONTENTS_ID CONTS_ID, A.CONTENTS_NAME, A.REG_UPDATE 
+		       FROM (
+		          SELECT TRIM(NVL(ALERT_IDX, '')) ALERT_IDX, NVL(CONTENTS_ID, '') CONTENTS_ID,          
+		                 NVL(CONTENTS_NAME, '') CONTENTS_NAME, NVL(REG_UPDATE, '') REG_UPDATE 
+		            FROM PT_VO_ALERT   
+		           WHERE SA_ID = #{saId} AND MAC_ADDR = #{stbMac} ) A, 
+		            PT_VO_CATEGORY_MAP M, 
+		            PT_VO_CATEGORY R      
+		      WHERE A.CONTENTS_ID = M.CONTENTS_ID 
+		        AND M.CATEGORY_ID = R.CATEGORY_ID 
+		        AND R.CATEGORY_GB = #{contsGb}
+		      GROUP BY A.ALERT_IDX, A.CONTENTS_ID, A.CONTENTS_NAME, A.REG_UPDATE 
+		      ORDER BY CASE WHEN 'N' = #{orderGb} THEN '0' ELSE CONTENTS_NAME END, TO_NUMBER(ALERT_IDX) DESC 
+		) X
+	<if test="!pageNo.equals('A'.toString()) and !pageCnt.equals('A'.toString())">
+	) Q
+    WHERE ORD_NUM <![CDATA[>=]]> ((TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt})) - (TO_NUMBER(#{pageCnt}) - 1))
+      AND ORD_NUM <![CDATA[<=]]> (TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt})) 
+	</if>
+	</select>
+	
+	
+	
+	<!-- 알람받기 리스트 조회2  (채널코드가 있는 경우) -->
+	<select id="getAlertListInfo2" parameterType="GetNSAlertListRequestVO" resultType="GetNSAlertListResponseVO">
+	<if test="!pageNo.equals('A'.toString()) and !pageCnt.equals('A'.toString())">
+	SELECT * FROM (  
+	</if>
+		SELECT SRC_FLAG AS CHECK_VALUE, ALERT_IDX AS IDX, ALBUM_ID AS ADI_ALBUM_ID, CONTS_ID AS CONTSID, CONTENTS_NAME AS CONTENTSNAME, REG_UPDATE AS REGDATE,
+		       SUM(1) OVER(PARTITION BY 0) AS TOTALCNT, ROWNUM ORD_NUM
+ 		  FROM ( 
+       		  SELECT SUM(SRC_FLAG) SRC_FLAG, ALERT_IDX, ALBUM_ID, CONTS_ID, CONTENTS_NAME, REG_UPDATE 
+         		FROM ( 
+                  SELECT 10 SRC_FLAG, A.ALERT_IDX, A.CONTENTS_ID ALBUM_ID, A.CONTENTS_ID CONTS_ID, A.CONTENTS_NAME, A.REG_UPDATE 
+                    FROM (   
+                        SELECT TRIM(NVL(ALERT_IDX, '')) ALERT_IDX, NVL(CONTENTS_ID, '') CONTENTS_ID,          
+                             NVL(CONTENTS_NAME, '') CONTENTS_NAME, NVL(REG_UPDATE, '') REG_UPDATE 
+                          FROM PT_VO_ALERT   
+                         WHERE SA_ID = #{saId} ) A, 
+                         PT_VO_CATEGORY_MAP M, 
+                         PT_VO_CATEGORY R      
+                   WHERE A.CONTENTS_ID = M.CONTENTS_ID 
+                     AND M.CATEGORY_ID = R.CATEGORY_ID 
+                     AND R.CATEGORY_GB = #{contsGb}
+                   GROUP BY A.ALERT_IDX, A.CONTENTS_ID, A.CONTENTS_NAME, A.REG_UPDATE 
+                  UNION ALL 
+                  SELECT 20 SRC_FLAG, A.ALERT_IDX, B.ADI_ALBUM_ID ALBUM_ID, A.CONTENTS_ID CONTS_ID, A.CONTENTS_NAME, A.REG_UPDATE 
+                    FROM ( 
+                        SELECT TRIM(NVL(ALERT_IDX, '')) ALERT_IDX, NVL(CONTENTS_ID, '') CONTENTS_ID,          
+                             NVL(CONTENTS_NAME, '') CONTENTS_NAME, NVL(REG_UPDATE, '') REG_UPDATE 
+                          FROM PT_VO_ALERT   
+                         WHERE SA_ID = #{saId}  )A, 
+                         IMCSUSER.PT_LA_ALBUM_MST B,     
+                         IMCSUSER.PT_LA_PACKAGE_ASSET K, 
+                         PT_VO_CATEGORY_MAP M,           
+                         PT_VO_CATEGORY R                
+                   WHERE A.CONTENTS_ID = K.ASSET_ID      
+                     AND B.ADI_ALBUM_ID = K.ADI_ALBUM_ID 
+                     AND B.ADI_ALBUM_ID = M.CONTENTS_ID  
+                     AND M.CATEGORY_ID = R.CATEGORY_ID   
+                     AND R.CATEGORY_GB = #{contsGb}
+                   GROUP BY A.ALERT_IDX, B.ADI_ALBUM_ID, A.CONTENTS_ID, A.CONTENTS_NAME, A.REG_UPDATE 
+                ) X 
+          GROUP BY ALERT_IDX, ALBUM_ID, CONTS_ID, CONTENTS_NAME, REG_UPDATE 
+          ORDER BY CASE WHEN 'N' = #{orderGb} THEN '0' ELSE CONTENTS_NAME END, TO_NUMBER(ALERT_IDX) DESC 
+       ) Z 
+	<if test="!pageNo.equals('A'.toString()) and !pageCnt.equals('A'.toString())">
+	) Q
+    WHERE ORD_NUM <![CDATA[>=]]> ((TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt})) - (TO_NUMBER(#{pageCnt}) - 1))
+      AND ORD_NUM <![CDATA[<=]]> (TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt})) 
+	</if>
+	</select>
+	
+	
+	<!-- 카테고리 정보 조회 -->
+	<select id="getCateInfo" parameterType="GetNSAlertListRequestVO" resultType="CateInfoVO">
+	SELECT R.COUNT,                                                                            
+	       R.CATEGORY_ID AS PARENT_CAT_ID, R.UPDATE_DATE AS IS_UPDATE, R.CATEGORY_LEVEL AS CONTS_LEVEL, R.CHA_NUM AS CHA_NUM, R.CATE_INFO,             
+	       (SELECT MAX(CATEGORY_NAME) FROM PT_VO_CATEGORY WHERE CATEGORY_LEVEL = '1'           
+	         START WITH CATEGORY_ID = R.CATEGORY_ID                                            
+	         CONNECT BY PRIOR PARENT_CATEGORY_ID = CATEGORY_ID) AS BELONGING_NAME               
+	  FROM                                                                                     
+	  ( SELECT COUNT(*) COUNT,                                                                 
+	           MIN(P.CATEGORY_ID) CATEGORY_ID, MIN(Q.UPDATE_DATE) UPDATE_DATE,                 
+	           TO_CHAR(TO_NUMBER(MIN(Q.CATEGORY_LEVEL)) + 1) CATEGORY_LEVEL,                   
+	           MIN(NVL(Q.CHA_NUM, '')) CHA_NUM, NVL(MAX(K.CATE_INFO), '|') CATE_INFO           
+	      FROM PT_VO_CATEGORY_MAP P,                                                           
+	           PT_VO_CATEGORY Q,                                                               
+	           (SELECT C.CONTENTS_ID, NVL(C.CATEGORY_ID||'|'||C.SERIES_NO, '|') CATE_INFO      
+	              FROM PT_VO_CATEGORY_MAP C,                                                   
+	                   PT_VO_CATEGORY D                                                        
+	             WHERE C.CATEGORY_ID = D.CATEGORY_ID                                           
+	               AND C.CONTENTS_ID = #{adiAlbumId}
+	               AND D.SERIES_YN = 'Y'                                                       
+	               AND D.CATEGORY_GB = #{contsGb}
+	               AND NVL(D.NSC_GB, 'LTE') = 'LTE'                                            
+	               AND (D.TEST_SBC = 'N' OR D.TEST_SBC IS NULL OR D.TEST_SBC = '')             
+	               AND ROWNUM = 1) K                                                           
+	      WHERE P.CATEGORY_ID = Q.CATEGORY_ID                                                  
+	         AND P.CONTENTS_ID = #{adiAlbumId}
+	         AND Q.CATEGORY_GB = #{contsGb}
+	         AND P.CONTENTS_ID = K.CONTENTS_ID (+)                                             
+	  ) R
+	</select>
+	
+	
+	
+	<!-- 앨범정보 조회1 -->
+	<select id="getAlbumInfo1" parameterType="GetNSAlertListRequestVO" resultType="AlbumInfoVO">
+		SELECT A.ONAIR_DATE, A.RELEASE_DATE, A.SERIES_NO AS SERIES_DESC, NVL(A.IS_RH, 'N') REAL_HD, 
+		       TO_CHAR(ROUND(TO_NUMBER(NVL(A.POINT_SUM, '0')) / (CASE WHEN NVL(A.POINT_CNT, '0')= '0' THEN 1 ELSE TO_NUMBER(NVL(A.POINT_CNT, '0')) END), 0)) POINT, 
+		       MIN(NVL(C.RATING, '')) AS PR_INFO, MIN(C.DISPLAY_RUN_TIME) AS RUN_TIME, NVL(MAX(C.SUGGESTED_PRICE), '0') AS PRICE,
+		       MIN(C.PRODUCER) AS OVERSEER_NAME, MIN(C.ACTORS_DISPLAY) AS ACTOR, MIN(NVL(C.LICENSING_WINDOW_END, '29991231')) AS LICENSING_END, 
+		       CASE WHEN MAX(NVL(C.GENRE_LARGE, '')) = '방송' THEN 'T' ELSE 'V' END AS GENRE_GB,
+		       CASE WHEN MAX(NVL(C.CATEGORY, '')) = 'K' OR MAX(NVL(C.CATEGORY, '')) = 'F' THEN MAX(NVL(C.CATEGORY, '')) ELSE 'N' END AS FILTER_GB, 
+		       MIN(D.CREATE_DATE) AS IS_NEW, UPPER(NVL(MIN(D.AUDIO_TYPE), '')) AS IS_51CH, MAX(D.HDCONTENT) AS HDCONTENT, NVL(MIN(D.IS_3D), 'N') AS IS_3D, 
+			   MAX(CASE WHEN NVL(C.DUBBING, 'N') = 'Y' THEN 'D' WHEN NVL(D.SMI_YN, 'N')='Y' AND NVL(D.SMI_IMP_YN, 'N') ='Y' THEN 'Y' ELSE 'N' END) AS CAPTION_YN, 
+		       CASE WHEN #{parentCatId} = 'X' THEN MAX(A.SERVICE_ICON_UFLIX) ELSE MAX(A.SERVICE_ICON_HDTV) END AS SERVICE_ICON,
+		       MIN(P.CONTENT_VALUE) AS IMG_FILE_NAME, MAX(Z.COM_CD) AS TERR_CH , A.PREVIEW_FLAG AS RESERVED_TYPE, 
+		       C.SUGGESTED_PRICE, A.RESERVED_PRICE, A.RESERVED_DATE 
+		  FROM IMCSUSER.PT_LA_ALBUM_MST A,
+		       (SELECT ADI_ALBUM_ID, ADI_PRODUCT_ID FROM IMCSUSER.PT_LA_PACKAGE_ASSET WHERE ASSET_ID = #{contsId}) B, 
+		       IMCSUSER.PT_LA_TITLE_ASSET C,
+		       IMCSUSER.PT_LA_CONTENT_ASSET D,
+		       (SELECT #{adiAlbumId} ALBUM_ID, MIN(CONTENT_VALUE) CONTENT_VALUE 
+		          FROM IMCSUSER.PT_LA_POSTER_ASSET 
+		         WHERE ADI_PRODUCT_ID IN (SELECT ADI_PRODUCT_ID FROM IMCSUSER.PT_LA_PACKAGE_ASSET WHERE ASSET_ID = #{contsId})) P, 
+		       (SELECT COM_CD, COM_NAME FROM IMCSUSER.PT_CD_COM_CD WHERE GRP_ID = 'PUBLICCH') Z 
+		 WHERE A.ADI_ALBUM_ID = #{adiAlbumId}
+		   AND A.ADI_ALBUM_ID = B.ADI_ALBUM_ID
+		   AND B.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID
+		   AND B.ADI_PRODUCT_ID = D.ADI_PRODUCT_ID
+		   AND A.ADI_ALBUM_ID = P.ALBUM_ID (+)
+		   AND C.CATEGORY = Z.COM_NAME (+)
+		 GROUP BY A.ONAIR_DATE, A.RELEASE_DATE, A.SERIES_NO, A.IS_RH, A.POINT_SUM, A.POINT_CNT, A.PREVIEW_FLAG, C.SUGGESTED_PRICE, A.RESERVED_PRICE, A.RESERVED_DATE
+	</select>
+	
+	
+	<!-- 앨범정보 조회2 -->
+	<select id="getAlbumInfo2" parameterType="GetNSAlertListRequestVO" resultType="AlbumInfoVO">
+		SELECT A.ONAIR_DATE, A.RELEASE_DATE, A.SERIES_NO AS SERIES_DESC, NVL(A.IS_RH, 'N') REAL_HD, 
+		       TO_CHAR(ROUND(TO_NUMBER(NVL(A.POINT_SUM, '0')) / (CASE WHEN NVL(A.POINT_CNT, '0')= '0' THEN 1 ELSE TO_NUMBER(NVL(A.POINT_CNT, '0')) END), 0)) POINT, 
+		       MIN(NVL(C.RATING, '')) AS PR_INFO, MIN(C.DISPLAY_RUN_TIME) AS RUN_TIME, NVL(MAX(C.SUGGESTED_PRICE), '0') AS PRICE,
+		       MIN(C.PRODUCER) AS OVERSEER_NAME, MIN(C.ACTORS_DISPLAY) AS ACTOR, MIN(NVL(C.LICENSING_WINDOW_END, '29991231')) AS LICENSING_END, 
+		       CASE WHEN MAX(NVL(C.GENRE_LARGE, '')) = '방송' THEN 'T' ELSE 'V' END AS GENRE_GB,
+		       CASE WHEN MAX(NVL(C.CATEGORY, '')) = 'K' OR MAX(NVL(C.CATEGORY, '')) = 'F' THEN MAX(NVL(C.CATEGORY, '')) ELSE 'N' END AS FILTER_GB, 
+		       MIN(D.CREATE_DATE) AS IS_NEW, UPPER(NVL(MIN(D.AUDIO_TYPE), '')) AS IS_51CH, MAX(D.HDCONTENT) AS HDCONTENT, NVL(MIN(D.IS_3D), 'N') AS IS_3D, 
+		       MAX(CASE WHEN NVL(C.DUBBING, 'N') = 'Y' THEN 'D' WHEN NVL(D.SMI_YN, 'N')='Y' AND NVL(D.SMI_IMP_YN, 'N') ='Y' THEN 'Y' ELSE 'N' END) AS CAPTION_YN, 
+		       CASE WHEN #{parentCatId} = 'X' THEN MAX(A.SERVICE_ICON_UFLIX) ELSE MAX(A.SERVICE_ICON_HDTV) END AS SERVICE_ICON,
+		       MIN(P.CONTENT_VALUE) AS IMG_FILE_NAME, MAX(Z.COM_CD) AS TERR_CH
+		       ,A.PREVIEW_FLAG AS RESERVED_TYPE, C.SUGGESTED_PRICE, A.RESERVED_PRICE, A.RESERVED_DATE 
+		  FROM IMCSUSER.PT_LA_ALBUM_MST A,         
+		       IMCSUSER.PT_LA_PACKAGE_ASSET B,     
+		       IMCSUSER.PT_LA_TITLE_ASSET C,       
+		       IMCSUSER.PT_LA_CONTENT_ASSET D,     
+		       (SELECT #{adiAlbumId} ALBUM_ID, MIN(CONTENT_VALUE) CONTENT_VALUE 
+		          FROM IMCSUSER.PT_LA_POSTER_ASSET 
+		         WHERE ADI_PRODUCT_ID IN (SELECT ADI_PRODUCT_ID FROM IMCSUSER.PT_LA_PACKAGE_ASSET WHERE NSC_ALBUM_ID = #{adiAlbumId})) P, 
+		       (SELECT COM_CD, COM_NAME FROM IMCSUSER.PT_CD_COM_CD WHERE GRP_ID = 'PUBLICCH') Z 
+		 WHERE A.ADI_ALBUM_ID = #{adiAlbumId}        
+		   AND A.ADI_ALBUM_ID = B.NSC_ALBUM_ID     
+		   AND B.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID 
+		   AND B.ADI_PRODUCT_ID = D.ADI_PRODUCT_ID 
+		   AND A.ADI_ALBUM_ID = P.ALBUM_ID (+)     
+		   AND C.CATEGORY = Z.COM_NAME (+)         
+		 GROUP BY A.ONAIR_DATE, A.RELEASE_DATE, A.SERIES_NO, A.IS_RH, A.POINT_SUM, A.POINT_CNT, A.PREVIEW_FLAG, C.SUGGESTED_PRICE, A.RESERVED_PRICE, A.RESERVED_DATE 
+	</select>
+	
+	
+	<!-- 상품타입 정보 조회 -->
+	<select id="getProductType" parameterType="GetNSAlertListRequestVO" resultType="String">
+		SELECT NVL(MIN(PRODUCT_TYPE), 'X') PRODUCT_TYPE
+		  FROM IMCSUSER.PT_PD_PACKAGE A,
+		       IMCSUSER.PT_PD_PACKAGE_DETAIL B
+		 WHERE A.PRODUCT_ID = B.PRODUCT_ID
+		 <if test="checkValue.equals('20'.toString())">
+		   AND B.CONTENTS_ID = #{contsId}
+		 </if>
+		 <if test="!checkValue.equals('20'.toString())">
+		   AND B.CONTENTS_ID IN (SELECT ASSET_ID FROM IMCSUSER.PT_LA_PACKAGE_ASSET WHERE NSC_ALBUM_ID = #{adiAlbumId})
+		 </if>
+	</select>
+	
+	
+	<!-- 장르정보가 T일 경우의 이미지파일명 조회 -->
+	<select id="getImageFileName" parameterType="GetNSAlertListRequestVO" resultType="StillImageVO">
+		SELECT 'http:'||REPLACE(NVL(A.MAIN_IMG_URL, ''), '\', '/') IMG_URL,
+		        A.MAIN_IMG_FILE_NAME AS IMG_FILE_NAME,
+		        A.IMG_FLAG
+		   FROM IMCSUSER.PT_LA_ALBUM_IMG A
+		  WHERE A.ADI_ALBUM_ID = #{adiAlbumId}
+		    AND A.IMG_FLAG = 'N'
+		  ORDER BY TO_NUMBER(ADI_ALBUM_SEQ) DESC
+	</select>
+	
+	
+	<!-- 장르정보가 T가 아닌 경우의 이미지파일명 조회  -->
+	<select id="getStillFileName" parameterType="GetNSAlertListRequestVO" resultType="String">
+	   SELECT MAX(A.CONTENT_VALUE) AS IMG_FILE_NAME
+		 FROM IMCSUSER.PT_LA_POSTER_ASSET A,
+		      IMCSUSER.PT_LA_PACKAGE_ASSET B
+		WHERE A.ADI_PRODUCT_ID = B.ADI_PRODUCT_ID
+		  AND B.NSC_ALBUM_ID   = #{adiAlbumId}
+		  AND A.POSTER_TYPE    = 'P'
+	</select>
+	
+</mapper> 

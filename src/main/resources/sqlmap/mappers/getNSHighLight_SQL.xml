@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSHighLight.GetNSHighLightDao">
+
+	<!-- 컨텐츠 상세정보 조회 -->
+	<select id="getHighlightAlbumInfo" resultType="GetNSHighLightAlbumVO">
+		SELECT A.ALBUM_NAME AS ALBUM_NM, A.ONAIR_DATE,
+		       SUBSTRB(NVL(B.SUMMARY_LONG, ''), 1, 1024) AS SYSNOPSIS,
+		       SUBSTR(C.RUN_TIME, 1, 6) AS RUN_TIME
+		  FROM IMCSUSER.PT_LA_ALBUM_INFO A,
+		       IMCSUSER.PT_LA_ALBUM_PLATFORM B,
+		       IMCSUSER.PT_LA_ALBUM_SUB C
+		 WHERE A.ALBUM_ID = #{album_id}
+		   AND A.ALBUM_ID = B.ALBUM_ID
+		   AND A.ALBUM_ID = C.ALBUM_ID
+		   AND B.SCREEN_TYPE = 'N'
+	</select>
+	
+	<!-- 스틸이미지명 조회 -->
+	<select id="getStillImage" resultType="StillImageVO">
+		SELECT 'http:'||REPLACE(NVL(A.MAIN_IMG_URL, ''), '\', '/') IMG_URL,
+		       A.MAIN_IMG_FILE_NAME AS IMG_FILE_NAME,
+		       A.IMG_FLAG
+		  FROM IMCSUSER.PT_LA_ALBUM_IMG A
+		 WHERE A.ADI_ALBUM_ID = #{album_id}
+		   AND A.IMG_FLAG = 'N'
+		 ORDER BY TO_NUMBER(ADI_ALBUM_SEQ)
+	</select>	
+	
+</mapper>

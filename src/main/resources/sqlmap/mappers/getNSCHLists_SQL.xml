@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSCHLists.GetNSCHListsDao">
+	
+	<!-- 노드 정보 조회 -->
+	<select id="getNode" resultType="ComNodeVO" >
+		SELECT SUB_NODE_CD AS NODE_CD,
+		       RANGE_IP_CD AS RBASE_CODE 
+<!-- 		  FROM IMCSUSER.PT_LV_RANGE_IP_INFO --> 
+ 		  FROM IMCSUSER.PT_LV_RANGE_IP_CHNL
+		 WHERE RANGE_IP_CD = #{baseCondi}
+		   AND NVL(USE_YN, 'Y') = 'Y'
+	</select>
+	
+	<!-- 검수 STB 여부 조회 -->
+	<select id="testSbc" resultType="ComTestSbcVO" >
+		SELECT CASE WHEN TEST_SBC = 'Y' THEN TEST_SBC ELSE 'N' END AS TEST_SBC,
+		       NVL(HJDONG_NO, 'X') AS HJDONG_NO 
+		  FROM PT_VO_CUSTOM_ID 
+		 WHERE SA_ID = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	<!-- 행정동 코드 조회 -->
+	<select id="getNodeHjd" resultType="String" >
+		SELECT B.STB_PLAY_IP1 AS DONG_YN             
+ 		  FROM IMCSUSER.PT_LV_NODE_INFO B,
+			   IMCSUSER.PT_LV_DONG_INFO C        
+		 WHERE C.DONG_CD = #{hjdongNo}
+		   AND B.SUB_NODE_CD = C.NSC_SUB_NODE_CD
+	</select>
+	
+	<!-- 메인페이지 채널정보 조회 -->
+	<select id="getNSChnlLists" resultType="GetNSCHListsResponseVO" >
+		
+		<![CDATA[			
+			SELECT SERVICE_ID service_id, CHNL_NAME service_name, CHNL_ENG_NAME service_eng_name, 
+				 STB_PLAY_IP1 live_ip1, M3U8_FILE1 live_file_name1, 
+				 STB_PLAY_IP2 live_ip2, M3U8_FILE1 live_file_name2,
+			     STB_PLAY_IP3 live_ip3, M3U8_FILE1 live_file_name3, 
+			     STB_PLAY_IP1 live_ip4, M3U8_FILE2 live_file_name4, 
+			     STB_PLAY_IP2 live_ip5, M3U8_FILE2 live_file_name5, 
+			     STB_PLAY_IP3 live_ip6, M3U8_FILE2 live_file_name6,  
+			     ICON_URL img_url, ICON_FILE_NAME img_file_name, CHANNELNUMBER channel_no, SUB_NODE_PORT1 live_port, 
+			     CDN_LOCAL_TYP vod_server1_type, CDN_NEAR_TYP vod_server2_type, CDN_CENTER_TYP vod_server3_type, POOQ_YN pooq_yn
+			FROM (
+			      SELECT DISTINCT A.SERVICE_ID ,
+			             A.CHNL_NAME ,
+			             A.CHNL_ENG_NAME ,
+			             E.SORT_NO ,
+			             A.SORT_NO ,
+			             B.STB_PLAY_IP1,
+			             B.STB_PLAY_IP2 ,
+			             B.STB_PLAY_IP3 ,
+			             decode(B.CDN_LOCAL_TYP, '1', NVL(A.M3U8_FILE1, ''), '2', NVL(A.M3U8_FILE1_N, '')) M3U8_FILE1,
+			             decode(B.CDN_LOCAL_TYP, '1', NVL(A.M3U8_FILE2, ''), '2', NVL(A.M3U8_FILE2_N, '')) M3U8_FILE2,
+			             'http:'||REPLACE(A.ICON_URL,'\','/') ICON_URL,
+			             A.ICON_FILE_NAME,
+			             A.CHANNELNUMBER,
+			             B.SUB_NODE_PORT1,
+			             B.CDN_LOCAL_TYP,
+			             B.CDN_NEAR_TYP,
+			             B.CDN_CENTER_TYP,
+			             decode(NVL(A.POOQ_YN , 'N'), 'Y', 'N', 'Y') POOQ_YN
+		  ]]>
+		  <if test='baseGb == "N"'>                                        
+		  		   FROM IMCSUSER.PT_CD_PLAY_CHNL A,
+		  		   		IMCSUSER.PT_LV_NODE_INFO B,
+		  		   		IMCSUSER.PT_LV_DONG_INFO C,
+		  		   		IMCSUSER.PT_CD_ONECLICK_CHNL E
+		  </if>
+		  <if test='baseGb != "N"'>                                        
+		  		   FROM IMCSUSER.PT_CD_PLAY_CHNL A,
+		  		   		IMCSUSER.PT_LV_NODE_INFO B,
+		  		   		IMCSUSER.PT_LV_RANGE_IP_CHNL C,
+		  		   		IMCSUSER.PT_CD_ONECLICK_CHNL E
+		  </if>
+		  <if test='nscType == "PAD"'>                                        
+		  		   WHERE A.FILTERING_CODE in ('8', '9', '10', '11', '12', '13', '14', '15')
+		  		     AND E.SERVICE_ID = A.SERVICE_ID
+		  </if>
+		  <if test='nscType != "PAD"'>                                        
+		  		   WHERE A.FILTERING_CODE in ('1', '3', '5', '7', '9', '11', '15')
+		  		     AND E.SERVICE_ID = A.SERVICE_ID
+		  </if>
+		   <if test='testSbc == "N"'>
+		  <![CDATA[                                                                  
+		  			 AND A.SORT_NO <> '999'
+		  ]]>   
+		  </if>
+		  <if test='baseGb == "N"'>                                        
+		  		     AND B.sub_node_cd = C.nsc_sub_node_cd
+		  		   	 AND C.dong_cd = #{hjdongNo} 
+		  		   	 AND (NVL(A.YOUTH_YN, '2') = '2' or NVL(A.YOUTH_YN, '2') = #{youthYnCom} )
+		  </if>
+		  <if test='baseGb != "N"'>                                        
+		  		     AND C.sub_node_cd = #{nodeCd}
+		  		   	 AND C.RANGE_IP_CD = #{rbaseCode}
+		  		   	 AND NVL(C.USE_YN, 'Y') = 'Y'
+		  		   	 AND B.sub_node_cd = C.sub_node_cd
+		  		   	 AND (NVL(A.YOUTH_YN, '2') = '2' or NVL(A.YOUTH_YN, '2') = #{youthYnCom})
+		  </if>
+		 			 ORDER BY TO_NUMBER(E.SORT_NO), TO_NUMBER(A.SORT_NO), A.CHANNELNUMBER, A.SERVICE_ID )
+		
+	</select>	
+		
+</mapper>
+	
+	
+	

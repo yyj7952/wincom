@@ -1,0 +1,23 @@
+﻿[jeus@himcs01:/home/jeus/jeus7/bin]$ cat jdown
+echo "$ jeusadmin -host $DAS_URL -domain $DOMAIN_NAME -f $ENCODE_FILE "stopdomain" "
+jeusadmin -host $DAS_URL -domain $DOMAIN_NAME -f $ENCODE_FILE "stopdomain"
+echo
+sleep 5
+echo
+echo "$ nmdown"
+nmdown
+echo
+sleep 10
+echo "$ jeusadmin -host $DAS_URL -domain $DOMAIN_NAME -f $ENCODE_FILE "si" "
+jeusadmin -host $DAS_URL -domain $DOMAIN_NAME -f $ENCODE_FILE "si"
+echo "$ jeusadmin -host $DAS_URL -domain $DOMAIN_NAME -f $ENCODE_FILE "nodelist" "
+jeusadmin -host $DAS_URL -domain $DOMAIN_NAME -f $ENCODE_FILE "nodelist"
+echo
+echo "$ dsdown"
+dsdown
+echo
+sleep 5
+echo "$ ps -ef | grep "java" | grep $LOGNAME "
+ps -ef | grep "java" | grep $LOGNAME
+You have new mail in /var/spool/mail/jeus
+[jeus@himcs01:/home/jeus/jeus7/bin]$ 

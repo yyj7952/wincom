@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSMakePrefIP.GetNSMakePrefIPDao">
+	
+	<!-- IPv6 PrefixIP 정보 조회 -->
+	<select id="getPrefixIP" parameterType="GetNSMakePrefIPRequestVO" resultType="GetNSMakePrefIPResponseVO" >
+		SELECT RANGE_IP_CD || '|' || 'INTERNET=' || regexp_substr(INTERNET64_PREFIX, '[^/]+', 1,1,'i') || '|' || 'UPLUS_HDTV=' || regexp_substr(HDTV64_PREFIX, '[^/]+', 1,1,'i') AS result_value
+		  FROM PVSUSER.PV_CDNINFO_IP_TBL
+	</select>
+
+</mapper> 

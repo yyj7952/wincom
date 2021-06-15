@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSSubCount.GetNSSubCountDao">
+
+	<resultMap type="HashMap" id="myUserInfo">
+		<result property="test_sbc" column="TEST_SBC" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="view_flag" column="VIEW_FLAG" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<!-- 가입자 정보 가져오기 검수 여부 -->
+	<select id="getUserInfo" resultMap="myUserInfo" parameterType="GetNSSubCountRequestVO">		
+		SELECT
+			DECODE(NVL(test_sbc, 'N'), 'Y', 'Y', 'N') AS test_sbc
+			, DECODE(NVL(test_sbc, 'N'), 'Y', 'T', 'V') AS view_flag
+		FROM PT_VO_CUSTOM_ID
+		WHERE sa_id = #{saId}
+		AND mac_addr = #{stbMac}
+	</select>
+	
+	<!-- 요청한 카테고리의 하위 카테고리 컨텐츠 수 가져오기 -->
+	<select id="getCategorySubContsCnt" resultType="java.lang.Integer" parameterType="GetNSSubCountRequestVO">		
+		SELECT
+			COUNT(*) AS cnt
+		FROM (
+			SELECT
+				category_id
+			FROM PT_VO_CATEGORY
+			WHERE NVL(test_sbc, 'N') IN ('N', #{testSbc})
+			START WITH category_id = #{catId}
+			CONNECT BY PRIOR category_id = parent_category_id
+		) A, PT_VO_CATEGORY_MAP B
+		WHERE A.category_id = B.category_id
+		AND NVL(B.viewing_flag, 'V') IN ('V', #{viewFlag})
+	</select>
+	
+	
+</mapper> 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

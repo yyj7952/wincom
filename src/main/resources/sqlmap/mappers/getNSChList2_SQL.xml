@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="kr.co.wincom.imcs.api.getNSChList2.GetNSChList2Dao">
+	
+	<resultMap type="HashMap" id="CjChChnl">
+		<result property="CJ_CHNL_URL" column="CJ_CHNL_URL" javaType="String"/>
+		<result property="CJ_HEVC_CHNL_URL" column="CJ_HEVC_CHNL_URL" javaType="String"/>
+	</resultMap>
+	
+	<!-- 테스트 가입자 여부 조회 -->
+	<select id="getTestSbc" resultType="String" >
+		SELECT CASE WHEN TEST_SBC = 'Y' THEN TEST_SBC ELSE 'N' END TEST_SBC 
+		  FROM PT_VO_CUSTOM_ID 
+		 WHERE SA_ID = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	
+	<!-- 가입 상품 조회 -->
+	<select id="getmProdId" resultType="String" >
+		SELECT A.PRODUCT_ID M_PROD_ID 
+		  FROM IMCSUSER.PT_PD_PACKAGE A, PT_VO_CUSTOM_PRODUCT B 
+		 WHERE A.PRODUCT_ID = B.PRODUCTCD
+		   AND A.PRODUCT_KIND = '1'
+		   AND B.SA_ID = #{saId}
+		   AND B.MAC_ADDR = #{stbMac}
+		   AND NVL(A.UFLIX_PROD_YN, 'N') = 'N'
+		   AND A.NSC_PROD_KIND = '1'
+	</select>
+	
+</mapper>

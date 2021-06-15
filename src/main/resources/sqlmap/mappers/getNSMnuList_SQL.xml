@@ -1,0 +1,487 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="kr.co.wincom.imcs.api.getNSMnuList.GetNSMnuListDao">
+	
+	<resultMap type="HashMap" id="mgetTestSbc">
+		<result property="TEST_SBC" column="TEST_SBC" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="CURRENT_DATE" column="CURRENT_DATE" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mgetTestSbcMake">
+		<result property="TEST_SBC" column="TEST_SBC" javaType="String" typeHandler="EmptyStringIfNull"/>		
+		<result property="VIEW_FLAG2" column="VIEW_FLAG2" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="CURRENT_DATE" column="CURRENT_DATE" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mVodVersion">
+		<result property="VERSION" column="VERSION" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="P_VERSION" column="P_VERSION" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="PP_VERSION" column="PP_VERSION" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+
+	<resultMap type="HashMap" id="mCatLevel">
+		<result property="CATEGORY_LEVEL" column="CATEGORY_LEVEL" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="NSC_GB" column="NSC_GB" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="CATEGORY_NAME" column="CATEGORY_NAME" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+
+	<resultMap type="HashMap" id="mCatLevel2">
+		<result property="CATEGORY_LEVEL" column="CATEGORY_LEVEL" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="NSC_GB" column="NSC_GB" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+
+	<resultMap type="HashMap" id="mParentVersion">
+		<result property="VOD_VERSION" column="VOD_VERSION" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="P_VOD_VERSION" column="P_VOD_VERSION" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="PP_VOD_VERSION" column="PP_VOD_VERSION" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mStillImg">
+		<result property="MAIN_IMG_FILE_NAME" column="MAIN_IMG_FILE_NAME" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="IMG_FLAG" column="IMG_FLAG" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mM3u8Info">
+		<result property="M3U8_ORDER" column="M3U8_ORDER" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="M3U8_FILE_1" column="M3U8_FILE_1" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="M3U8_FILE_2" column="M3U8_FILE_2" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+
+	<resultMap type="HashMap" id="mLastInfo">
+		<result property="ACTORS_DISPLAY" column="ACTORS_DISPLAY" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="RATING_CD" column="RATING_CD" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="PRODUCER" column="PRODUCER" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="COM_CD" column="COM_CD" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+
+	<resultMap type="HashMap" id="mSubLevelInfo">
+		<result property="PAR_YN" column="PAR_YN" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="SUB_CNT" column="SUB_CNT" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+
+	<resultMap type="HashMap" id="mAlbumInfo">
+		<result property="ONAIR_DATE" column="ONAIR_DATE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="RATING_CD" column="RATING_CD" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="ACTORS_DISPLAY" column="ACTORS_DISPLAY" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="PRODUCER" column="PRODUCER" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="SUGGESTED_PRICE" column="SUGGESTED_PRICE" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<!-- 테스트 가입자 여부 조회 -->
+	<select id="getTestSbc" resultMap="mgetTestSbc" >
+		SELECT CASE WHEN TEST_SBC = 'Y' THEN TEST_SBC ELSE 'N' END TEST_SBC, to_char(sysdate, 'YYYYMMDD') as CURRENT_DATE
+		  FROM PT_VO_CUSTOM_ID
+		 WHERE SA_ID = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	<select id="getTestSbcMake" resultMap="mgetTestSbcMake" >
+		SELECT case when test_sbc = 'Y' then TEST_SBC else 'N' end test_sbc, case when test_sbc = 'Y' then 'T' else 'V' end VIEW_FLAG2
+		       , to_char(sysdate, 'YYYYMMDD') as CURRENT_DATE
+          FROM PT_VO_CUSTOM_ID
+		 WHERE SA_ID = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	<!-- 카테고리ID의 카테고리 level 확인 -->
+	<select id="getCateLevel" resultMap="mCatLevel">
+		SELECT TO_CHAR(TO_NUMBER(category_level)+1) CATEGORY_LEVEL, NVL(NSC_GB, 'LTE') NSC_GB, CATEGORY_NAME
+		  FROM PT_VO_CATEGORY
+		 WHERE CATEGORY_ID = #{catId}
+	</select>
+	
+	<select id="getCateLevelMake" resultMap="mCatLevel2">
+		SELECT TO_CHAR(TO_NUMBER(category_level)+1) CATEGORY_LEVEL, NVL(NSC_GB, 'LTE') NSC_GB
+		  FROM PT_VO_CATEGORY
+		 WHERE CATEGORY_ID = #{catId}
+	</select>
+	
+	<!-- 하위카테고리부터 순차적으로 연결된 상위 카테고리중에서 2레벨의 카테고리 정보 SELECT -->
+	<select id="getCateId" resultType="String">
+		SELECT X.CATEGORY_ID
+		  FROM PT_VO_CATEGORY X,
+		      (select category_id from pt_vo_category WHERE CATEGORY_GB = 'NSC'
+					  START WITH category_id = #{catId}
+					  CONNECT BY category_id = PRIOR parent_category_id
+				) Y
+		WHERE X.category_id = Y.category_id
+		  AND X.CATEGORY_LEVEL = '2'
+	</select>
+	
+	<!-- 부모카테고리 버전 가져오기 -->
+	<select id="getParentVersion" resultMap="mParentVersion">
+		SELECT vod_version, p_vod_version, pp_vod_version
+		  FROM PT_VO_I20_VERSION
+		 WHERE CATEGORY_ID = #{parentCategory}
+	</select>
+
+	<!-- 카테고리 버전 가져오기 -->
+	<select id="getParentVersion2" resultMap="mParentVersion">
+		SELECT vod_version, p_vod_version, pp_vod_version
+		  FROM PT_VO_I20_VERSION
+		 WHERE CATEGORY_ID = #{catId}
+	</select>
+	
+	<select id="getNSMnuList" resultType="GetNSMnuListResponseVO" timeout="60">
+		 SELECT 
+		  		result_type, category_id, category_name,
+		  		case when result_type = 'CAT' and recommend_id is not null
+		  		then case when category_flag = 'A' then 'APP'
+		  		     	  when category_flag = 'R' then 'RCM'
+		  		     else category_type end
+		  		else category_type end
+		  		as category_type, 
+		  		image_file_name, parent_category_id, auth_yn, 
+		  		category_level, bill_flag album_bill_flag, rating, run_time run_time, new is_new, sort_no, close_yn, service_icon, 
+		  		onair_date, series_desc, terr_ch, last_album_id, ord_num,SUB_FILE_NAME, SYNOPSIS, VR_TYPE, 
+				RELEASE_DATE, ACTORS_DISPLAY, PRODUCER, SUB_TITLE, YEAR, NFC_CODE, VOD_TYPE, PLAYER, STUDIO, WATCHA_POINT
+				, special_cat_type, category_sub_name, animaiton_file,
+				case when result_type = 'CAT' and recommend_id is not null
+		  		then case when category_flag = 'A' then recommend_id
+		  		     	  when category_flag = 'R' then recommend_id
+		  		     else '' end
+		  		else '' end
+		  		as recommend_id
+				, kids_grade, category_flag, main_property, sub_property
+				, GENRE_UXTEN
+		    FROM (SELECT result_type result_type, category_id, category_name category_name, category_type category_type, 
+		                  image_file_name image_file_name, parent_category_id parent_category_id, auth_yn auth_yn, 
+		                 category_level category_level, bill_flag bill_flag,   rating_cd rating, run_time run_time, 
+		                  new new, sort_no sort_no, 
+		                  close_yn close_yn, 
+		                  service_icon service_icon, 
+		                 onair_date  onair_date, ''  series_desc,   terr_ch terr_ch, 
+		                 last_album_id, 0 ord_num 
+		                 ,SUB_FILE_NAME, '' AS SYNOPSIS, '' AS VR_TYPE 
+						  , case when A.category_type = 'SER' then (select release_date from imcsuser.pt_la_album_info where album_id = A.last_album_id) else '' end AS RELEASE_DATE, '' AS ACTORS_DISPLAY, '' AS PRODUCER, '' AS SUB_TITLE, '' AS YEAR, '' AS NFC_CODE, '' AS VOD_TYPE, 
+						  '' AS PLAYER, '' AS STUDIO, '' AS WATCHA_POINT
+						   <if test='orderGb == "W"'>
+					   	   		, 0 AS WATCH_RANK
+					   	   </if>
+					   	 , special_cat_type
+                         , category_sub_name
+                         , animaiton_file
+                         , recommend_id
+                         , '' as kids_grade
+                         , category_flag
+                         , main_property
+                         , sub_property
+                         , '' as GENRE_UXTEN
+		            FROM (SELECT 
+		                         'CAT' result_type, 
+		                         A.category_id  category_id, 
+		                         A.category_name category_name, 
+		                         case when A.series_yn = 'Y' then 'SER' when A.promotion_yn = 'Y' then 'PMO' else NVL(A.category_type, '') end category_type, 
+		                         A.IMG_FILE_NAME image_file_name, 
+		                         A.parent_category_id parent_category_id, 
+		                         NVL(A.auth_yn, 'N') auth_yn, 
+		                         A.category_level category_level, 
+		                         '' bill_flag, 
+		                         '' rating_cd, 
+		                         '' run_time, 
+		                         substr(A.create_date, 1, 8) new, 
+		                         A.sort_no sort_no, 
+		                         NVL(A.close_yn, 'N') close_yn, 
+		                         case when nvl(A.nsc_gb, 'LTE') = 'UFX' then A.service_icon_uflix else A.service_icon_hdtv end service_icon, 
+		                         '' terr_ch, 
+		                         '' onair_date, 
+		                         (SELECT min(contents_id) 
+		                            FROM pt_vo_category_map 
+		                           WHERE category_id = A.category_id 
+		                             AND rank_no = (SELECT decode(nvl(min(g.close_yn), 'N'), 'Y', max(m.rank_no), min(m.rank_no)) 
+		                                              FROM pt_vo_category_map m, pt_vo_category g, IMCSUSER.PT_LA_ALBUM_INFO R, IMCSUSER.PT_LA_ASSET_INFO W 
+		                                             WHERE m.category_id = A.category_id  AND m.category_id = g.category_id 
+		                                               AND R.album_id = m.contents_id 
+		                                               AND R.ALBUM_ID = W.ALBUM_ID 
+		                                               AND W.SCREEN_TYPE = 'N' 
+		                                               AND (nvl(r.pre_mapping_yn, 'N') = 'N' or (nvl(r.pre_mapping_yn, 'N') = 'Y' AND nvl(m.viewing_flag, 'N') in ('V', #{viewFlag1}, #{viewFlag2})) or (nvl(w.RESERVED_FLAG,'N') in ('R', 'P', 'X'))) 
+		                                          )) last_album_id 
+		                         ,'img_cat_server'||A.SUB_FILE_NAME SUB_FILE_NAME
+		                         , ACTORS_DISPLAY as special_cat_type
+		                         , THUMBNAIL_FILE_NAME as category_sub_name
+		                         , wide_file_name as animaiton_file
+		                         , genre as recommend_id
+		                         , caption_yn as category_flag
+		                         , '' main_property
+                                 , '' sub_property
+		                    FROM PT_VO_CATEGORY A 
+		                   WHERE (A.test_sbc = #{testSbc} or A.test_sbc = 'N' or A.test_sbc is null or A.test_sbc = '') 
+		                     AND A.category_gb = 'NSC' 
+		                     AND NVL(A.NSC_GB, 'LTE') IN ('LTE', 'UFX', 'KID') 
+		 					  AND A.PARENT_CATEGORY_ID = trim(#{catId}) 
+		                ) A 
+		          UNION ALL 
+		          SELECT X.a0, X.a1 category_id, X.a2 category_name, X.a3, X.a5, X.a6, X.a7, X.a9 category_level, X.a10, 
+		                 X.a11, X.a12, X.a14, 
+		                 X.a21 sort_no, '' cloase_yn, X.a32, 
+		                 X.a37, X.a38, X.a33, '' last_album_id, 1 ord_num 
+		                 ,X.SUB_FILE_NAME SUB_FILE_NAME, X.SYNOPSIS AS SYNOPSIS, X.VR_TYPE, 
+						  X.RELEASE_DATE, X.ACTORS_DISPLAY, X.PRODUCER, X.SUB_TITLE, X.YEAR, X.NFC_CODE, X.VOD_TYPE, X.PLAYER, X.STUDIO, X.WATCHA_POINT
+						   <if test='orderGb == "W"'>
+					   	   		, X.WATCH_RANK
+					   	   </if>
+					   	 , '' as special_cat_type
+                         , '' as category_sub_name
+                         , '' as animaiton_file
+                         , '' as recommend_id
+                         , X.kids_grade
+                         , '' as category_flag
+                         , (select ${@kr.co.wincom.imcs.common.util.GlobalCom@getDBMconUser()}.UF_GET_ALBUM_PROPERTY(X.a1, 'P') from dual) main_property
+                         , (select ${@kr.co.wincom.imcs.common.util.GlobalCom@getDBMconUser()}.UF_GET_ALBUM_PROPERTY(X.a1, 'C') from dual) sub_property
+                         , X.GENRE_UXTEN
+		            FROM (SELECT max(a0) a0, a1, max(a2) a2, max(a3) a3, max(a5) a5, max(a6) a6, max(a7) a7, max(a9) a9, max(a10) a10, max(a11) a11, max(a12) a12, 
+		                         max(a14) a14, max(a21) a21, max(a22) a22, max(a24) a24, 
+		                         max(a32) a32, max(a33) a33, max(a37) a37, max(a38) a38, 
+		                         max(X.a45)  SUB_FILE_NAME, MAX(SYNOPSIS) AS SYNOPSIS, MAX(VR_TYPE) AS VR_TYPE, 
+								  max(X.RELEASE_DATE) AS RELEASE_DATE, max(X.ACTORS_DISPLAY) AS ACTORS_DISPLAY, max(X.PRODUCER) PRODUCER, max(X.SUB_TITLE) SUB_TITLE, max(X.YEAR) AS YEAR, max(X.NFC_CODE) NFC_CODE,	
+								  max(X.VOD_TYPE) as VOD_TYPE, max(X.PLAYER) as PLAYER, MAX(X.STUDIO) as STUDIO, MAX(X.WATCHA_POINT) as WATCHA_POINT
+								  <if test='orderGb == "W"'>
+					   	   				, max(X.WATCH_RANK) as WATCH_RANK
+					   	   		  </if>
+					   	   		  , max(X.KIDS_GRADE) as KIDS_GRADE
+					   	   		  , max(X.GENRE_UXTEN) as GENRE_UXTEN
+		                    FROM (SELECT 'ALB'                a0, 
+		                                 X.ALBUM_ID        a1, 
+		                                 X.ALBUM_NAME     a2, 
+		                                 '' a3, 
+		                                 X.content_value      a5, 
+		                                 X.category_id        a6, 
+		                                 'N' a7, 
+		                                 X.CATEGORY_LEVEL     a9, 
+		                                 case when TO_NUMBER(NVL(X.suggested_price, '0'))>0 and substr(X.product_type, 1, 1) <![CDATA[<>]]> '0' then 'Y' else 'N' end a10, 
+		                                 NVL(X.rating_cd, '') a11, 
+		                                 SUBSTR(X.RUN_TIME, 1, 6) a12, 
+		                                 X.create_date  a14, 
+		                                 X.rank_no       a21, 
+		                                 X.category_id a22, 
+		                                 X.sort_no     a24, 
+		                                 X.SERVICE_ICON a32, 
+		                                 Y.COM_CD a33 , 
+		                                 X.onair_date a37, 
+		                                 X.series_no a38, 
+		                                 X.SUB_FILE_NAME a45, 
+										  X.SYNOPSIS AS SYNOPSIS, 
+										  X.VR_TYPE,	
+										  X.RELEASE_DATE,	
+										  X.ACTORS_DISPLAY,	
+										  X.PRODUCER,	
+										  X.SUB_TITLE,	
+										  X.YEAR,	
+										  X.NFC_CODE,	
+										  X.VOD_TYPE,	
+										  X.PLAYER,		
+										  X.STUDIO,
+										  X.WATCHA_POINT
+										  <if test='orderGb == "W"'>
+					   	   						, X.WATCH_RANK
+					   	   		 		  </if>
+					   	   		 		  , X.KIDS_GRADE
+					   	   		 		  , X.GENRE_UXTEN
+		                            FROM ( 
+		                                      SELECT /*+ LEADING(J E ALI ALS ALPL W ASI ALP X Y) USE_NL(J E ALI ALS ALPL W ASI ALP X Y) */
+		                                             ALI.album_id, 
+		                                             MAX(J.CATEGORY_ID) AS CATEGORY_ID, 
+		                                             MAX(TO_CHAR(TO_NUMBER(j.category_level) + 1)) AS CATEGORY_LEVEL, 
+		                                             MAX(J.SORT_NO) AS SORT_NO, 
+		                                             MAX(substr(E.create_date, 1, 8)) AS CREATE_DATE, 
+		                                             MAX(ALI.ALBUM_NAME) AS ALBUM_NAME, 
+		                                             MAX(ALP.content_value) AS CONTENT_VALUE, 
+		                                             MAX(ASI.suggested_price) AS SUGGESTED_PRICE, 
+		                                             MAX(ALS.rating_cd) AS RATING_CD, 
+		                                             MAX(ALS.run_time) AS RUN_TIME, 
+		                                             MIN(Y.product_type) AS PRODUCT_TYPE, 
+		                                             MAX(X.contents_id) AS CONTENTS_ID, 
+		                                             MAX(ASI.is_3d) AS IS_3D, 
+		                                             MAX(ALS.category) AS CATEGORY_COM, 
+		                                             MAX(ALI.pre_mapping_yn) AS PRE_MAPPING_YN, 
+		                                             'img_cat_server'||MAX(J.SUB_FILE_NAME) AS SUB_FILE_NAME, 
+		                                             MAX(ALI.ONAIR_DATE_DISPLAY) AS ONAIR_DATE, 
+		                                             MAX(ALI.SERIES_NO) AS SERIES_NO, 
+		                                             MAX(case when nvl(J.nsc_gb, 'LTE') = 'UFX' then ALPL.service_icon_uflix else ALPL.service_icon end) AS SERVICE_ICON, 
+		                                             MAX(E.RANK_NO) AS RANK_NO, 
+													  MAX(REPLACE(REPLACE(TRIM(NVL(SUBSTRB(ALPL.SUMMARY_LONG, 1, 1024), '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n')) AS SYNOPSIS, 
+													  MAX(ALS.VR_TYPE) VR_TYPE,	
+        											  MAX(ALI.RELEASE_DATE) RELEASE_DATE,	
+        											  MAX(ALS.ACTORS_DISPLAY) ACTORS_DISPLAY,	
+        											  MAX(ALS.PRODUCER) PRODUCER,	
+         											  MAX(ALS.SUB_TITLE) SUB_TITLE,	
+        											  MAX(ALS.YEAR) YEAR,	
+        										  	  MAX(ALS.NFC_CODE) NFC_CODE,	
+        											  MAX(ALI.VOD_TYPE)	VOD_TYPE,	
+        											  MAX(ALS.PLAYER) PLAYER,		
+        											  MAX(ALS.STUDIO) STUDIO,
+        											  NVL(MAX(W.AVG_RATING), '0.0') WATCHA_POINT
+													  <if test='orderGb == "W"'>
+								   	   						, MAX(NVL(WAT.RANK_INFO, '9999999')) AS WATCH_RANK
+								   	   		 		  </if>
+								   	   		 		  , MAX(ALS.KIDS_GRADE) as KIDS_GRADE
+								   	   		 		  , MAX((SELECT K.name FROM IMCSUSER.PT_CD_IMCS_CD K WHERE K.gid = 'UXTEN' and K.code = ALPL.genre_uxten_cd)) as GENRE_UXTEN
+		                                        FROM IMCSUSER.PT_LA_ALBUM_INFO ALI, 
+		                                             IMCSUSER.PT_LA_ALBUM_SUB ALS, 
+		                                             IMCSUSER.PT_LA_ALBUM_PLATFORM ALPL, 
+		                                             IMCSUSER.PT_LA_ASSET_INFO ASI, 
+		                                             IMCSUSER.PT_LA_ALBUM_POSTER ALP, 
+		                                             PT_VO_CATEGORY J, 
+		                                             PT_VO_CATEGORY_MAP E, 
+		                                             IMCSUSER.PT_PD_PACKAGE Y, 
+		                                             IMCSUSER.PT_PD_PACKAGE_DETAIL X, 		                                              
+		                                              IMCSUSER.PT_WC_WATCHA_RATING W
+		                                              <if test='orderGb == "W"'>
+								   	   						, (
+								   	   							SELECT STATISTICS_ID,
+																       row_number() over (order by RANK_INFO desc) as rank_info
+																  FROM (
+																        SELECT STATISTICS_ID,
+																        p_idx_dd,
+																               sum(RANK_INFO) as rank_info,
+																               DENSE_RANK() OVER(order by case when p_idx_dd = to_char(sysdate, 'D') then 0 else 1 end, case when p_idx_dd <![CDATA[<]]> to_char(sysdate, 'D') then 0 else 1 end, p_idx_dd desc) as filter_rownum 
+																          FROM ${@kr.co.wincom.imcs.common.util.GlobalCom@getDBMcustUser()}.NPT_VO_STAT_WAT 
+																         WHERE P_IDX_DD in (to_char(sysdate, 'D'), to_char(sysdate-1, 'D'), to_char(sysdate-2, 'D'))
+																           and FLAG = 'W'
+																         group by statistics_id, p_idx_dd
+																       ) 
+																 WHERE filter_rownum = '1'
+								   	   						   ) WAT
+								   	   		 		  </if>
+		                                       where J.category_id = trim(#{catId}) 
+		                                         AND J.CATEGORY_GB = 'NSC' 
+		                                         AND (J.test_sbc = #{testSbc} or J.test_sbc = 'N' or J.test_sbc is null or J.test_sbc = '') 
+		                                         AND NVL(J.series_yn,'N') = 'N' 
+		                                         AND NVL(J.NSC_GB, 'LTE') IN ('LTE', 'UFX', 'KID') 
+		                                         AND TO_CHAR(TO_NUMBER(j.category_level) + 1) <![CDATA[<=]]> #{categoryLevel} 
+		                                         AND J.CATEGORY_ID = E.CATEGORY_ID 
+		                                         AND NVL(E.multi_mapping_flag, '1') in ('1', '0') 
+		                                         AND (nvl(ALI.pre_mapping_yn, 'N') = 'N' or (nvl(ALI.pre_mapping_yn, 'N') = 'Y' and nvl(E.viewing_flag, 'N') in ('V', #{viewFlag1}, #{viewFlag2})) or (nvl(ASI.RESERVED_FLAG,'N') in ('R','P', 'X'))) 
+		                                         AND E.CONTENTS_ID = ALI.ALBUM_ID 
+		                                         AND ALI.ALBUM_ID = ALS.ALBUM_ID 
+		                                         AND ALS.ALBUM_ID = ALPL.ALBUM_ID 
+		                                         AND ALPL.SCREEN_TYPE = 'N' 
+		                                         AND ALPL.ALBUM_ID = ASI.ALBUM_ID 
+		                                         AND ALPL.SCREEN_TYPE = ASI.SCREEN_TYPE 
+		                                         AND ASI.ALBUM_ID = ALP.ALBUM_ID 
+		                                         AND ASI.SCREEN_TYPE = ALP.SCREEN_TYPE 
+		                                         AND ALP.POSTER_TYPE = 'P' 
+		                                         AND ALP.SERVICE_YN = 'Y' 
+		                                         AND NVL(ALS.RATING_CD,'01') <![CDATA[<]]> #{rating} 
+		                                         AND ASI.ASSET_ID = X.CONTENTS_ID 
+		                                         AND X.PRODUCT_ID = Y.PRODUCT_ID
+		                                         AND E.CONTENTS_ID = W.ALBUM_ID(+)
+		                                         <if test='orderGb == "W"'>
+							   	   						AND E.CONTENTS_ID = WAT.STATISTICS_ID(+)
+							   	   		 		 </if>
+		                                      GROUP BY ALI.ALBUM_ID 
+		  			             	   ) X, 
+		                                 (select COM_CD ,COM_NAME  from imcsuser.pt_cd_com_cd  where grp_id = 'PUBLICCH' ) Y 
+		                           WHERE X.CATEGORY_COM    = Y.COM_NAME(+) 
+		                        ) X 
+		                   group by a1 
+		                   order by a24, a22, a9 desc, a6, a0, a21, a1 
+		                ) X 
+		        ) X 
+		   order by category_level, 
+		            parent_category_id, 
+					 result_type desc,	 
+		            case when #{orderGb} = 'A' then case when ascii(substr(category_name,0,1)) between 45217 and 51454 then 1 
+		                                                        when substr(category_name,0,1) between 'A' and 'Z' then 2 
+		                                                        when substr(category_name,0,1) between 'a' and 'z' then 2 
+		                                                        when substr(category_name,0,1) between '0' and '9' then 3 
+		                                                        else 4 end else 0 end, 
+		            case when #{orderGb} = 'A' then UPPER(category_name) else '0' end, 
+		            case when #{orderGb} = 'P' then watcha_point else '0' end desc,
+		            <if test='orderGb == "W"'>
+					    case when #{orderGb} = 'W' then to_number(watch_rank) else 0 end,
+   	   		 		</if>
+		            sort_no, 
+		            category_id 
+	</select>	
+
+	<select id="getStillImageFileName" resultMap="mStillImg">
+		SELECT A.main_img_file_name,
+		       A.img_flag
+		  FROM IMCSUSER.PT_LA_ALBUM_IMG A
+		 WHERE A.adi_album_id = #{categoryId}
+		   AND A.img_flag = 'N'
+		 ORDER BY to_number(adi_album_seq)	
+	</select>
+	
+	<select id="getSeriesInfo" resultType="String">
+		select A.category_id||'|'||A.series_no series_info
+		  from PT_VO_CATEGORY_MAP A,
+		       PT_VO_CATEGORY B
+		 where A.contents_id = #{categoryId}
+		   and A.category_id = B.category_id
+		   and B.series_yn = 'Y'
+		   and B.category_gb = 'NSC'
+		   and nvl(b.nsc_gb, 'LTE') IN ('LTE', 'UFX')
+		   and (B.test_sbc = #{testSbc} or B.test_sbc = 'N' or B.test_sbc is null or B.test_sbc = '')
+		   AND rownum = 1
+	</select>
+
+	<select id="getFpAlbumInfo" resultType="String">
+		SELECT ADI_ALBUM_ID
+		  FROM IMCSUSER.PT_LA_ALBUM_PR
+		 WHERE PR_ALBUM_ID = #{categoryId}
+		   AND SVC_TYPE = 'NSC'
+		   AND PR_TYPE = 'P'
+		 ORDER BY PR_SEQ
+	</select>
+	
+	<select id="getChnlM3u8Search" resultMap="mM3u8Info">
+		SELECT /*+ INDEX(A PT_LA_M3U8_INFO_IDX01) */
+		       A.M3U8_ORDER, A.M3U8_FILE_1, A.M3U8_FILE_2
+		  FROM IMCSUSER.PT_LA_M3U8_INFO A
+		 WHERE A.M3U8_ID = #{categoryId}	
+	</select>
+	
+	<select id="getListInfo" resultMap="mLastInfo">
+		SELECT A.ACTORS_DISPLAY, A.RATING_CD, A.PRODUCER, B.COM_CD
+		  FROM IMCSUSER.PT_LA_ALBUM_SUB A,
+		       (select com_cd, com_name from IMCSUSER.PT_CD_COM_CD where GRP_ID = 'PUBLICCH') B
+		 WHERE A.ALBUM_ID = #{lastAlbumId}
+		   AND A.category = B.com_name (+)	
+	</select>
+	
+	<select id="getPosterImgFileName" resultType="String">
+		SELECT content_value
+		  FROM IMCSUSER.PT_LA_ALBUM_POSTER
+		 WHERE ALBUM_ID = #{lastAlbumId}
+		   AND screen_type = 'N'
+		   AND poster_type = 'P'
+		   AND service_yn = 'Y'
+	</select>
+	
+	<select id="getSubLevel" resultMap="mSubLevelInfo">
+		SELECT CASE WHEN COUNT(category_id) > 0 THEN 'Y' ELSE 'N' END PAR_YN, COUNT(category_id) SUB_CNT
+		  FROM PT_VO_CATEGORY B
+		 WHERE B.parent_category_id = trim(#{categoryId})
+	       AND (B.test_sbc = #{testSbc} or B.test_sbc = 'N' or B.test_sbc is null or B.test_sbc = '')
+		   AND B.category_gb = 'NSC'
+	</select>
+	
+	<select id="getAlbumInfo" resultMap="mAlbumInfo">
+		SELECT NVL(onair_date_display, 'NULL') ONAIR_DATE, B.RATING_CD, B.ACTORS_DISPLAY, B.PRODUCER, NVL(C.SUGGESTED_PRICE, '0') SUGGESTED_PRICE
+		  FROM IMCSUSER.PT_LA_ALBUM_INFO A,
+		       IMCSUSER.PT_LA_ALBUM_SUB B,
+		       IMCSUSER.PT_LA_ASSET_INFO C
+		 WHERE A.ALBUM_ID = #{lastAlbumId}
+		   AND A.ALBUM_ID = B.ALBUM_ID
+		   AND B.ALBUM_ID = C.ALBUM_ID
+		   AND C.SCREEN_TYPE = 'N'
+		   AND ROWNUM = 1	
+	</select>
+	
+	<select id="getProductType" resultType="String">
+		select min(product_type) product_type
+		  from imcsuser.pt_pd_package a, imcsuser.pt_pd_package_detail b
+		 where a.product_id = b.product_id
+		   and b.contents_id = (select max(asset_id)
+		                           from imcsuser.PT_LA_ASSET_INFO
+		                          where ALBUM_ID = #{lastAlbumId}
+		                            AND SCREEN_TYPE = 'N' 
+		                       )
+	</select>
+		
+</mapper>
+	
+	
+	

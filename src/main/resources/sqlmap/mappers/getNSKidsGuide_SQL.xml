@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSKidsGuide.GetNSKidsGuideDao">
+
+	<resultMap type="HashMap" id="myUserInfo">
+		<result property="test_sbc" column="TEST_SBC" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="view_flag" column="VIEW_FLAG" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="myKidsGuideCatInfo">
+		<result property="current_level" column="CURRENT_LEVEL" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="parent_cat_id" column="PARENT_CAT_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="sub_title" column="SUB_TITLE" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<!-- 가입자 정보 가져오기 검수 여부 -->
+	<select id="getUserInfo" resultMap="myUserInfo" parameterType="GetNSKidsGuideRequestVO">
+		SELECT
+			DECODE(NVL(test_sbc, 'N'), 'Y', 'Y', 'N') AS test_sbc 
+			, DECODE(NVL(test_sbc, 'N'), 'Y', 'T', 'V') AS view_flag
+		FROM PT_VO_CUSTOM_ID
+		WHERE sa_id = #{saId}
+		AND mac_addr = #{stbMac}
+	</select>
+	
+	<!-- 현재 흘려듣기 카테고리 정보 가져오기 -->
+	<select id="getKidsGuideCatInfo" resultMap="myKidsGuideCatInfo" parameterType="GetNSKidsGuideRequestVO">
+		SELECT
+			NVL(A.point, 0) AS current_level
+			, A.parent_category_id AS parent_cat_id
+			, A.thumbnail_file_name AS sub_title
+		FROM PT_VO_CATEGORY A
+		WHERE A.category_id = #{catId}
+	</select>
+	
+	<!-- 현재 흘려듣기 전체 목록 가져오기 -->
+	<select id="listKidsGuide" resultType="GetNSKidsGuide_VO" parameterType="GetNSKidsGuideRequestVO">
+		SELECT guide_level AS guide_level,
+		       category_id AS category_id,
+		       category_name AS category_nm,
+		       sub_title AS sub_title,
+		       conts_id AS conts_id,
+		       conts_nm AS conts_nm,
+		       synopsis AS guide_text,
+		       m3u8_file_1 AS asset_id,
+		       m3u8_file_2 AS asset_file_nm,
+		       (SELECT A.main_img_file_name FROM IMCSUSER.PT_LA_ALBUM_IMG A WHERE A.adi_album_id = XX.conts_id AND A.img_flag = 'N' AND ROWNUM = 1) AS image_file_name
+		FROM (SELECT /*+LEADING(A) USE_NL(M L T P C D G) */
+				   A.guide_level,
+				   A.category_id,
+				   A.category_name,
+				   A.sub_title,
+				   M.contents_id conts_id,
+				   L.album_name conts_nm,
+				   DECODE(NVL(T.run_time, '0'), '0', '1', TO_CHAR(TO_NUMBER(SUBSTR(T.run_time, 1, 2)) * 60 + TO_NUMBER(SUBSTR(T.run_time, 3, 2)))) runtime,
+				   SUBSTRB(REPLACE(REPLACE(TRIM(NVL(P.summary_long, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n'), 1, 500) synopsis,
+				   case when A.test_sbc = 'Y' or NVL(M.viewing_flag, 'V') = 'T' then 'Y' else 'N' end test_sbc,
+				   D.m3u8_file_1,
+				   D.m3u8_file_2,
+				   M.rank_no
+			  FROM (SELECT category_id, category_name, NVL(test_sbc, 'N') test_sbc,
+						   point guide_level, thumbnail_file_name sub_title
+					  FROM PT_VO_CATEGORY
+					WHERE NVL(test_sbc, 'N') IN ('N', #{testSbc})
+					   AND NVL(point, '0') >= '1'
+					START WITH category_id = #{parent_cat_id}
+					CONNECT BY PRIOR category_id = parent_category_id) A,
+				   PT_VO_CATEGORY_MAP M,
+				   IMCSUSER.PT_LA_ALBUM_INFO L,
+				   IMCSUSER.PT_LA_ALBUM_SUB T,
+				   IMCSUSER.PT_LA_ALBUM_PLATFORM P,
+				   IMCSUSER.PT_LA_M3U8_INFO D 
+			WHERE 1 = 1
+			   AND A.category_id = M.category_id
+			   AND M.contents_id = L.album_id
+			   AND L.album_id = T.album_id
+			   AND L.album_id = P.album_id
+			   AND P.screen_type = 'N'
+			   AND L.album_id = D.m3u8_id
+			   AND D.m3u8_type = 'H'
+			   AND NVL(M.viewing_flag, 'V') IN ('V', #{viewFlag}) ) XX
+		ORDER BY guide_level, rank_no
+	</select>
+</mapper>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.buyNSPresent.BuyNSPresentDao">
+
+	<resultMap type="HashMap" id="ChkHashMap">
+		<result property="DUPLIC_CHK" column="DUPLIC_CHK" javaType="Integer"/>
+		<result property="BUY_DATE" column="BUY_DATE" javaType="String"/>
+	</resultMap>
+
+	
+	<!-- 가입자 정보 조회 -->
+	<select id="getCustomerInfo" resultType="ComSbcVO">
+		SELECT DECODE(A.ST_TYP, '1', 'Y', 'N') AS STATUS_FLAG,      /*서비스 구분*/
+		      A.VOD_USE_YN AS YN_VOD_OPEN,     						/*PPV, PVOD사용유무 - 최초'N', 해피콜완료시'Y' */
+		      NVL(A.CP_CNT, 0) AS CP_CNT
+		 FROM PT_VO_CUSTOM_ID A
+		WHERE A.SA_ID    = #{saId}
+		  AND A.MAC_ADDR = #{stbMac}
+	</select>
+
+	<!-- 상품가격정보 조회 -->
+	<select id="getBillType" resultType="ComPriceVO">
+		SELECT DISTINCT NVL(A.IMCS_AMOUNT_GB, ' ') AS BILL_TYPE,
+		      NVL(TRIM(C.SUGGESTED_PRICE), '0') AS SUGGESTED_PRICE,
+		      CASE WHEN NVL(TRIM(C.PRESENT_PRICE), '0') = '0' THEN NVL(TRIM(C.SUGGESTED_PRICE), '0')
+		           ELSE NVL(TRIM(C.PRESENT_PRICE), '0') END PRESENT_PRICE,
+		      A.IMCS_PRODUCT_TYPE AS PRODUCT_TYPE,
+		      '0' AS EVENT_VALUE,
+		      C.SUGGESTED_PRICE AS EVENT_PRICE,
+		      NVL(SUBSTR(D.MAXIMUM_VIEWING_LENGTH, 1, LENGTH(D.MAXIMUM_VIEWING_LENGTH) - 2), '48') AS EVENT_TYPE,
+		      NVL(E.GENRE, ' ') AS CONTS_GENRE,
+		      C.ASSET_NAME,
+	       	  C.HDCONTENT,
+	       	  E.RATING_CD	       
+	   	   	  , A.IMCS_PRODUCT_ID AS PRODUCT_ID
+	   	   	  , A.IMCS_PRODUCT_NAME AS PRODUCT_NAME
+	   	   	  , A.IMCS_PRODUCT_KIND AS PRODUCT_KIND
+	   	   	  , D.CP_ID
+	   	   	  , D.MAXIMUM_VIEWING_LENGTH
+	   	   	  , F.SERIES_NO
+		 FROM IMCSUSER.PT_PD_PACKAGE_UNITED A,
+		      IMCSUSER.PT_PD_PACKAGE_DETAIL B,
+		      IMCSUSER.PT_LA_ASSET_INFO C,
+	       	  IMCSUSER.PT_LA_ALBUM_PLATFORM D,
+	       	  IMCSUSER.PT_LA_ALBUM_SUB E,
+	       	  IMCSUSER.PT_LA_ALBUM_INFO F
+		WHERE F.ALBUM_ID    = #{albumId}
+		  AND F.ALBUM_ID = E.ALBUM_ID
+		  AND E.ALBUM_ID = D.ALBUM_ID
+		  AND D.ALBUM_ID = C.ALBUM_ID
+		  AND D.SCREEN_TYPE = 'N'
+		  AND D.SCREEN_TYPE = C.SCREEN_TYPE
+		  AND C.ASSET_ID = B.CONTENTS_ID
+		  AND B.PRODUCT_ID = A.IMCS_PRODUCT_ID
+		  AND A.IMCS_PRODUCT_TYPE  = '1'
+		  AND NVL(C.PRESENT_YN,'Y') = 'Y'
+	</select>
+
+
+	<!-- 가입자 구매 가능 여부 체크 -->
+	<select id="CustomProductChk" resultType="Integer">
+		SELECT 1 
+		  FROM DUAL 
+		 WHERE EXISTS (
+		        SELECT /*+ USE_NL(C D A B E) */ 'X' 
+		          FROM IMCSUSER.PT_PD_PACKAGE A,
+		               IMCSUSER.PT_PD_PACKAGE_DETAIL B,
+		               PT_VO_CUSTOM_PRODUCT C,
+		               IMCSUSER.PT_PD_PACKAGE_RELATION D ,
+		               IMCSUSER.PT_LA_ASSET_INFO E 
+		         WHERE E.ALBUM_ID = #{albumId}
+		           AND E.SCREEN_TYPE = 'N'
+		           AND C.SA_ID = #{saId}
+		           AND C.MAC_ADDR = #{stbMac}
+		           AND A.PRODUCT_ID = B.PRODUCT_ID
+		           AND D.P_PRODUCT_ID = C.PRODUCTCD
+		           AND D.PRODUCT_ID = A.PRODUCT_ID
+		           AND B.CONTENTS_ID = E.ASSET_ID
+		       )
+	</select>
+	
+	
+	<!-- 가입자 구매내역 중복 체크 -->
+	<select id="getPresentDupCk" resultMap="ChkHashMap">
+		SELECT COUNT(*) AS DUPLIC_CHK,
+		       MAX(BUY_DATE) AS BUY_DATE 
+		  FROM PT_VO_BUY_NSC
+		 WHERE SA_ID = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+		   AND PRODUCT_ID = #{albumId}
+		   AND (EXPIRED_DATE <![CDATA[>=]]> TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS') OR EXPIRED_DATE = '0')
+		   AND NVL(REFUND_YN, 'N') <![CDATA[<>]]> 'P'
+		   AND NVL(regexp_substr(replace(replace(ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+	</select>
+	
+	<!-- 이벤트 구매내역 조회 -->
+	<select id="getEventCk" resultType="Integer">
+		SELECT EVENT_CHK
+          FROM (
+                SELECT COUNT(A.BUY_DATE) AS EVENT_CHK
+                  FROM PT_VO_BUY_NSC A,
+                       PT_VO_BUY_DETAIL_NSC B
+                 WHERE A.SA_ID = #{saId}
+                   AND A.SA_ID = B.SA_ID
+                   AND A.MAC_ADDR = #{stbMac}
+                   AND A.MAC_ADDR = B.MAC_ADDR
+                   AND A.PRODUCT_ID = B.PRODUCT_ID
+                   AND B.CONTENTS_ID = #{albumId}
+                   AND A.BUY_DATE = B.BUY_DATE
+                   AND A.BUY_AMT = '0'
+                   AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+                ) X
+	</select>
+
+	<!-- 선물 컨텐츠 보관함 저장 (PT_VO_BUY_DETAIL) -->
+	<insert id="insertBuyPresent2" parameterType="BuyNSPresentRequestVO">
+		INSERT INTO PT_VO_BUY_DETAIL_NSC (SA_ID, MAC_ADDR, BUY_DATE, PRODUCT_ID, CONTENTS_ID, CONTENTS_NAME, LINK_TIME, PRODUCT_NAME) 
+		VALUES(#{saId}, #{stbMac}, #{buyingDate}, #{albumId}, #{albumId} ,REPLACE(#{albumName}, ' ', ' '), '0' , #{contsGenre})
+	</insert> 
+	
+	
+	<!-- 선물구매내역 저장 (PT_VO_BUY) -->
+	<insert id="insertBuyPresent1" parameterType="BuyNSPresentRequestVO">
+		INSERT INTO PT_VO_BUY_NSC (SA_ID, MAC_ADDR, BUY_DATE, PRODUCT_ID, PRODUCT_NAME, PKG_YN, GENRE_NAME, 
+		    BUY_AMT, CP_USE_YN, EXPIRED_DATE, APPL_TYPE, ALWNCE_CHARGE, BALACE, REFUND_YN, PVS_TRANS_NO) 
+		VALUES (#{saId}, #{stbMac}, #{buyingDate}, #{albumId}, REPLACE(#{albumName}, ' ', ' '), 'N', TRIM(#{catId}), 
+		    NVL(#{presentPrice}, '0'), #{cpUseYn}, #{buyingDate}, #{appType}, #{alwnceCharge}, NVL(#{balace}, '0'), 'P', 'V')
+	</insert> 
+	
+	<!-- 보낸선물내역 저장 (PT_VO_PRESENT) -->
+	<insert id="insertBuyPresentP" parameterType="BuyNSPresentRequestVO">
+		INSERT INTO PT_VO_PRESENT (SA_ID, MAC_ADDR, PRESENT_DATE, CONTENTS_ID, SERVICE_GB, CTN_NO, RCV_SA_ID, RCV_MAC_ADDR, 
+		    RCV_CTN_NO, PRESENT_GB, BUYING_PRICE, PRESENT_PRICE, USE_YN, USE_DATE, EXPIRED_DATE, SMS_YN, SMS_DATE, SMS_MSG, DEL_FLG, REAL_PRESENT_PRICE) 
+		VALUES(#{saId}, #{stbMac}, #{buyingDate}, #{albumId}, 'NSC', #{ctnNo}, #{rcvSaId}, #{rcvStbMac}, #{rcvCtnNo}, 'N', 
+		    #{buyingPrice}, NVL(#{presentPrice}, '0'), 'N', '', '', 'N', #{buyingDate}, #{smsMsg}, 'N', #{realPresentPrice})
+	</insert>
+	
+	<!-- 구매 콘텐츠 메타 정보 저장 -->
+	<insert id="insBuyMeta" parameterType="BuyNSPresentRequestVO">
+	 INSERT INTO MCUSTUSER.NPT_VO_BUY_META
+       (
+        P_IDX_MM, P_IDX_SA, SA_ID, MAC_ADDR, BUY_DATE, CONTENTS_ID, CONTENTS_NAME, PRODUCT_ID, PRODUCT_NAME,
+        PRODUCT_KIND, PRODUCT_TYPE, ALBUM_ID, HDCONTENT, RATING_CD, CP_ID, MAXIMUM_VIEWING_LENGTH, SERIES_NO        
+       )
+	   VALUES
+	       (
+	        mod(to_char(to_date(#{buyingDate}, 'YYYYMMDDHH24MISS'), 'MM'), 4),
+	        MOD(#{pIdxSa},33),
+	        #{saId},
+	        #{stbMac},
+	        #{buyingDate},
+	        #{albumId},
+	        #{assetName},
+	        #{productId},
+	        #{productName},
+	        #{productKind},
+	        #{prodType},
+	        #{albumId},
+	        #{hdcontent},
+	        #{ratingCd},
+	        #{cpId},
+	        #{maximumViewingLength},
+	        #{seriesNo}
+	       )
+	</insert>	 
+</mapper> 

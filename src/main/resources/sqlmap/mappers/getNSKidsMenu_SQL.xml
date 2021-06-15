@@ -1,0 +1,1624 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSKidsMenu.GetNSKidsMenuDao">
+
+	<resultMap type="HashMap" id="myUserInfo">
+		<result property="test_sbc" column="TEST_SBC" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="view_flag" column="VIEW_FLAG" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="stb_sa_id" column="STB_SA_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="stb_mac_addr" column="STB_MAC_ADDR" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="stb_pairing" column="STB_PAIRING" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<!-- 인기순 정렬을 위한 사전 설정 -->
+	<sql id="listCategoryMenuList_include_aaa">
+		(SELECT statistics_id,
+				row_number() over (order by RANK_INFO desc) as rank_info
+		FROM (SELECT statistics_id, p_idx_dd, SUM(rank_info) as rank_info,
+				DENSE_RANK() OVER(order by case when p_idx_dd = to_char(sysdate, 'D') then 0 else 1 end, case when p_idx_dd &lt; to_char(sysdate, 'D') then 0 else 1 end, p_idx_dd desc) as filter_rownum
+				FROM ${@kr.co.wincom.imcs.common.util.GlobalCom@getDBMcustUser()}.NPT_VO_STAT_WAT
+				WHERE p_idx_sa between 0 and 9
+				AND p_idx_dd in (to_char(sysdate, 'D'), to_char(sysdate-1, 'D'), to_char(sysdate-2, 'D'))
+				AND flag = 'T'
+				GROUP BY statistics_id, p_idx_dd)
+		WHERE filter_rownum = '1') FF
+	</sql>
+	
+	<!-- 인기순 정렬을 위한 사전 설정 -->
+	<sql id="listCategoryMenuList_include_bbb">
+		(SELECT 'X' statistics_id, 0 rank_info FROM dual) FF
+	</sql>
+	
+	<!-- 가입자 정보 가져오기 검수 여부 -->
+	<select id="getUserInfo" resultMap="myUserInfo" parameterType="GetNSKidsMenuRequestVO">		
+		SELECT
+			case when A.test_sbc = 'Y' then A.test_sbc else 'N' end AS test_sbc
+			, case when A.test_sbc = 'Y' then 'T' else 'V' end AS view_flag
+			, NVL(T.stb_sa_id, '') AS stb_sa_id
+			, NVL(T.stb_mac, '') AS stb_mac_addr
+			, NVL(T.flag, 'N') AS stb_pairing
+		FROM PT_VO_CUSTOM_ID A,
+		(
+			SELECT m_sa_id, stb_sa_id, stb_mac, flag, ctn
+			FROM PT_VO_SBC_PAIRING_TBL
+			WHERE m_sa_id = #{saId}
+			AND m_mac = #{stbMac}
+			AND flag = 'Y'
+		) T
+		WHERE A.sa_id = #{saId}
+		AND A.mac_addr = #{stbMac}
+		AND A.sa_id = T.m_sa_id (+)
+	</select>
+	
+	<!-- 아이들나라 대메뉴 진입시 하위 메뉴 정보 제공 -->
+	<select id="getCategoryInfo" resultType="KidsMenuCategoryInfo_VO" parameterType="GetNSKidsMenuRequestVO">		
+		SELECT
+			A.category_id
+			, A.category_name AS category_nm
+			, case when A.actors_display IN ('B','C','P','G','T','E','R','H') then A.actors_display else 'M' end AS category_type
+			, case NVL(A.caption_yn, '') when 'A' then 'APP' when 'R' then 'RCM' when 'U' then 'MNU' when 'T' then 'TOP' else '' end AS menu_type
+			, A.category_level
+		FROM PT_VO_CATEGORY A
+		WHERE A.category_id = #{catId}
+		AND A.category_gb = 'NSC'
+		AND NVL(A.nsc_gb, 'X') = 'KID'
+	</select>
+	
+	<!-- 카테고리 편성 정보 가져오기 (최상위 메뉴 - CatType C) -->
+	<select id="listCategoryTopMenu_CatType_C" resultType="KidsMenuMenuList_VO" parameterType="GetNSKidsMenuRequestVO">
+		SELECT
+			X.result_type,
+			X.category_id AS conts_id,
+			X.category_name AS conts_nm,
+			X.type,
+			X.category_type,
+			X.display_option,
+			X.parent_category_id AS parent_id,
+			X.category_sub_name,
+			X.sub_cat_yn,
+			X.category_flag,
+			X.cat_eng_level,
+			X.image_file,
+			X.animation_file,
+			X.recommend_id,
+			X.service_icon,
+			X.ppm_prod_id,
+			X.ppm_prod_type,
+			X.pps_prod_id,
+			X.pr_info,
+			X.add_info
+		FROM (SELECT 'CAT' result_type,
+				   A.category_id,
+				   A.category_name,
+				   case when NVL(series_yn, 'N') = 'Y' then 'SER'
+						else (case NVL(A.caption_yn, '')
+								   when 'A' then 'APP'
+								   when 'R' then 'RCM'
+								   when 'U' then 'MNU'
+								   when 'T' then 'TOP'
+								   when 'D' then 'DIR'
+								   when 'Q' then 'PRV'
+								   else '' end) end type,
+				   case when A.actors_display IN ('B','C','P','G','T','E','R','H') then A.actors_display else '' end category_type,
+				   case when NVL(A.order_yn, '') IN ('T','L') then A.order_yn else '' end display_option,
+				   A.parent_category_id,
+				   A.thumbnail_file_name category_sub_name,
+				   (SELECT case when COUNT(*) > 0 then 'Y' else 'N' end FROM PT_VO_CATEGORY C WHERE C.parent_category_id = A.category_id) sub_cat_yn,
+				   case when NVL(A.caption_yn, '') = 'L' then 'L' else DECODE(NVL(A.caption_yn, ''), 'U', Trim(A.point), DECODE(Trim(A.point), 'P', 'P', '')) end category_flag,
+				   case when NVL(A.caption_yn, '') = 'L' then Trim(A.point) else '' end cat_eng_level,
+				   A.img_file_name image_file,
+				   A.wide_file_name animation_file,
+				   case when NVL(A.caption_yn, '') IN ('A','R') then Trim(A.genre) end recommend_id,
+				   A.service_icon,
+				   case when NVL(A.caption_yn, '') IN ('S','M','K') then A.ppm_prod_id else '' end ppm_prod_id,
+				   case when NVL(A.caption_yn, '') IN ('S','M','K') then A.caption_yn else '' end ppm_prod_type,
+				   case when NVL(A.caption_yn, '') IN ('S','M','K') then '' else '' end pps_prod_id,
+				   A.pr_info,
+				   A.save_hd_price add_info,
+				   A.category_level,
+				   A.sort_no,
+				   DECODE(NVL(A.ch_51_yn, 'N'), 'L', '1', 'R', '9', '2') pos_flag
+			  FROM PT_VO_CATEGORY A
+			 WHERE 1 = 1
+			   AND A.category_gb = 'NSC'
+			   AND A.category_level &lt;= #{category_level} + 1
+			   AND NVL(A.ch_51_yn, 'N') != 'X'
+			   AND NVL(A.test_sbc, 'N') IN ('N', #{testSbc})
+			 START WITH A.category_id = #{catId}
+			 CONNECT BY PRIOR A.category_id = A.parent_category_id ) X,
+		   (SELECT adi_album_id category_id, watch_date
+			  FROM PT_VO_SET_TIME_PTT_NSC
+			 WHERE sa_id = #{saId}
+			   AND p_idx_sa = #{p_idx_sa}
+			   AND nscn_cust_no = 'C') Y
+		WHERE X.category_id = Y.category_id (+)
+		ORDER BY X.category_level, X.pos_flag, CASE WHEN X.pos_flag = '2' THEN NVL(Y.watch_date, '0') ELSE '0' END DESC, X.sort_no
+	</select>
+	
+	<!-- 카테고리 편성 정보 가져오기 (최상위 메뉴) -->
+	<select id="listCategoryTopMenu" resultType="KidsMenuMenuList_VO" parameterType="GetNSKidsMenuRequestVO">		
+		SELECT
+			'CAT' AS result_type
+			, A.category_id AS conts_id
+			, A.category_name AS conts_nm
+			, case when NVL(series_yn, 'N') = 'Y' then 'SER'
+					else (case NVL(A.caption_yn, '')
+								when 'A' then 'APP'
+								when 'R' then 'RCM'
+								when 'U' then 'MNU'
+								when 'T' then 'TOP'
+								when 'D' then 'DIR'
+								when 'Q' then 'PRV'
+								else '' end)
+				end AS type
+			, case when A.actors_display IN ('B','C','P','G','T','E','R','H') then A.actors_display else '' end AS category_type
+			, case when NVL(A.order_yn, '') IN ('T','L') then A.order_yn else '' end AS display_option
+			, A.parent_category_id AS parent_id
+			, A.thumbnail_file_name AS category_sub_name
+			, (SELECT case when COUNT(*) > 0 then 'Y' else 'N' end FROM PT_VO_CATEGORY C WHERE C.parent_category_id = A.category_id) AS sub_cat_yn
+			, case when NVL(A.caption_yn, '') = 'L' then 'L' else DECODE(NVL(A.caption_yn, ''), 'U', Trim(A.point), DECODE(Trim(A.point), 'P', 'P', 'E', 'E', '')) end AS category_flag
+			, case when NVL(A.caption_yn, '') = 'L' then Trim(A.point) else '' end AS cat_eng_level
+			, A.img_file_name AS image_file
+			, A.wide_file_name AS animation_file
+			, case when NVL(A.caption_yn, '') IN ('A','R') then Trim(A.genre) end AS recommend_id
+			, A.service_icon AS service_icon
+			, case when NVL(A.caption_yn, '') IN ('S','M','K') then A.ppm_prod_id else '' end AS ppm_prod_id
+			, case when NVL(A.caption_yn, '') IN ('S','M','K') then A.caption_yn else '' end AS ppm_prod_type
+			, case when NVL(A.caption_yn, '') IN ('S','M','K') then '' else '' end AS pps_prod_id
+			, A.pr_info AS pr_info
+			, A.save_hd_price AS add_info
+		FROM PT_VO_CATEGORY A
+		WHERE 1 = 1
+		AND A.category_gb = 'NSC'
+		AND A.category_level &lt;= (#{category_level} + 1)
+		AND NVL(A.ch_51_yn, 'N') != 'X'
+		AND NVL(A.test_sbc, 'N') IN ('N', #{testSbc})
+		START WITH A.category_id = #{catId}
+		CONNECT BY PRIOR A.category_id = A.parent_category_id
+		ORDER BY A.category_level, DECODE(NVL(A.ch_51_yn, 'N'), 'L', '1', 'R', '9', '2'), A.sort_no
+	</select>
+	
+	<!-- 책읽어주는TV 진입 메뉴 정보 제공(모바일에서는 poster_r 이 필요가 없다고 함) -->
+	<select id="listCategoryTopMenuBook" resultType="KidsMenuMenuList_VO" parameterType="GetNSKidsMenuRequestVO">
+		SELECT
+			result_type
+			, conts_id
+			, conts_nm
+			, type
+			, category_type
+			, display_option
+			, parent_cat_id AS parent_id
+			, category_sub_name
+			, sub_cat_yn
+			, category_flag
+			, cat_eng_level
+			, image_file
+			, animation_file
+			, still_file
+			, recommend_id
+			, service_icon
+			, ppm_prod_id
+			, ppm_prod_type
+			, pps_prod_id
+			, pr_info
+			, kids_grade
+			, runtime
+			, is_51_ch
+			, is_caption
+			, is_hd
+			, synopsis
+			, watcha_point
+			, cine21_point AS cine_point
+			, poster_v
+			, poster_h
+			, add_info
+		FROM
+			(
+				SELECT
+					X.upp_no, X.sort_no,
+					'CAT' result_type,
+					X.conts_id,
+					X.conts_nm,
+					X.type,
+					X.category_type,
+					'' display_option,
+					X.parent_cat_id,
+					X.category_sub_name,
+					'N' sub_cat_yn,
+					X.category_flag,
+					X.cat_eng_level,
+					X.image_file,
+					X.animation_file,
+					X.recommend_id,
+					X.service_icon,
+					X.ppm_prod_id,
+					X.ppm_prod_type,
+					X.pps_prod_id,
+					X.pr_info,
+					'' kids_grade,
+					'' runtime,
+					'' is_51_ch,
+					'' is_caption,
+					'' is_hd,
+					'' synopsis,
+					'' watcha_point,
+					'' cine21_point,
+					'' still_file,
+					'' poster_v,
+					'' poster_h,
+					'' add_info
+				FROM ( SELECT DECODE(NVL(A.ch_51_yn, 'N'), 'L', 1, 'R', 9, 8) upp_no, A.sort_no,
+							A.category_id conts_id,
+							A.category_name conts_nm,
+							case when NVL(series_yn, 'N') = 'Y' then 'SER'
+								else (case NVL(A.caption_yn, '')
+											when 'A' then 'APP'
+											when 'R' then 'RCM'
+											when 'U' then 'MNU'
+											when 'D' then 'DIR'
+											when 'Q' then 'PRV'
+											else '' end)
+								end AS type,
+							case when A.actors_display IN ('B','C','P','G','T','E','R','H') then A.actors_display else '' end category_type,
+							case when NVL(A.order_yn, '') IN ('T','L') then A.order_yn else '' end display_option,
+							A.parent_category_id parent_cat_id,
+							NVL(A.thumbnail_file_name, '') category_sub_name,
+							case when NVL(A.caption_yn, '') = 'L' then 'L' else DECODE(NVL(A.caption_yn, ''), 'U', Trim(A.point), '') end category_flag,
+							case when NVL(A.caption_yn, '') = 'L' then Trim(A.point) else '' end cat_eng_level,
+							A.img_file_name image_file,
+							A.wide_file_name animation_file,
+							case when NVL(A.caption_yn, '') IN ('A','R') then Trim(A.genre) end recommend_id,
+							A.service_icon,
+							case when NVL(A.caption_yn, '') IN ('S','M','K') then A.ppm_prod_id else '' end ppm_prod_id,
+							case when NVL(A.caption_yn, '') IN ('S','M','K') then A.caption_yn else '' end ppm_prod_type,
+							case when NVL(A.caption_yn, '') IN ('S','M','K') then '' else '' end pps_prod_id,
+							A.pr_info,
+							NVL(A.test_sbc, 'N') test_sbc
+						FROM PT_VO_CATEGORY A
+						WHERE A.category_gb = 'NSC'
+						AND NVL(A.nsc_gb, 'N') = 'KID'
+						AND NVL(A.ch_51_yn, 'N') IN ('L','R')
+						AND NVL(A.test_sbc, 'N') IN ('N', #{testSbc})
+						AND NVL(A.is_cat_fh, 'N') != 'H'
+						AND A.category_level &lt;= #{iLevel}
+						START WITH A.category_id = #{catId}
+						CONNECT BY PRIOR A.category_id = A.parent_category_id
+					) X
+				UNION ALL
+				SELECT
+					X.upp_no, X.sort_no,
+					'ALB' result_type,
+					X.conts_id,
+					X.conts_nm,
+					'' type,
+					'' category_type,
+					'' display_option,
+					X.parent_cat_id,
+					'' category_sub_name,
+					'N' sub_cat_yn,
+					'' category_flag,
+					'' cat_eng_level,
+					X.poster_v image_file,
+					'' animation_file,
+					'' recommend_id,
+					X.service_icon,
+					'' ppm_prod_id,
+					'' ppm_prod_type,
+					'' pps_prod_id,
+					X.pr_info,
+					X.kids_grade,
+					X.runtime,
+					X.is_51_ch,
+					X.is_caption,
+					X.is_hd,
+					X.synopsis,
+					X.watcha_point,
+					X.cine21_point,
+					(SELECT A.main_img_file_name FROM IMCSUSER.PT_LA_ALBUM_IMG A WHERE A.adi_album_id = X.conts_id AND A.img_flag = 'N' AND ROWNUM = 1) still_file,
+					X.poster_v,
+					X.poster_h,
+					X.add_info
+				FROM (SELECT /*+USE_NL(X W N)*/
+							3 upp_no, X.rank_no sort_no,
+							X.category_id parent_cat_id,
+							X.conts_id, X.conts_nm, X.service_icon,
+							X.pr_info, X.kids_grade, X.runtime, X.synopsis, X.add_info,
+							MAX(X.is_51ch) is_51_ch,
+							MAX(X.is_caption) is_caption,
+							MAX(X.is_hd) is_hd,
+							MAX(case when X.poster_type = 'T' and X.service_yn = 'Y' then X.content_value else '' end) poster_h,
+							MAX(case when X.poster_type = 'P' and X.service_yn = 'Y' then X.content_value else '' end) poster_v,
+							MAX(case when NVL(W.avg_rating, '') is not null then TRIM(TO_CHAR(W.avg_rating,'0.0')) else '' end) watcha_point,
+							MAX(NVL(N.cine_avg_point, '0')) cine21_point
+						FROM ( SELECT /*+LEADING(A) USE_NL(M L T P I C D G S) */
+									M.rank_no, A.category_id, A.test_sbc,
+									NVL(M.viewing_flag, 'V') viewing_flag,
+									M.contents_id conts_id,
+									L.album_name conts_nm,
+									P.service_icon,
+									NVL(T.rating_cd, '') pr_info,
+									T.kids_grade,
+									SUBSTRB(REPLACE(REPLACE(TRIM(NVL(P.summary_long, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n'), 1, 1024) synopsis,
+									DECODE(NVL(T.run_time, '0'), '0', '1', TO_CHAR(TO_NUMBER(SUBSTR(T.run_time, 1, 2)) * 60 + TO_NUMBER(SUBSTR(T.run_time, 3, 2)))) runtime,
+									case when SUBSTR(NVL(UPPER(C.audio_type), 'N'), 9) = 'DOLBY 5.1' then 'Y' else 'N' end is_51ch,
+									NVL(P.smi_yn, 'N') is_caption,
+									case when NVL(C.hdcontent, 'N') = 'Y' OR NVL(C.hdcontent, 'N') = 'S' then 'Y' else 'N' end is_hd,
+									T.cine_id, S.poster_type, S.service_yn, S.content_value, S.second_value, T.sub_title AS add_info
+								FROM ( SELECT J.category_id, NVL(J.test_sbc, 'N') test_sbc
+										FROM PT_VO_CATEGORY J
+										WHERE 1 = 1
+										AND J.category_gb = 'NSC'
+										AND NVL(J.nsc_gb, 'N') = 'KID'
+										AND NVL(J.series_yn, 'N') = 'N'
+										AND NVL(J.ch_51_yn, 'N') != 'X'
+										AND NVL(J.test_sbc, 'N') IN ('N', #{testSbc})
+										AND NVL(J.is_cat_fh, 'N') != 'H'
+										AND J.category_id = #{sugg_cat_id}
+									) A,
+									PT_VO_CATEGORY_MAP M,
+									IMCSUSER.PT_LA_ALBUM_INFO L,
+									IMCSUSER.PT_LA_ALBUM_SUB T,
+									IMCSUSER.PT_LA_ALBUM_PLATFORM P,
+									IMCSUSER.PT_LA_ALBUM_SMI I,
+									IMCSUSER.PT_LA_ASSET_INFO C,
+									IMCSUSER.PT_LA_ALBUM_POSTER S,
+									IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+									IMCSUSER.PT_PD_PACKAGE G
+								WHERE 1 = 1
+								AND A.category_id = M.category_id
+								AND M.contents_id = L.album_id
+								AND L.album_id = T.album_id
+								AND L.album_id = P.album_id
+								AND L.album_id = I.album_id
+								AND L.album_id = C.album_id
+								AND L.album_id = S.album_id
+								AND P.screen_type = 'N'
+								AND P.screen_type = C.screen_type
+								AND P.screen_type = I.screen_type
+								AND P.screen_type = S.screen_type
+								AND S.poster_type IN ('P', 'T')
+								AND S.service_yn = 'Y'
+								AND C.asset_id = D.contents_id
+								AND D.product_id = G.product_id
+								AND NVL(L.high_quality_type, 'N') != 'H'
+								AND (NVL(M.viewing_flag, 'V') IN ('V', #{viewFlag}) OR NVL(C.reserved_flag, 'N') IN ('R', 'P', 'X'))
+							) X,
+							IMCSUSER.PT_WC_WATCHA_RATING W,
+							IMCSUSER.PT_WC_CINE_RATING N
+						WHERE 1=1
+						AND X.conts_id = W.album_id (+)
+						AND X.cine_id = N.cine_id (+)
+						GROUP BY X.rank_no, X.category_id, X.test_sbc, X.viewing_flag,
+								X.conts_id, X.conts_nm, X.service_icon, X.pr_info, X.kids_grade, X.runtime, X.synopsis, X.add_info
+					) X
+			) XX
+		ORDER BY upp_no, sort_no ASC	
+	</select>
+	
+	<!-- 요청한 카테고리 정보 가져오기 -->
+	<select id="getCategoryInfo_2" resultType="KidsMenuCategoryInfo_VO" parameterType="GetNSKidsMenuRequestVO">		
+		SELECT
+			A.category_id
+			, A.category_name AS category_nm
+			, case when A.actors_display IN ('B','C','P','G','T','E','R','H') then A.actors_display else 'M' end AS category_type
+			, case NVL(A.caption_yn, '') when 'A' then 'APP' when 'R' then 'RCM' when 'U' then 'MNU' when 'T' then 'TOP' when 'Q' then 'PRV' else '' end AS menu_type
+			, A.select_file_name AS top_image
+			, A.thumbnail_file_name AS guide_text
+			, NVL(B.goods_id, '') AS goods_id
+			, NVL(B.goods_info, '') AS goods_text
+			, A.category_level
+		FROM PT_VO_CATEGORY A,
+			(SELECT goods_id, goods_info FROM IMCSUSER.PT_KD_GOODS_MST
+				WHERE NVL(viewing_flag, 'V') IN ('V', #{viewFlag})
+			) B
+		WHERE A.category_id = #{catId}
+		AND A.category_gb = 'NSC'
+		AND NVL(A.test_sbc, 'N') IN ('N', #{testSbc})
+		AND NVL(A.nsc_gb, 'X') = 'KID'
+		AND NVL(A.series_yn, 'N') = 'N'
+		AND A.product_id = B.goods_id (+)
+	</select>
+	
+	<!-- 카테고리 편성 정보 가져오기 (아이들나라 기준 2레벨 이하) -->
+	<select id="listCategoryMenuList" resultType="KidsMenuMenuList_VO" parameterType="GetNSKidsMenuRequestVO">
+		SELECT
+			result_type
+			, conts_id
+			, conts_nm
+			, type
+			, category_type
+			, display_option
+			, parent_cat_id AS parent_id
+			, category_sub_name
+			, sub_cat_yn
+			, category_flag
+			, cat_eng_level
+			, image_file
+			, animation_file
+			, still_file
+			, recommend_id
+			, service_icon
+			, ppm_prod_id
+			, ppm_prod_type
+			, pps_prod_id
+			, pr_info
+			, kids_grade
+			, runtime
+			, is_51_ch
+			, is_caption
+			, is_hd
+			, synopsis
+			, watcha_point
+			, cine21_point AS cine_point
+			, poster_v
+			, poster_h
+			, add_info
+		  FROM
+		       (
+		        SELECT case when X.upp_no = 1 and X.order_no = 1 then 0 else 1 end top_flag,
+		        		case when X.parent_multi_yn = 'Y' then X.upp_no else X.order_no end real_no,
+		               X.upp_no, X.order_no, X.sort_no, X.favor_no,
+		               'CAT' result_type,
+		               X.conts_id,
+		               X.conts_nm,
+		               X.type,
+		               X.category_type,
+		               X.display_option,
+		               X.parent_cat_id,
+		               X.category_sub_name,
+		               case when X.sub_cnt > 0 then 'Y' else 'N' end sub_cat_yn,
+		               X.category_flag,
+		               X.cat_eng_level,
+		               X.image_file,
+		               X.animation_file,
+		               X.recommend_id,
+		               X.service_icon,
+		               X.ppm_prod_id,
+		               X.ppm_prod_type,
+		               X.pps_prod_id,
+		               X.pr_info,
+		               '' kids_grade,
+		               '' runtime,
+		               '' is_51_ch,
+		               '' is_caption,
+		               '' is_hd,
+		               '' synopsis,
+		               '' watcha_point,
+		               '' cine21_point,
+		               O.still_file,
+		               O.poster_v,
+		               O.poster_h,
+		               X.add_info,
+					   'Y' free_yn,
+					   NVL(O.start_date, '0') start_date,
+					   NVL(O.rank_info, '0') rank_info,
+					   case when ASCII(UPPER(X.conts_nm)) >= 45217 THEN '1'
+							when ASCII(UPPER(X.conts_nm)) BETWEEN '65'  AND '90' THEN '2'
+							when ASCII(UPPER(X.conts_nm)) BETWEEN '48'  AND '57'  THEN '3'
+							else '4' end title_order_flag
+		          FROM ( SELECT /*+USE_NL(A R)*/
+		          				NVL((
+		          				SELECT order_no
+		          				FROM
+		          				(
+		                          SELECT rownum order_no, category_id, parent_category_id
+		                            FROM (SELECT category_id, parent_category_id, category_name, sort_no
+		                                    FROM PT_VO_CATEGORY
+		                                   WHERE category_gb = 'NSC'
+		                                   START WITH category_id = #{catInfo_catId}
+		                                   CONNECT BY prior category_id = parent_category_id
+		                                   ORDER SIBLINGS BY parent_category_id, sort_no)
+		                        ) X
+		                        WHERE A.parent_category_id = X.category_id
+		                        ), 1) upp_no,
+		                        R.order_no, A.sort_no, NVL(A.cont_expired, '0000') favor_no,
+								A.category_id conts_id,
+								A.category_name conts_nm,
+								case when NVL(series_yn, 'N') = 'Y' then 'SER'
+									else (case NVL(A.caption_yn, '')
+												when 'A' then 'APP'
+												when 'R' then 'RCM'
+												when 'U' then 'MNU'
+												when 'P' then 'FLO'
+												when 'Q' then 'PRV'
+												else '' end)
+									end AS type,
+								case when A.actors_display IN ('B','C','P','G','T','E','R','H') then A.actors_display else '' end category_type,
+								case when NVL(A.order_yn, '') IN ('T','L') then A.order_yn else '' end display_option,
+								A.parent_category_id parent_cat_id,
+								NVL(A.thumbnail_file_name, '') category_sub_name,		                        
+		                        case when NVL(A.caption_yn, '') = 'L' then 'L' else DECODE(NVL(A.caption_yn, ''), 'U', Trim(A.point), DECODE(Trim(A.point), 'P', 'P', 'E', 'E', '')) end category_flag,
+		                        case when NVL(A.caption_yn, '') = 'L' then Trim(A.point) else '' end cat_eng_level,
+		                        A.img_file_name image_file,
+		                        A.wide_file_name animation_file,
+		                        case when NVL(A.caption_yn, '') IN ('A','R') then Trim(A.genre) end recommend_id,
+		                        A.service_icon,
+		                        case when NVL(A.caption_yn, '') IN ('S','M','K') then A.ppm_prod_id else '' end ppm_prod_id,
+		                        case when NVL(A.caption_yn, '') IN ('S','M','K') then A.caption_yn else '' end ppm_prod_type,
+		                        case when NVL(A.caption_yn, '') IN ('S','M','K') then '' else '' end pps_prod_id,
+		                        A.pr_info,
+		                        A.save_hd_price add_info,
+		                        NVL(A.test_sbc, 'N') test_sbc,
+		                        case when NVL(A.is_hd, 'N') = 'Y' then 'Y' else 'N' end multi_yn,
+		                        (SELECT NVL(U.is_hd, 'N') FROM PT_VO_CATEGORY U
+		                          WHERE U.category_id = A.parent_category_id) parent_multi_yn, 
+		                        (SELECT COUNT(C.category_id) FROM PT_VO_CATEGORY C
+		                          WHERE C.category_gb = 'NSC'
+		                            AND C.parent_category_id = A.category_id
+		                            AND NVL(C.test_sbc, 'N') IN ('N', #{testSbc})
+		                            AND NVL(C.ch_51_yn, 'N') != 'X'
+		                            AND NVL(C.is_cat_fh, 'N') != 'H') sub_cnt,
+		                        NVL(A.point, '0') AS level_vlaue,
+		                        case when R.ppm_prod_type IN ('S','M') and NVL(A.point, '0') > '0'
+									then (SELECT case when count(*) > 0 then 'Y' else 'N' end ppm_subsc_yn
+											FROM PVSUSER.XCION_VOD_BOOK_TRF_TBL F,
+												PVSUSER.PV_PROD_PRODUCT_TBL V
+											WHERE F.pvs_sbc_cont_no = #{stbSaId}
+											AND F.tbdv_prod_divs_cd IN ('B', 'C')
+											AND F.tbdv_prod_rqst_dt >= TO_CHAR(add_months(sysdate, -24), 'YYYYMMDD')
+											AND F.tbdv_prod_cd = V.prod_cd
+											AND V.product_cd in (SELECT iptv_product_id FROM IMCSUSER.PT_PD_PACKAGE_MAP
+                                                                             WHERE mapping_type = 'N'
+                                                                              AND nsc_product_id in (SELECT R.ppm_prod_id FROM dual
+                                                                                                     UNION ALL
+                                                                                                     SELECT product_id FROM IMCSUSER.PT_PD_PACKAGE_RELATION
+                                                                                                      WHERE p_product_id = R.ppm_prod_id))
+
+											AND F.tbdv_tms = NVL(A.point, '0'))
+									else 'Y' end AS ppm_subsc_yn
+		                   FROM PT_VO_CATEGORY A,
+		                         (SELECT rownum order_no, category_id, parent_category_id,
+										MAX(ppm_prod_type) over (partition by 0) ppm_prod_type,
+										MAX(ppm_prod_id) over (partition by 0) ppm_prod_id
+		                           FROM (SELECT category_id, parent_category_id, category_name, sort_no,
+												case when caption_yn in ('S','M') then caption_yn else '0' end ppm_prod_type,
+												case when caption_yn in ('S','M') then ppm_prod_id else '' end ppm_prod_id
+		                                   FROM PT_VO_CATEGORY
+		                                  WHERE category_gb = 'NSC'
+		                                  AND NVL(nsc_gb, 'N') = 'KID'
+		                                  AND category_level &lt;= #{iLastLevel}
+		                                  START WITH category_id = #{catInfo_catId}
+		                                  CONNECT BY prior category_id = parent_category_id
+		                                  ORDER SIBLINGS BY parent_category_id, sort_no) ) R
+		                  WHERE A.category_id = R.category_id
+		                    AND A.category_gb = 'NSC'
+		                    AND NVL(A.nsc_gb, 'N') = 'KID'
+		                    AND NVL(A.ch_51_yn, 'N') != 'X'
+		                    AND NVL(A.test_sbc, 'N') IN ('N', #{testSbc})
+		                    AND NVL(A.is_cat_fh, 'N') != 'H'
+		                    AND A.category_level &lt;= #{iLastLevel}
+		               ) X,
+		               ( SELECT /*+LEADING(Y) USE_NL(A U V S)*/
+		                        Y.category_id, Y.album_id, NVL(FF.rank_info, 99999) rank_info,
+		                        DECODE(TO_CHAR(TO_NUMBER(SUBSTR(V.display_run_time,1,2))*60 + TO_NUMBER(SUBSTR(V.display_run_time,3,2))), '0', '1',
+		                               TO_CHAR(TO_NUMBER(SUBSTR(V.display_run_time,1,2))*60 + TO_NUMBER(SUBSTR(V.display_run_time,3,2))) ) runtime,
+		                        MAX(U.licensing_window_start) start_date,
+		                        MAX(case when S.poster_type = 'T' then S.content_value else '' end) poster_h,
+		                        MAX(case when S.poster_type = 'P' then S.content_value else '' end) poster_v,
+		                        (SELECT A.main_img_file_name FROM IMCSUSER.PT_LA_ALBUM_IMG A WHERE A.adi_album_id = Y.album_id AND A.img_flag = 'N' AND ROWNUM = 1) still_file
+		                   FROM (SELECT /*+USE_NL(X M)*/
+		                                M.category_id, MAX(M.contents_id) album_id
+		                           FROM PT_VO_CATEGORY_MAP M,
+		                                (SELECT A.category_id,
+		                                        case when NVL(A.close_yn , 'N') = 'Y' then MAX(B.rank_no) else MIN(B.rank_no) end rank_no
+		                                   FROM (SELECT category_id, close_yn FROM PT_VO_CATEGORY
+		                                          WHERE NVL(series_yn, 'N') = 'Y'
+		                                            AND category_gb = 'NSC'
+		                                            AND NVL(nsc_gb, 'N') = 'KID'
+		                                            AND NVL(ch_51_yn, 'N') != 'X'
+		                                            AND NVL(is_cat_fh, 'N') != 'H'
+		                                            AND category_level &lt;= #{iLastLevel}
+		                                            START WITH category_id = #{catInfo_catId}
+		                                          CONNECT BY PRIOR category_id = parent_category_id) A,
+		                                        PT_VO_CATEGORY_MAP B
+		                                  WHERE A.category_id = B.category_id
+		                                    AND NVL(B.viewing_flag, 'V') = 'V'
+		                                  GROUP BY A.category_id, A.close_yn ) X
+		                          WHERE M.category_id = X.category_id
+		                            AND M.rank_no = X.rank_no
+		                          GROUP BY M.category_id
+		                        ) Y,
+		                        IMCSUSER.PT_LA_ALBUM_INFO A,
+		                        IMCSUSER.PT_LA_ALBUM_PLATFORM U,
+		                        IMCSUSER.PT_LA_ALBUM_SUB V,
+		                        IMCSUSER.PT_LA_ALBUM_POSTER S,
+								<choose>
+									<when test='orderType != null and orderType.equals("F")'>
+										<include refid="listCategoryMenuList_include_aaa" />
+									</when>
+									<otherwise>
+										<include refid="listCategoryMenuList_include_bbb" />
+									</otherwise>
+								</choose>
+		                  WHERE Y.album_id = A.album_id
+		                    AND Y.album_id = U.album_id
+		                    AND Y.album_id = S.album_id
+		                    AND Y.album_id = V.album_id
+		                    AND Y.album_id = FF.statistics_id(+)
+		                    AND U.screen_type = 'N'
+		                    AND S.screen_type = 'N'
+		                    AND S.poster_type IN ('P', 'T')
+		                    AND S.service_yn = 'Y'
+		                  GROUP BY Y.category_id, Y.album_id, V.display_run_time, FF.rank_info
+		               ) O
+		         WHERE X.conts_id = O.category_id (+)
+					AND X.ppm_subsc_yn = 'Y'
+		        UNION
+		        SELECT 1 top_flag,
+		        		case when X.parent_multi_yn = 'Y' then X.upp_no else X.order_no + 10000 end real_no,
+		               X.upp_no, X.order_no, X.sort_no, X.favor_no,
+		               'ALB' result_type,
+		               X.conts_id,
+		               X.conts_nm,
+		               '' type,
+		               '' category_type,
+		               '' display_option,
+		               X.parent_cat_id,
+		               '' category_sub_name,
+		               'N' sub_cat_yn,
+		               '' category_flag,
+		               '' cat_eng_level,
+		               X.poster_v image_file,
+		               '' animation_file,
+		               '' recommend_id,
+		               X.service_icon,
+		               '' ppm_prod_id,
+		               '' ppm_prod_type,
+		               '' pps_prod_id,
+		               X.pr_info,
+		               X.kids_grade,
+		               X.runtime,
+		               X.is_51_ch,
+		               X.is_caption,
+		               X.is_hd,
+		               X.synopsis,
+		               X.watcha_point,
+		               X.cine21_point,
+		               (SELECT A.main_img_file_name FROM IMCSUSER.PT_LA_ALBUM_IMG A WHERE A.adi_album_id = X.conts_id AND A.img_flag = 'N' AND ROWNUM = 1) still_file,
+		               X.poster_v,
+		               X.poster_h,
+		               X.add_info,
+					   X.free_yn,
+					   X.start_date,
+					   X.rank_info,
+					   case when ASCII(UPPER(X.conts_nm)) >= 45217 THEN '1'
+							when ASCII(UPPER(X.conts_nm)) BETWEEN '65'  AND '90' THEN '2'
+							when ASCII(UPPER(X.conts_nm)) BETWEEN '48'  AND '57'  THEN '3'
+							else '4' end title_order_flag
+		          FROM (SELECT /*+USE_NL(X W N)*/
+		                       X.real_no, X.upp_no, X.order_no, X.rank_no sort_no, X.favor_no,
+		                       X.category_id parent_cat_id, X.multi_yn parent_multi_yn,
+		                       X.conts_id, X.conts_nm, X.service_icon, X.synopsis,
+		                       X.pr_info, X.kids_grade, X.runtime,
+		                       X.add_info, X.start_date,
+		                       NVL(FF.rank_info, 99999) rank_info,
+		                       MAX(X.is_51ch) is_51_ch,
+		                       MAX(X.is_caption) is_caption,
+		                       MAX(X.is_hd) is_hd,
+		                       MAX(case when X.poster_type = 'T' and X.service_yn = 'Y' then X.content_value else '' end) poster_h,
+		                       MAX(case when X.poster_type = 'P' and X.service_yn = 'Y' then X.content_value else '' end) poster_v,
+		                       MAX(case when NVL(W.avg_rating, '') is not null then TRIM(TO_CHAR(W.avg_rating,'0.0')) else '' end) watcha_point,
+		                       MAX(NVL(N.cine_avg_point, '0')) cine21_point,
+		                       MAX(X.free_yn) free_yn
+		                  FROM ( SELECT /*+LEADING(A) USE_NL(M L T P I C D G S) */
+		                                A.real_no, A.upp_no, A.order_no, A.sort_no, M.rank_no, NVL(M.favor_no, '0000') favor_no,
+		                                A.category_id, A.multi_yn, A.test_sbc, NVL(M.viewing_flag, 'V') viewing_flag,
+		                                M.contents_id conts_id,
+		                                L.album_name conts_nm,
+		                                P.service_icon,
+		                                NVL(T.rating_cd, '') pr_info,
+		                                T.kids_grade,
+		                                DECODE(NVL(T.run_time, '0'), '0', '1', TO_CHAR(TO_NUMBER(SUBSTR(T.run_time, 1, 2)) * 60 + TO_NUMBER(SUBSTR(T.run_time, 3, 2)))) runtime,
+		                                case when SUBSTR(NVL(UPPER(C.audio_type), 'N'), 9) = 'DOLBY 5.1' then 'Y' else 'N' end is_51ch,
+		                                NVL(P.smi_yn, 'N') is_caption,
+		                                case when NVL(C.hdcontent, 'N') = 'Y' OR NVL(C.hdcontent, 'N') = 'S' then 'Y' else 'N' end is_hd,
+		                                SUBSTRB(REPLACE(REPLACE(TRIM(NVL(P.summary_long, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n'), 1, 1024) synopsis,
+		                                T.cine_id, S.poster_type, S.service_yn, S.content_value, S.second_value,
+		                                T.sub_title add_info, P.licensing_window_start start_date,
+										case when G.product_type = '0' then 'Y' else 'N' end free_yn
+								FROM ( SELECT XX.real_no, XX.upp_no, XX.order_no, XX.sort_no,
+											XX.category_id, XX.test_sbc, XX.multi_yn
+										FROM
+		                           			( SELECT /*+USE_NL(J R)*/
+		                                         R.order_no real_no, R.order_no upp_no, R.order_no, J.sort_no,
+		                                         J.category_id, NVL(J.test_sbc, 'N') test_sbc,
+		                                         DECODE(NVL(J.is_hd, 'N'), 'Y', 'Y', 'N') multi_yn, NVL(J.point, '0') level_vlaue,
+												case when R.ppm_prod_type IN ('S','M') and NVL(J.point, '0') > '0'
+													then (SELECT case when count(*) > 0 then 'Y' else 'N' end ppm_subsc_yn
+															FROM PVSUSER.XCION_VOD_BOOK_TRF_TBL A,
+																PVSUSER.PV_PROD_PRODUCT_TBL B
+															WHERE A.pvs_sbc_cont_no = #{stbSaId}
+															AND A.tbdv_prod_divs_cd IN ('B', 'C')
+ 															AND A.tbdv_prod_rqst_dt >= TO_CHAR(add_months(sysdate, -24), 'YYYYMMDD')
+															AND A.tbdv_prod_cd = B.prod_cd
+															AND B.product_cd in (SELECT iptv_product_id FROM IMCSUSER.PT_PD_PACKAGE_MAP
+                                                                             WHERE mapping_type = 'N'
+                                                                              AND nsc_product_id in (SELECT R.ppm_prod_id FROM dual
+                                                                                                     UNION ALL
+                                                                                                     SELECT product_id FROM IMCSUSER.PT_PD_PACKAGE_RELATION
+                                                                                                      WHERE p_product_id = R.ppm_prod_id))
+															AND A.tbdv_tms = NVL(J.point, '0'))
+													else 'Y' end ppm_subsc_yn
+		                                    FROM PT_VO_CATEGORY J,
+		                                          (SELECT rownum order_no, category_id, parent_category_id,
+															MAX(ppm_prod_type) over (partition by 0) ppm_prod_type,
+															MAX(ppm_prod_id) over (partition by 0) ppm_prod_id
+		                                             FROM (SELECT category_id, parent_category_id, category_name, sort_no,
+																	case when caption_yn in ('S','M') then caption_yn else '0' end ppm_prod_type,
+																	case when caption_yn in ('S','M') then ppm_prod_id else '' end ppm_prod_id
+		                                                     FROM PT_VO_CATEGORY
+		                                                    WHERE category_gb = 'NSC'
+		                                                    AND NVL(nsc_gb, 'N') = 'KID'
+		                                                    AND category_level &lt; #{iLastLevel}
+		                                                    START WITH category_id = #{catInfo_catId}
+		                                                    CONNECT BY prior category_id = parent_category_id
+		                                                    ORDER SIBLINGS BY parent_category_id, sort_no) ) R
+		                                   WHERE 1 = 1
+		                                     AND J.category_gb = 'NSC'
+		                                     AND NVL(J.nsc_gb, 'N') = 'KID'
+		                                     AND NVL(J.series_yn, 'N') = 'N'
+		                                     AND NVL(J.ch_51_yn, 'N') != 'X'
+		                                     AND NVL(J.test_sbc, 'N') IN ('N', #{testSbc})
+		                                     AND NVL(J.is_cat_fh, 'N') != 'H'
+		                                     AND J.category_level &lt; #{iLastLevel}
+		                                     AND J.category_id = R.category_id
+		                                   START WITH J.category_id = #{catInfo_catId}
+		                                   CONNECT BY PRIOR J.category_id = J.parent_category_id ) XX
+										WHERE XX.ppm_subsc_yn = 'Y' ) A,
+		                                PT_VO_CATEGORY_MAP M,
+		                                IMCSUSER.PT_LA_ALBUM_INFO L,
+		                                IMCSUSER.PT_LA_ALBUM_SUB T,
+		                                IMCSUSER.PT_LA_ALBUM_PLATFORM P,
+		                                IMCSUSER.PT_LA_ALBUM_SMI I,
+		                                IMCSUSER.PT_LA_ASSET_INFO C,
+		                                IMCSUSER.PT_LA_ALBUM_POSTER S,
+		                                IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+		                                IMCSUSER.PT_PD_PACKAGE G
+		                          WHERE 1 = 1
+		                            AND A.category_id = M.category_id
+		                            AND M.contents_id = L.album_id
+		                            AND L.album_id = T.album_id
+		                            AND L.album_id = P.album_id
+		                            AND L.album_id = I.album_id
+		                            AND L.album_id = C.album_id
+		                            AND L.album_id = S.album_id
+		                            AND P.screen_type = 'N'
+		                            AND P.screen_type = C.screen_type
+		                            AND P.screen_type = I.screen_type
+		                            AND P.screen_type = S.screen_type
+		                            AND S.poster_type IN ('P', 'T')
+		                            AND S.service_yn = 'Y'
+		                            AND C.asset_id = D.contents_id
+		                            AND D.product_id = G.product_id
+		                            AND NVL(L.high_quality_type, 'N') != 'H'
+		                            AND (NVL(M.viewing_flag, 'V') IN ('V', #{viewFlag}) OR NVL(C.reserved_flag, 'N') IN ('R', 'P', 'X'))
+		                       ) X,
+		                       IMCSUSER.PT_WC_WATCHA_RATING W,
+		                       IMCSUSER.PT_WC_CINE_RATING N,
+		                       <choose>
+									<when test='orderType != null and orderType.equals("F")'>
+										<include refid="listCategoryMenuList_include_aaa" />
+									</when>
+									<otherwise>
+										<include refid="listCategoryMenuList_include_bbb" />
+									</otherwise>
+							   </choose>
+		                 WHERE 1=1
+		                   AND X.conts_id = W.album_id (+)
+		                   AND X.cine_id = N.cine_id (+)
+		                   AND X.conts_id = FF.statistics_id (+)
+		                 GROUP BY X.real_no, X.upp_no, X.order_no, X.rank_no, X.favor_no,
+		                          X.category_id, X.multi_yn, X.test_sbc, X.viewing_flag,
+		                          X.conts_id, X.conts_nm, X.service_icon, X.pr_info, X.kids_grade, X.runtime, X.synopsis, X.add_info, X.start_date, FF.rank_info
+		               ) X
+		        ) XX
+		        WHERE 1=1
+		        <choose>
+		        	<when test='requestType != null and requestType.equals("C")'>
+		        		AND conts_id != #{catId}
+			        	AND NVL(type, 'X') NOT IN ('APP')			        	
+			        	<if test='freeYn != null and freeYn.equals("Y")'>
+			        		AND free_yn = 'Y'
+			        	</if>
+		        	</when>
+		        	<otherwise>
+		        		<if test='freeYn != null and freeYn.equals("Y")'>
+			        		AND free_yn = 'Y'
+			        	</if>
+			        </otherwise>
+		        </choose>
+		        <choose>
+		        	<when test='orderType != null and orderType.equals("C")'>
+		        		ORDER BY top_flag, upp_no, start_date DESC, (case when favor_no = '0000' then DECODE(result_type, 'CAT','1','2') else favor_no end), sort_no ASC
+		        	</when>
+		        	<when test='orderType != null and orderType.equals("A")'>
+		        		ORDER BY top_flag, upp_no, title_order_flag, conts_nm, (case when favor_no = '0000' then DECODE(result_type, 'CAT','1','2') else favor_no end), sort_no ASC
+		        	</when>
+		        	<when test='orderType != null and orderType.equals("F")'>
+		        		ORDER BY top_flag, upp_no, rank_info, (case when favor_no = '0000' then DECODE(result_type, 'CAT','1','2') else favor_no end), sort_no ASC
+		        	</when>
+		        	<otherwise>
+		        		ORDER BY real_no, upp_no, (case when favor_no = '0000' then DECODE(result_type, 'CAT','1','2') else favor_no end), sort_no ASC
+		        	</otherwise>
+		        </choose>
+	</select>
+	
+	<!-- 캐릭터 전체보기(type = C)요청한 카테고리 정보 가져오기 -->
+	<select id="getCategoryInfo_type_c" resultType="KidsMenuCategoryInfo_VO" parameterType="GetNSKidsMenuRequestVO">		
+		SELECT
+			A.category_id
+			, A.category_name AS category_nm
+			, case when A.actors_display IN ('B','C','P','G','T','E','R','H') then A.actors_display else 'M' end AS category_type
+			, case NVL(A.caption_yn, '') when 'A' then 'APP' when 'R' then 'RCM' when 'U' then 'MNU' when 'T' then 'TOP' else '' end AS menu_type
+			, A.select_file_name AS top_image
+			, A.thumbnail_file_name AS guide_text
+			, NVL(B.goods_id, '') AS goods_id
+			, NVL(B.goods_info, '') AS goods_text
+			, A.category_level
+		FROM PT_VO_CATEGORY A,
+			(SELECT goods_id, goods_info FROM IMCSUSER.PT_KD_GOODS_MST
+				WHERE NVL(viewing_flag, 'V') IN ('V', #{viewFlag})
+			) B
+		WHERE A.category_id = (SELECT parent_category_id FROM PT_VO_CATEGORY WHERE category_id = #{catId})
+		AND A.category_id != #{catId}
+		AND A.category_gb = 'NSC'
+		AND NVL(A.test_sbc, 'N') IN ('N', #{testSbc})
+		AND NVL(A.nsc_gb, 'X') = 'KID'
+		AND NVL(A.series_yn, 'N') = 'N'
+		AND A.product_id = B.goods_id (+)
+	</select>
+	
+	<!-- 영어유치원 레벨별 보기(type = L) 요청한 카테고리 정보 가져오기 -->
+	<select id="getCategoryInfo_type_L" resultType="KidsMenuCategoryInfo_VO" parameterType="GetNSKidsMenuRequestVO">		
+		SELECT
+			A.category_id
+		FROM PT_VO_CATEGORY A
+		WHERE A.category_id = (SELECT parent_category_id FROM PT_VO_CATEGORY WHERE category_id = #{catId})
+		AND A.category_id != #{catId}
+		AND A.category_gb = 'NSC'
+		AND NVL(A.test_sbc, 'N') IN ('N', #{testSbc})
+		AND NVL(A.nsc_gb, 'X') = 'KID'
+		AND NVL(A.series_yn, 'N') = 'N'
+	</select>
+	
+	<!-- 영어유치원 레벨별 보기 메뉴 정보 제공 -->
+	<select id="listCategoryLevelMenu" resultType="KidsMenuMenuList_VO" parameterType="GetNSKidsMenuRequestVO">
+		SELECT
+			result_type
+			, conts_id
+			, conts_nm
+			, type
+			, category_type
+			, display_option
+			, parent_cat_id AS parent_id
+			, category_sub_name
+			, sub_cat_yn
+			, category_flag
+			, cat_eng_level
+			, image_file
+			, animation_file
+			, still_file
+			, recommend_id
+			, service_icon
+			, ppm_prod_id
+			, ppm_prod_type
+			, pps_prod_id
+			, pr_info
+			, kids_grade
+			, runtime
+			, is_51_ch
+			, is_caption
+			, is_hd
+			, synopsis
+			, '' AS watcha_point
+			, '' AS cine_point
+			, poster_v
+			, poster_h
+			, poster_r
+		FROM (
+			SELECT
+				P.sort_no,
+				0 order_flag,
+				M.rank_no,
+				'CAT' result_type,
+				M.conts_id,
+				P.category_name conts_nm,
+				M.type,
+				M.category_type,
+				M.display_option,
+				M.parent_cat_id,
+				M.category_sub_name,
+				'N' sub_cat_yn,
+				M.category_flag,
+				M.cat_eng_level,
+				M.image_file,
+				M.animation_file,
+				'' still_file,
+				'' recommend_id,
+				M.service_icon,
+				'' ppm_prod_id,
+				'' ppm_subscribe_yn,
+				'' ppm_prod_type,
+				'' pps_prod_id,
+				M.pr_info,
+				'' kids_grade,
+				'' runtime,
+				'' is_51_ch,
+				'' is_caption,
+				'' is_hd,
+				'' synopsis,
+				'' poster_h,
+				'' poster_v,
+				'' poster_r
+			FROM (
+				SELECT
+					R.category_id conts_id
+					, R.category_name conts_nm
+					, case when NVL(series_yn, 'N') = 'Y' then 'SER'
+							else (case NVL(R.caption_yn, '')
+										when 'A' then 'APP'
+										when 'R' then 'RCM'
+										when 'U' then 'MNU'
+										when 'D' then 'DIR'
+										when 'Q' then 'PRV'
+										else '' end)
+							end AS type,
+					case when R.actors_display IN ('B','C','P','G','T','E','R','H') then R.actors_display else '' end category_type,
+					case when NVL(R.order_yn, '') IN ('T','L') then R.order_yn else '' end display_option,
+					R.parent_category_id parent_cat_id,
+					NVL(R.thumbnail_file_name, '') category_sub_name,
+					'' category_flag,
+					R.point cat_eng_level,
+					'' image_file,
+					'' animation_file,
+					'' recommend_id,
+					R.service_icon,
+					R.pr_info,
+					R.sort_no,
+					0 rank_no
+				FROM PT_VO_CATEGORY R
+				WHERE R.category_gb = 'NSC'
+				AND NVL(R.nsc_gb, 'N') = 'KID'
+				AND NVL(R.ch_51_yn, 'N') != 'X'
+				AND NVL(R.test_sbc, 'N') IN ('N', #{testSbc})
+				AND NVL(R.is_cat_fh, 'N') != 'H'
+				AND NVL(R.point, 0) between '1' and '9'
+				START WITH R.category_id = #{catInfo_catId}
+				CONNECT BY PRIOR R.category_id = R.parent_category_id
+			) M,
+			(
+				SELECT R.category_id, R.category_name, R.parent_category_id, R.sort_no
+				FROM PT_VO_CATEGORY R
+				WHERE R.category_gb = 'NSC'
+				AND NVL(R.nsc_gb, 'N') = 'KID'
+				AND NVL(R.ch_51_yn, 'N') != 'X'
+				AND NVL(R.test_sbc, 'N') IN ('N', #{testSbc})
+				AND NVL(R.is_cat_fh, 'N') != 'H'
+				AND NVL(R.caption_yn, '') = 'L'
+				START WITH category_id = #{catInfo_catId}
+				CONNECT BY PRIOR R.category_id = R.parent_category_id
+			) P
+			WHERE M.parent_cat_id = P.category_id
+			UNION ALL
+			SELECT
+				X.sort_no,
+				1 order_flag,
+				X.rank_no,
+				'ALB' result_type,
+				X.conts_id,
+				X.conts_nm,
+				'' type,
+				'' category_type,
+				'' display_option,
+				X.parent_cat_id,
+				'' category_sub_name,
+				'' sub_cat_yn,
+				'' category_flag,
+				X.cat_eng_level,
+				X.poster_v image_file,
+				'' animation_file,
+				(SELECT A.main_img_file_name FROM IMCSUSER.PT_LA_ALBUM_IMG A WHERE A.adi_album_id = X.conts_id AND A.img_flag = 'N' AND ROWNUM = 1) still_file,
+				'' recommend_id,
+				X.service_icon,
+				'' ppm_prod_id,
+				'' ppm_subscribe_yn,
+				'' ppm_prod_type,
+				'' pps_prod_id,
+				X.pr_info,
+				X.kids_grade,
+				X.runtime,
+				X.is_51_ch,
+				X.is_caption,
+				X.is_hd,
+				X.synopsis,
+				'' poster_h,
+				'' poster_v,
+				'' poster_r
+			FROM (
+				SELECT /*+USE_NL(X W N)*/
+					X.sort_no, X.rank_no, X.category_id parent_cat_id, X.cat_eng_level,
+					case when X.test_sbc = 'Y' OR X.viewing_flag = 'T' then 'Y' else 'N' end test_sbc,
+					X.conts_id, X.conts_nm, X.service_icon, X.pr_info, X.kids_grade, X.runtime, X.synopsis,
+					MAX(X.is_51ch) is_51_ch,
+					MAX(X.is_caption) is_caption,
+					MAX(X.is_hd) is_hd,
+					MAX(case when X.poster_type = 'T' and X.service_yn = 'Y' then X.content_value else '' end) poster_r,
+					MAX(case when X.poster_type = 'T' and X.service_yn = 'Y' then X.content_value else '' end) poster_h,
+					MAX(case when X.poster_type = 'P' and X.service_yn = 'Y' then X.content_value else '' end) poster_v
+				FROM (
+					SELECT /*+LEADING(A) USE_NL(M L T P I C D G S) */
+						A.sort_no, DECODE(A.multi_yn, 'Y', TO_NUMBER(NVL(M.favor_no, '0000')), M.rank_no) rank_no,
+						A.category_id, A.cat_eng_level, A.test_sbc, NVL(M.viewing_flag, 'V') viewing_flag,
+						A.multi_yn, M.contents_id conts_id, L.album_name conts_nm, P.service_icon,
+						NVL(T.rating_cd, '') pr_info, T.kids_grade, NVL(P.smi_yn, 'N') is_caption,
+						DECODE(NVL(T.run_time, '0'), '0', '1', TO_CHAR(TO_NUMBER(SUBSTR(T.run_time, 1, 2)) * 60 + TO_NUMBER(SUBSTR(T.run_time, 3, 2)))) runtime,
+						SUBSTRB(REPLACE(REPLACE(TRIM(NVL(P.summary_long, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n'), 1, 1024) synopsis,
+						case when SUBSTR(NVL(UPPER(C.audio_type), 'N'), 9) = 'DOLBY 5.1' then 'Y' else 'N' end is_51ch,
+						case when NVL(C.hdcontent, 'N') = 'Y' OR NVL(C.hdcontent, 'N') = 'S' then 'Y' else 'N' end is_hd,
+						T.cine_id, S.poster_type, S.service_yn, S.content_value, S.second_value
+					FROM (
+						SELECT R.category_id, NVL(R.test_sbc, 'N') test_sbc,
+							R.point cat_eng_level,
+							DECODE(NVL(R.is_hd, 'N'), 'Y', 'Y', 'N') multi_yn,
+							(SELECT B.sort_no FROM PT_VO_CATEGORY B WHERE B.category_id = R.parent_category_id) sort_no
+						FROM PT_VO_CATEGORY R
+						WHERE R.category_gb = 'NSC'
+						AND NVL(R.nsc_gb, 'N') = 'KID'
+						AND NVL(R.series_yn, 'N') = 'N'
+						AND NVL(R.ch_51_yn, 'N') != 'X'
+						AND NVL(R.is_cat_fh, 'N') != 'H'
+						AND NVL(R.test_sbc, 'N') IN ('N', #{testSbc})
+						AND NVL(R.point, '0') between '1' and '9'
+						START WITH R.category_id = #{catInfo_catId}
+						CONNECT BY PRIOR R.category_id = R.parent_category_id
+					) A,
+						PT_VO_CATEGORY_MAP M,
+						IMCSUSER.PT_LA_ALBUM_INFO L,
+						IMCSUSER.PT_LA_ALBUM_SUB T,
+						IMCSUSER.PT_LA_ALBUM_PLATFORM P,
+						IMCSUSER.PT_LA_ALBUM_SMI I,
+						IMCSUSER.PT_LA_ASSET_INFO C,
+						IMCSUSER.PT_LA_ALBUM_POSTER S,
+						IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+						IMCSUSER.PT_PD_PACKAGE G
+					WHERE 1 = 1
+					AND A.category_id = M.category_id
+					AND M.contents_id = L.album_id
+					AND L.album_id = T.album_id
+					AND L.album_id = P.album_id
+					AND L.album_id = I.album_id
+					AND L.album_id = C.album_id
+					AND L.album_id = S.album_id
+					AND P.screen_type = 'N'
+					AND P.screen_type = C.screen_type
+					AND P.screen_type = I.screen_type
+					AND P.screen_type = S.screen_type
+					AND S.poster_type IN ('P','T')
+					AND S.service_yn = 'Y'
+					AND C.asset_id = D.contents_id
+					AND D.product_id = G.product_id
+					AND NVL(L.high_quality_type, 'N') != 'H'
+					AND (NVL(M.viewing_flag, 'V') IN ('V', #{viewFlag}))
+				) X
+				WHERE 1=1
+				GROUP BY X.sort_no, X.rank_no, X.category_id, X.test_sbc, X.cat_eng_level, X.viewing_flag,
+					X.conts_id, X.conts_nm, X.service_icon, X.pr_info, X.kids_grade, X.runtime, X.synopsis
+			) X
+			UNION ALL
+			SELECT
+				P.sort_no,
+				case when P.multi_yn = 'Y' then 1 else 0 end order_flag,
+				case when P.multi_yn = 'Y' then M.rank_no else M.sort_no end rank_no,
+				'CAT' result_type,
+				M.conts_id,
+				M.conts_nm,
+				M.type,
+				M.category_type,
+				M.display_option,
+				M.parent_cat_id,
+				M.category_sub_name,
+				'N' sub_cat_yn,
+				'' category_flag,
+				P.cat_eng_level,
+				M.image_file,
+				M.animation_file,
+				O.still_file,
+				'' recommend_id,
+				M.service_icon,
+				'' ppm_prod_id,
+				'' ppm_subscribe_yn,
+				'' ppm_prod_type,
+				'' pps_prod_id,
+				M.pr_info,
+				'' kids_grade,
+				'' runtime,
+				'' is_51_ch,
+				'' is_caption,
+				'' is_hd,
+				'' synopsis,
+				O.poster_h,
+				O.poster_v,
+				O.poster_r
+			FROM (
+				SELECT
+					A.category_id conts_id, A.category_name conts_nm,
+					case when NVL(series_yn, 'N') = 'Y' then 'SER'
+						else (case NVL(A.caption_yn, '')
+								when 'A' then 'APP'
+								when 'R' then 'RCM'
+								when 'U' then 'MNU'
+								when 'Q' then 'PRV'
+								else '' end)
+						end type,
+					case when A.actors_display IN ('B','C','P','G','T','E','R','H') then A.actors_display else '' end category_type,
+					case when NVL(A.order_yn, '') IN ('T','L') then A.order_yn else '' end display_option,
+					A.parent_category_id parent_cat_id, NVL(A.thumbnail_file_name, '') category_sub_name,
+					A.point cat_eng_level, A.img_file_name image_file, A.wide_file_name animation_file,
+					A.service_icon, A.pr_info, A.sort_no, TO_NUMBER(NVL(A.cont_expired, '0000')) rank_no
+				FROM PT_VO_CATEGORY A
+				WHERE 1 = 1
+				AND A.category_gb = 'NSC'
+				AND NVL(A.nsc_gb, 'N') = 'KID'
+				AND NVL(A.series_yn, 'N') = 'Y'
+				AND NVL(A.ch_51_yn, 'N') != 'X'
+				AND NVL(A.is_cat_fh, 'N') != 'H'
+				AND NVL(A.test_sbc, 'N') IN ('N', #{testSbc})
+				START WITH A.category_id = #{catInfo_catId}
+				CONNECT BY PRIOR A.category_id = A.parent_category_id
+			) M,
+			(
+				SELECT A.category_id, A.category_name, A.parent_category_id, A.point cat_eng_level,
+					DECODE(NVL(A.is_hd, 'N'), 'Y', 'Y', 'N') multi_yn, A.sort_no rank_no,
+					(SELECT B.sort_no FROM PT_VO_CATEGORY B WHERE B.category_id = A.parent_category_id) sort_no
+				FROM PT_VO_CATEGORY A
+				WHERE A.category_gb = 'NSC'
+				AND NVL(A.nsc_gb, 'N') = 'KID'
+				AND NVL(A.ch_51_yn, 'N') != 'X'
+				AND NVL(A.is_cat_fh, 'N') != 'H'
+				AND NVL(A.test_sbc, 'N') IN ('N', #{testSbc})
+				AND NVL(A.point, '0') between '1' and '9'
+				START WITH A.category_id = #{catInfo_catId}
+				CONNECT BY PRIOR A.category_id = A.parent_category_id
+			) P,
+			(
+				SELECT /*+LEADING(Y) USE_NL(A U V S)*/
+					Y.category_id, Y.album_id,
+					MAX(case when S.poster_type = 'T' then S.content_value else '' end) poster_r,
+					MAX(case when S.poster_type = 'T' then S.content_value else '' end) poster_h,
+					MAX(case when S.poster_type = 'P' then S.content_value else '' end) poster_v,
+					(SELECT A.main_img_file_name FROM IMCSUSER.PT_LA_ALBUM_IMG A WHERE A.adi_album_id = Y.album_id AND A.img_flag = 'S' AND ROWNUM = 1) still_file
+				FROM (
+					SELECT /*+USE_NL(X M)*/
+						M.category_id, MAX(M.contents_id) album_id
+					FROM PT_VO_CATEGORY_MAP M,
+						(
+							SELECT A.category_id,
+								case when NVL(A.close_yn , 'N') = 'Y' then MAX(B.rank_no) else MIN(B.rank_no) end rank_no
+							FROM (
+								SELECT category_id, close_yn FROM PT_VO_CATEGORY
+								WHERE category_gb = 'NSC'
+								AND NVL(nsc_gb, 'N') = 'KID'
+								AND NVL(series_yn, 'N') = 'Y'
+								AND NVL(ch_51_yn, 'N') != 'X'
+								AND NVL(is_cat_fh, 'N') != 'H'
+								START WITH category_id = #{catInfo_catId}
+								CONNECT BY PRIOR category_id = parent_category_id
+							) A, PT_VO_CATEGORY_MAP B
+							WHERE A.category_id = B.category_id
+							AND NVL(B.viewing_flag, 'V') IN ('V', #{viewFlag})
+							GROUP BY A.category_id, A.close_yn
+						) X
+							WHERE M.category_id = X.category_id
+							AND M.rank_no = X.rank_no
+							GROUP BY M.category_id
+					) Y,
+						IMCSUSER.PT_LA_ALBUM_INFO A,
+						IMCSUSER.PT_LA_ALBUM_PLATFORM U,
+						IMCSUSER.PT_LA_ALBUM_SUB V,
+						IMCSUSER.PT_LA_ALBUM_POSTER S
+					WHERE Y.album_id = A.album_id
+					AND Y.album_id = U.album_id
+					AND Y.album_id = S.album_id
+					AND Y.album_id = V.album_id
+					AND U.screen_type = 'N'
+					AND S.screen_type = 'N'
+					AND S.poster_type IN ('T','P')
+					AND S.service_yn = 'Y'
+					GROUP BY Y.category_id, Y.album_id, V.display_run_time
+				) O
+				WHERE M.parent_cat_id = P.category_id
+				AND M.conts_id = O.category_id (+)
+			) XX
+		WHERE cat_eng_level = #{requestCode}
+		ORDER BY cat_eng_level, sort_no, order_flag, rank_no
+	</select>
+	
+	<!-- 흘려듣기 영상 정보 가져오기(temp_level 정보) -->
+	<select id="getGuideTempLevelInfo" resultType="KidsMenuGuide_VO" parameterType="GetNSKidsMenuRequestVO">
+		SELECT
+			MAX(level_id) AS temp_level_id
+			, MAX(max_level_id) AS temp_max_level_id
+			, MAX(parent_category_id) AS temp_parent_id
+			, MAX(img_file_name) AS guide_image_file
+		FROM (
+			SELECT case when NVL(A.point, '0') = #{cust_eng_level} then A.category_id else '' end level_id,
+					case when NVL(A.point, '0') = MAX(NVL(A.point, '0')) over (partition by 0) then A.category_id else '' end max_level_id,
+					DECODE(NVL(A.point, '0'), '0', A.category_id, A.parent_category_id) AS parent_category_id,
+					(SELECT K.img_file_name FROM PT_VO_CATEGORY K WHERE K.category_id = DECODE(NVL(A.point, '0'), '0', A.category_id, A.parent_category_id)) AS img_file_name
+			FROM PT_VO_CATEGORY A
+			WHERE A.category_gb = 'NSC'
+			AND NVL(A.nsc_gb, 'N') = 'KID'
+			AND NVL(A.test_sbc, 'N') IN ('N', #{testSbc})
+			START WITH A.category_id = (SELECT J.category_id FROM PT_VO_CATEGORY J
+										WHERE 1 = 1
+										AND J.category_gb = 'NSC'
+										AND NVL(J.nsc_gb, 'N') = 'KID'
+										AND NVL(J.test_sbc, 'N') IN ('N', #{testSbc})
+										AND NVL(J.is_cat_fh, 'N') != 'H'
+										AND NVL(J.caption_yn, 'N') = 'P'
+										AND J.parent_category_id = #{catInfo_catId})
+			CONNECT BY PRIOR A.category_id = A.parent_category_id
+		) X
+	</select>
+	
+	<!-- 흘려듣기 영상 정보 가져오기 -->
+	<select id="listGuideAlbums" resultType="KidsMenuGuide_VO" parameterType="GetNSKidsMenuRequestVO">
+		SELECT
+			C.album_id AS conts_id
+			, C.album_name AS conts_nm
+			, D.m3u8_file_1
+			, D.m3u8_file_2
+			, SUBSTRB(REPLACE(REPLACE(TRIM(NVL(P.summary_long, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n'), 1, 500) AS guide_text
+			, (SELECT X.main_img_file_name FROM IMCSUSER.PT_LA_ALBUM_IMG X WHERE X.adi_album_id = B.contents_id AND X.img_flag = 'N' AND ROWNUM = 1) AS image_file_name
+		FROM PT_VO_CATEGORY A,
+			PT_VO_CATEGORY_MAP B,
+			IMCSUSER.PT_LA_ALBUM_INFO C,
+			IMCSUSER.PT_LA_ALBUM_PLATFORM P,
+			IMCSUSER.PT_LA_M3U8_INFO D 
+		WHERE A.category_id = B.CATEGORY_ID
+			AND A.category_id = #{guide_cat_id}
+			AND NVL(B.viewing_flag, 'V') IN ('V', #{viewFlag})
+			AND B.contents_id = C.album_id
+			AND B.contents_id = P.album_id
+			AND P.screen_type = 'N'
+			AND C.album_id = D.m3u8_id
+			AND D.m3u8_type = 'H'
+		ORDER BY B.rank_no
+	</select>
+	
+	<!-- 예외처리 하위에 시리즈 카테고리가 없을 때는 type 값을 제공하지 않음 -->
+	<select id="getTempSerCatId" resultType="java.lang.String" parameterType="GetNSKidsMenuRequestVO">
+		SELECT
+			category_id
+		FROM (
+			SELECT category_id, category_level, sort_no
+			FROM PT_VO_CATEGORY A
+			WHERE category_gb = 'NSC'
+			AND NVL(A.ch_51_yn, 'N') != 'X'
+			AND NVL(A.test_sbc, 'N') IN ('N', #{testSbc})
+			AND NVL(A.series_yn, 'N') = 'Y'
+			START WITH A.category_id = #{temp_category_id}
+			CONNECT BY PRIOR A.category_id = A.parent_category_id
+			ORDER BY category_level, sort_no
+		) X
+		WHERE rownum = 1
+	</select>
+	
+	<!-- 최근 시청한 책 가져오기 -->
+	<select id="listCategoryTopMenuBookWatch" resultType="KidsMenuMenuList_VO" parameterType="GetNSKidsMenuRequestVO">
+		SELECT
+			result_type
+			, conts_id
+			, conts_nm
+			, type
+			, category_type
+			, display_option
+			, parent_cat_id AS parent_id
+			, category_sub_name
+			, sub_cat_yn
+			, category_flag
+			, cat_eng_level
+			, image_file
+			, animation_file
+			, still_file
+			, recommend_id
+			, service_icon
+			, ppm_prod_id
+			, ppm_prod_type
+			, pps_prod_id
+			, pr_info
+			, kids_grade
+			, runtime
+			, is_51_ch
+			, is_caption
+			, is_hd
+			, synopsis
+			, watcha_point
+			, cine21_point AS cine_point
+			, poster_v
+			, poster_h
+			, poster_r
+			, screen AS screen_type
+			, watch_date
+			, add_info
+		FROM
+		(
+			SELECT
+				X.upp_no, X.sort_no,
+				'ALB' result_type,
+				X.conts_id,
+				X.conts_nm,
+				'' type,
+				'' category_type,
+				'' display_option,
+				X.parent_cat_id,
+				'' category_sub_name,
+				'N' sub_cat_yn,
+				'' category_flag,
+				'' cat_eng_level,
+				X.poster_v image_file,
+				'' animation_file,
+				'' recommend_id,
+				X.service_icon,
+				'' ppm_prod_id,
+				'' ppm_prod_type,
+				'' pps_prod_id,
+				X.pr_info,
+				X.kids_grade,
+				X.runtime,
+				X.is_51_ch,
+				X.is_caption,
+				X.is_hd,
+				X.synopsis,
+				X.add_info,
+				X.watcha_point,
+				X.cine21_point,
+				(SELECT A.main_img_file_name FROM IMCSUSER.PT_LA_ALBUM_IMG A WHERE A.adi_album_id = X.conts_id AND A.img_flag = 'N' AND ROWNUM = 1) still_file,
+				X.poster_v,
+				X.poster_h,
+				X.poster_r,
+				X.screen,
+				X.watch_date
+			FROM (SELECT /*+USE_NL(X W N)*/
+						3 upp_no, X.rank_no sort_no,
+						X.category_id parent_cat_id,
+						X.conts_id, X.conts_nm, X.service_icon,
+						X.pr_info, X.kids_grade, X.runtime,
+						X.synopsis, X.add_info,
+						MAX(X.is_51ch) is_51_ch,
+						MAX(X.is_caption) is_caption,
+						MAX(X.is_hd) is_hd,
+						MAX(case when X.poster_type = 'T' and X.service_yn = 'Y' then X.content_value else '' end) poster_r,
+						MAX(case when X.poster_type = 'T' and X.service_yn = 'Y' then X.content_value else '' end) poster_h,
+						MAX(case when X.poster_type = 'P' and X.service_yn = 'Y' then X.content_value else '' end) poster_v,
+						MAX(case when NVL(W.avg_rating, '') is not null then TRIM(TO_CHAR(W.avg_rating,'0.0')) else '' end) watcha_point,
+						MAX(NVL(N.cine_avg_point, '0')) cine21_point,
+						MAX(X.screen) screen, MAX(X.watch_date) watch_date
+				FROM ( SELECT /*+LEADING(A) USE_NL(M L T P I C D G S) */
+							M.rank_no, A.category_id, A.test_sbc,
+							NVL(M.viewing_flag, 'V') viewing_flag,
+							M.contents_id conts_id,
+							L.album_name conts_nm,
+							P.service_icon,
+							NVL(T.rating_cd, '') pr_info,
+							T.kids_grade,
+							SUBSTRB(REPLACE(REPLACE(TRIM(NVL(P.summary_long, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n'), 1, 1024) synopsis,
+							DECODE(NVL(T.run_time, '0'), '0', '1', TO_CHAR(TO_NUMBER(SUBSTR(T.run_time, 1, 2)) * 60 + TO_NUMBER(SUBSTR(T.run_time, 3, 2)))) runtime,
+							case when SUBSTR(NVL(UPPER(C.audio_type), 'N'), 9) = 'DOLBY 5.1' then 'Y' else 'N' end is_51ch,
+							NVL(P.smi_yn, 'N') is_caption,
+							case when NVL(C.hdcontent, 'N') = 'Y' OR NVL(C.hdcontent, 'N') = 'S' then 'Y' else 'N' end is_hd,
+							T.cine_id, S.poster_type, S.service_yn, S.content_value, S.second_value,
+							W.screen, W.watch_date, T.sub_title AS add_info
+						FROM ( SELECT J.category_id, NVL(J.test_sbc, 'N') test_sbc
+								FROM PT_VO_CATEGORY J
+								WHERE 1 = 1
+								AND J.category_gb = 'NSC'
+								AND NVL(J.nsc_gb, 'N') = 'KID'
+								AND NVL(J.series_yn, 'N') = 'N'
+								AND NVL(J.ch_51_yn, 'N') != 'X'
+								AND NVL(J.actors_display, 'N') = #{categoryType}
+								AND NVL(J.test_sbc, 'N') IN ('N', #{testSbc})
+								AND NVL(J.is_cat_fh, 'N') != 'H'
+								START WITH J.category_id = #{catId}
+								CONNECT BY PRIOR J.category_id = J.parent_category_id
+							) A,
+							(SELECT adi_album_id, screen, watch_date
+								FROM (SELECT adi_album_id, MAX(screen) screen, MAX(watch_date) watch_date
+										FROM (SELECT X.adi_album_id,
+													case when watch_date = MAX(watch_date) over (partition by X.adi_album_id) then watch_date else '' end watch_date,
+													case when watch_date = MAX(watch_date) over (partition by X.adi_album_id) then screen else '' end screen
+												FROM (
+														<if test='stbPairing != null and stbPairing.equals("Y")'>
+															SELECT A.adi_album_id, watch_date, 'I' screen
+															FROM PT_VO_SET_TIME_PTT A
+															WHERE A.sa_id = #{stbSaId}
+															AND A.p_idx_sa = #{p_stb_idx_sa}
+															AND A.nscn_cust_no = 'M'
+															AND DECODE(substr(${@kr.co.wincom.imcs.common.util.GlobalCom@getDBMcustUser()}.nuf_get_nscreen_info(A.adi_album_id, 'N'), -1), 'A', 'Y', 'T', 'Y', 'N') = 'Y'
+															UNION ALL
+														</if>
+														SELECT A.adi_album_id, watch_date, 'N' screen
+														FROM PT_VO_SET_TIME_PTT_NSC A
+														WHERE A.sa_id = #{saId}
+														AND A.p_idx_sa = #{p_idx_sa}
+														AND A.nscn_cust_no = 'M'
+													) X
+												) XX
+												GROUP BY adi_album_id
+												ORDER BY watch_date desc
+											) KK
+											WHERE rownum &lt;= 3
+										) W,
+										PT_VO_CATEGORY_MAP M,
+										IMCSUSER.PT_LA_ALBUM_INFO L,
+										IMCSUSER.PT_LA_ALBUM_SUB T,
+										IMCSUSER.PT_LA_ALBUM_PLATFORM P,
+										IMCSUSER.PT_LA_ALBUM_SMI I,
+										IMCSUSER.PT_LA_ASSET_INFO C,
+										IMCSUSER.PT_LA_ALBUM_POSTER S,
+										IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+										IMCSUSER.PT_PD_PACKAGE G
+		                          WHERE 1 = 1
+		                            AND A.category_id = M.category_id
+		                            AND M.contents_id = L.album_id
+		                            AND M.contents_id = W.adi_album_id
+		                            AND L.album_id = T.album_id
+		                            AND L.album_id = P.album_id
+		                            AND L.album_id = I.album_id
+		                            AND L.album_id = C.album_id
+		                            AND L.album_id = S.album_id
+		                            AND P.screen_type = 'N'
+		                            AND P.screen_type = C.screen_type
+		                            AND P.screen_type = I.screen_type
+		                            AND P.screen_type = S.screen_type
+		                            AND S.poster_type IN ('P','T')
+		                            AND S.service_yn = 'Y'
+		                            AND C.asset_id = D.contents_id
+		                            AND D.product_id = G.product_id
+		                            AND NVL(L.high_quality_type, 'N') != 'H'
+		                            AND (NVL(M.viewing_flag, 'V') IN ('V', #{viewFlag}) OR NVL(C.reserved_flag, 'N') IN ('R', 'P', 'X'))
+		                       ) X,
+		                       IMCSUSER.PT_WC_WATCHA_RATING W,
+		                       IMCSUSER.PT_WC_CINE_RATING N
+		                 WHERE 1=1
+		                   AND X.conts_id = W.album_id (+)
+		                   AND X.cine_id = N.cine_id (+)
+		                 GROUP BY X.rank_no,
+		                          X.category_id, X.test_sbc, X.viewing_flag,
+		                          X.conts_id, X.conts_nm, X.service_icon, X.pr_info, X.kids_grade, X.runtime, X.synopsis, X.add_info
+		               ) X
+		        ) XX
+		 ORDER BY watch_date desc, conts_id, parent_cat_id ASC
+	</select>
+	
+	<!-- 아이들나라 업체 상품 가입여부 체크(페어링된 IPTV 권한으로 체크함) -->
+	<select id="getPPMSubscribe" resultType="java.lang.String" parameterType="GetNSKidsMenuRequestVO">
+		SELECT 'Y'
+		FROM PT_VO_CUSTOM_PRODUCT A,
+		(
+			SELECT G.product_id
+			FROM IMCSUSER.PT_PD_PACKAGE G
+			WHERE 1 = 1
+			AND G.product_id IN
+			(
+				SELECT A.iptv_product_id
+				FROM IMCSUSER.PT_PD_PACKAGE_MAP A
+				WHERE A.mapping_type = 'N'
+				AND A.nsc_product_id IN (
+					SELECT product_id FROM IMCSUSER.PT_PD_PACKAGE_RELATION
+					WHERE p_product_id = #{ppm_prod_id}
+					UNION
+					SELECT #{ppm_prod_id} FROM dual
+				)
+			)
+			AND G.product_type = '3'
+			UNION ALL
+			SELECT R.p_product_id product_id
+			FROM IMCSUSER.PT_PD_PACKAGE G,
+			IMCSUSER.PT_PD_PACKAGE_RELATION R
+			WHERE 1 = 1
+			AND G.product_id IN
+			(
+				SELECT A.iptv_product_id
+				FROM IMCSUSER.PT_PD_PACKAGE_MAP A
+				WHERE A.mapping_type = 'N'
+				AND A.nsc_product_id IN (
+					SELECT product_id FROM IMCSUSER.PT_PD_PACKAGE_RELATION
+					WHERE p_product_id = #{ppm_prod_id}
+					UNION
+					SELECT #{ppm_prod_id} FROM dual
+				)
+			)
+			AND G.product_id = R.product_id
+			AND G.product_type = '3'
+		) B
+		WHERE 1 = 1
+		AND A.sa_id = #{stbSaId}
+		AND A.mac_addr = #{stbMacAddr}
+		AND A.productcd = B.product_id
+		AND ROWNUM = 1
+	</select>
+	
+	<!-- 아이들나라 일반 월정액 가입여부 체크(모바일 가번 기준) -->
+	<select id="getPPMSubscribeMobile" resultType="java.lang.String" parameterType="GetNSKidsMenuRequestVO">
+		SELECT case when SUM(subsc_count) > 0 then 'Y' else 'N' end
+		  FROM (
+		        SELECT COUNT(*) subsc_count
+		          FROM PT_VO_CUSTOM_PRODUCT A,
+		               (SELECT G.product_id
+		                  FROM IMCSUSER.PT_PD_PACKAGE G
+		                 WHERE 1 = 1
+		                   AND G.product_id = #{ppm_prod_id}
+		                   AND G.product_type = '4'
+		                UNION ALL
+		                SELECT R.p_product_id product_id
+		                  FROM IMCSUSER.PT_PD_PACKAGE G,
+		                       IMCSUSER.PT_PD_PACKAGE_RELATION R
+		                 WHERE 1 = 1
+		                   AND G.product_id = #{ppm_prod_id}
+		                   AND G.product_id = R.product_id
+		                   AND G.product_type = '3' ) B
+		         WHERE 1 = 1
+		           AND A.sa_id = #{saId}
+		           AND A.mac_addr = #{stbMac}
+		           AND A.productcd = B.product_id
+		
+		        UNION ALL
+		
+		        SELECT COUNT(*) subsc_count
+		          FROM PT_VO_NSC_PRODUCT A,
+		               (SELECT G.product_id
+		                  FROM IMCSUSER.PT_PD_PACKAGE G
+		                 WHERE 1 = 1
+		                   AND G.product_id = #{ppm_prod_id}
+		                   AND G.product_type = '4'
+		                UNION ALL
+		                SELECT R.p_product_id product_id
+		                  FROM IMCSUSER.PT_PD_PACKAGE G,
+		                       IMCSUSER.PT_PD_PACKAGE_RELATION R
+		                 WHERE 1 = 1
+		                   AND G.product_id = #{ppm_prod_id}
+		                   AND G.product_id = R.product_id
+		                   AND G.product_type = '3' ) B
+		         WHERE 1 = 1
+		           AND A.sbc_cont_no = #{saId}
+		           AND A.mac_addr = #{stbMac}
+		           AND A.prod_cd = B.product_id
+		           AND (TO_CHAR(sysdate , 'yyyymmddhh24miss') between A.buy_date AND A.expired_date )
+		     ) XX
+	</select>
+	
+	<!-- 에그스쿨의 경우 별도의 메시지 처리를 위해 추가 정보를 획득한다 -->
+	<select id="getMessageOfTypeH" resultType="HashMap">
+		SELECT
+			MAX(case when option_id = 'K21' then option4 else '' end) AS cat_msg_ppm1
+			, MAX(case when option_id = 'K21' then option5 else '' end) AS cat_msg_ppm2
+			, MAX(case when option_id = 'K22' then option4 else '' end) AS cat_msg_free
+		FROM IMCSUSER.PT_CD_SYS_OPTION
+		WHERE option_id IN ('K21', 'K22')
+		AND screen_type = 'N'
+	</select>
+	
+</mapper> 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

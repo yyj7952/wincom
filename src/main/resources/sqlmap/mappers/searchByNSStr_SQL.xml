@@ -1,0 +1,403 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.searchByNSStr.SearchByNSStrDao">
+
+	<select id="searchByNSStrList" resultType="SearchByNSStrResponseVO">
+		<![CDATA[
+		SELECT * 
+	       FROM (SELECT X.RESULT_TYPE RESULT_TYPE, X.CONTS_ID CONTS_ID, X.CONTS_NAME CONTS_NAME, X.CAT_TYPE CAT_TYPE, X.IMG_URL IMG_URL, X.IMG_FILE_NAME IMG_FILE_NAME,
+	       				X.PARENT_CAT_ID PARENT_CAT_ID, X.AUTH_YN AUTH_YN, X.CHA_NUM CHA_NUM, X.CAT_LEVEL CAT_LEVEL, X.SUGGESTED_PRICE SUGGESTED_PRICE,  
+	                    X.PR_INFO PR_INFO, X.RUN_TIME RUN_TIME, X.IS_51CH IS_51CH, X.IS_NEW IS_NEW, X.IS_CAPTION IS_CAPTION, X.HDCONTENT HDCONTENT, X.RELAY_VIEW RELAY_VIEW, X.POINT POINT,                                                                                              
+	                    X.PRODUCT_TYPE PRODUCT_TYPE, X.CLOSE_YN CLOSE_YN, X.SVOD_YN SVOD_YN, X.IS_3D IS_3D, X.TEMP_PRICE TEMP_PRICE, X.EVENT_VALUE EVENT_VALUE,                                                                                                     
+	                    X.FILTER_GB FILTER_GB, X.SERVICE_ICON SERVICE_ICON, X.PPS_YN PPS_YN, X.CATEGORY_DESC CATEGORY_DESC, X.IS_ORDER IS_ORDER, X.FNS_FILE_NAME FNS_FILE_NAME,                                                                                                            
+	                    X.TERR_CH TERR_CH, X.OVERSEE_NAME OVERSEE_NAME, X.ACTOR ACTOR, X.RELEASE_DATE RELEASE_DATE, ROWNUM ORD_NUM  
+	               FROM (SELECT 0 A, RESULT_TYPE, CONTS_ID, CONTS_NAME, CAT_TYPE, IMG_URL, MIN(IMG_FILE_NAME) IMG_FILE_NAME,                                                                                                                 
+	                            FNC_GET_CATE_ID_LIST_SCHOOL(CONTS_ID, 'NSC', #{youthYnCom}) PARENT_CAT_ID,                                                                            
+	                            AUTH_YN, CHA_NUM, MAX(CAT_LEVEL) CAT_LEVEL, SUGGESTED_PRICE,                                                                                                                             
+	                            PR_INFO, RUN_TIME, IS_51CH, MAX(IS_NEW) IS_NEW, IS_CAPTION, HDCONTENT, RELAY_VIEW, POINT,                                                                                                      
+	                            MAX(X.CATEGORY_ID) CATEGORY_ID, PRODUCT_TYPE, CLOSE_YN, SVOD_YN, IS_3D, TEMP_PRICE, EVENT_VALUE,                                                                                             
+	                            FILTER_GB, SERVICE_ICON, PPS_YN, CATEGORY_DESC, IS_ORDER, FNS_FILE_NAME,                                                                                                                
+	                            TERR_CH, OVERSEE_NAME, ACTOR, RELEASE_DATE, '' SERVICE_ID, '' PRO_TIME                                                                                                      
+	                       FROM (SELECT 'ALB'            RESULT_TYPE,                                                                                                                 
+	                                    E.CONTENTS_ID           CONTS_ID,                                                                                                          
+	                                     A.ADI_ALBUM_NAME          CONTS_NAME,                                                                                                       
+	                                    '' CAT_TYPE,                                                                                                                               
+	                                    '' IMG_URL,                                                                                                                               
+	                                    X.CONTENT_VALUE    IMG_FILE_NAME,                                                                                                               
+	                                    J.CATEGORY_ID PARENT_CAT_ID,                                                                                                                    
+	                                    'N' AUTH_YN,                                                                                                                              
+	                                    E.CHA_NUM               CHA_NUM,                                                                                                          
+	                                    TO_CHAR(TO_NUMBER(J.CATEGORY_LEVEL) + 1) CAT_LEVEL,                                                                                         
+	                                    CASE WHEN TO_NUMBER(NVL(X.SUGGESTED_PRICE, '0'))>0                                          
+	                                         THEN 'Y'                                                                                                                        
+	                                         ELSE 'N' END SUGGESTED_PRICE,                                                                                                               
+	                                    NVL(X.RATING, '') PR_INFO,                                                                                                               
+	                                    DECODE(TO_CHAR(TO_NUMBER(SUBSTR(X.display_run_time,1,2))*60 + TO_NUMBER(SUBSTR(X.display_run_time,3,2))), '0', '1',
+                                                 TO_CHAR(TO_NUMBER(SUBSTR(X.display_run_time,1,2))*60 + TO_NUMBER(SUBSTR(X.display_run_time,3,2))) ) RUN_TIME,
+	                                    UPPER(NVL(X.AUDIO_TYPE, ''))      IS_51CH,                                                                             
+	                                    E.CREATE_DATE IS_NEW,                                                            
+	                                    CASE WHEN NVL(X.DUBBING,'N') = 'Y' THEN 'D' WHEN NVL(X.SMI_YN,'N')='Y' AND NVL(X.SMI_IMP_YN,'N') ='Y' THEN 'Y' ELSE 'N' END IS_CAPTION,                                         
+	                                    NVL(X.HDCONTENT, 'N')              HDCONTENT,                                                                            
+	                                    'N' RELAY_VIEW,                                                                                                           
+	                                    TO_CHAR(ROUND(TO_NUMBER(NVL(A.POINT_SUM,'0'))                                                                      
+	                                          /(CASE WHEN NVL(A.POINT_CNT,'0')= '0' THEN 1 ELSE TO_NUMBER(NVL(A.POINT_CNT,'0')) END), 0))  POINT,            
+	                                    J.CATEGORY_ID CATEGORY_ID,                                                                                                 
+	                                    '' PRODUCT_TYPE,                                                                                                           
+	                                    'N' CLOSE_YN,                                                                                                           
+	                                    'N' SVOD_YN,                                                                                                           
+	                                    NVL(X.IS_3D, 'N') IS_3D,                                                                                             
+	                                    NVL(X.SUGGESTED_PRICE, '0') TEMP_PRICE,                                                                                   
+	                                    NVL(X.EVENT_VALUE, '0') EVENT_VALUE,                                                                                       
+	                                    CASE WHEN NVL(X.CATEGORY, '') = 'K' OR NVL(X.CATEGORY, '') = 'F' THEN NVL(X.CATEGORY, '') ELSE 'N' END FILTER_GB,        
+		                                A.SERVICE_ICON SERVICE_ICON,                                                                                                
+		                                '' PPS_YN,                                                                                                            
+		                                '' CATEGORY_DESC,                                                                                                            
+	                                    '' IS_ORDER,                                                                                                            
+		                                '' FNS_FILE_NAME,                                                                                                            
+	                                    Y.COM_CD    TERR_CH  ,                                                                                                 
+	                                    X.PRODUCER OVERSEE_NAME,                                                                                                    
+	                                    X.ACTORS_DISPLAY ACTOR,                                                                                              
+	                                    X.RELEASE_DATE RELEASE_DATE                                                                                                 
+	                               FROM PT_VO_CATEGORY J,                                                                                                  
+	                                    PT_VO_CATEGORY_MAP E,                                                                                              
+	                                    (SELECT D.CONTENT_VALUE, C.SUGGESTED_PRICE,                                                                        
+	                                            C.RATING, C.DISPLAY_RUN_TIME, B.AUDIO_TYPE, C.DUBBING, B.SMI_YN, B.SMI_IMP_YN, B.IS_3D, C.EVENT_VALUE, E.ALBUM_TYPE,  
+	                                            C.CATEGORY, C.PRODUCER, C.ACTORS_DISPLAY, C.RELEASE_DATE, E.NSC_ALBUM_ID, D.POSTER_TYPE, B.HDCONTENT       
+	                                      FROM IMCSUSER.PT_PD_CONTENTS_MST A, IMCSUSER.PT_LA_CONTENT_ASSET B,                                              
+	                                           IMCSUSER.PT_LA_TITLE_ASSET C, IMCSUSER.PT_LA_POSTER_ASSET D,                                                
+	                                           IMCSUSER.PT_LA_PACKAGE_ASSET E                                                                              
+	                                     WHERE B.ADI_PRODUCT_ID  = A.ASSET_ID                                                                              
+	                                       AND C.ADI_PRODUCT_ID    = B.ADI_PRODUCT_ID                                                                      
+	                                       AND E.ADI_PRODUCT_ID    = C.ADI_PRODUCT_ID                                                                      
+	                                       AND D.ADI_PRODUCT_ID(+) = E.ADI_PRODUCT_ID) X,                                                                  
+	                                    IMCSUSER.PT_LA_ALBUM_MST A,                                                                                        
+	                                    (SELECT COM_CD ,COM_NAME  FROM IMCSUSER.PT_CD_COM_CD  WHERE GRP_ID = 'PUBLICCH'  ) Y                               
+	                              WHERE (J.TEST_SBC = 'N' OR J.TEST_SBC IS NULL OR J.TEST_SBC = '')                                                        
+	                                AND (J.SERIES_YN = 'N' OR J.SERIES_YN IS NULL OR J.SERIES_YN = '')                                                                                
+	                                AND A.ADI_ALBUM_ID = E.CONTENTS_ID                                                                                                                
+	                                AND X.NSC_ALBUM_ID = A.ADI_ALBUM_ID                                                                                                               
+	                                AND E.CATEGORY_ID = J.CATEGORY_ID                                                                                                                 
+	                                AND J.CATEGORY_GB = 'NSC'                                                                                                                         
+	                                AND X.POSTER_TYPE = 'P'                                                                                                                           
+	                                AND X.CATEGORY  = Y.COM_NAME(+)                                                                                                                   
+	                                AND (NVL(J.YOUTH_YN, '2') = '2' OR NVL(J.YOUTH_YN, '2') = #{youthYnCom})   
+	                                AND (REPLACE(UPPER(A.ADI_ALBUM_NAME), ' ', '') LIKE '%'|| REPLACE(UPPER(REPLACE(REPLACE(#{keyWord},'_','\_'),'%','\%')), ' ', '')||'%' ESCAPE '\'
+	                                    OR REPLACE(UPPER(X.ACTORS_DISPLAY), ' ', '') LIKE '%'|| REPLACE(UPPER(REPLACE(REPLACE(#{keyWord},'_','\_'),'%','\%')), ' ', '')||'%' ESCAPE '\'   )            
+	                                AND NOT EXISTS (SELECT /*+ LEADING(AA) */  'x'                                                                                                    
+	                                                  FROM IMCSUSER.PT_LA_PACKAGE_ASSET AA,                                                                                           
+	                                                       IMCSUSER.PT_LA_TITLE_ASSET BB                                                                                              
+	                                                 WHERE AA.ADI_PRODUCT_ID = BB.ADI_PRODUCT_ID                                                                                      
+	                                                   AND NVL(BB.RATING, '') = '06'                                                                                                  
+	                                                   AND A.ADI_ALBUM_ID = AA.NSC_ALBUM_ID)                                                                                          
+	                                AND J.CATEGORY_ID = (SELECT MIN(CATEGORY_ID) FROM PT_VO_CATEGORY_MAP X WHERE X.CONTENTS_ID = A.ADI_ALBUM_ID AND X.CATEGORY_ID = J.CATEGORY_ID )    
+	                	        ) X,                                                                                                                                                     
+	                	        (SELECT CATEGORY_ID FROM PT_VO_CATEGORY                                                                                                                  
+	                              WHERE CATEGORY_GB = 'NSC'                                                                                                                                  
+	                              START WITH CATEGORY_ID = #{catId}                                                                                                         
+	                            CONNECT BY PRIOR CATEGORY_ID = PARENT_CATEGORY_ID                                                                                                     
+	                                         AND CATEGORY_GB = 'NSC'                                                                                                                               
+	                            ) Y                                                                                                                                                   
+	                      WHERE X.PARENT_CAT_ID = Y.CATEGORY_ID  
+	                      GROUP BY RESULT_TYPE, CONTS_ID, CONTS_NAME, CAT_TYPE, IMG_URL, AUTH_YN, CHA_NUM, SUGGESTED_PRICE, PR_INFO, RUN_TIME, IS_51CH, IS_CAPTION, HDCONTENT, RELAY_VIEW, POINT, PRODUCT_TYPE, CLOSE_YN, SVOD_YN, IS_3D, TEMP_PRICE, EVENT_VALUE, FILTER_GB, SERVICE_ICON, PPS_YN, CATEGORY_DESC, IS_ORDER, FNS_FILE_NAME, TERR_CH, OVERSEE_NAME, ACTOR, RELEASE_DATE                                                                                                                                
+	                     UNION  ALL                                                                                                                                                   
+	                     SELECT 1 A,                                                                                                                                                  
+	                            'CAT' RESULT_TYPE,                                                                                                                                             
+	                            A.CATEGORY_ID  CONTS_ID,                                                                                                   
+	                            A.CATEGORY_NAME CONTS_NAME,                                                                                                  
+	                            CASE WHEN A.SERIES_YN = 'Y' THEN 'SER' ELSE NVL(A.CATEGORY_TYPE, '') END CAT_TYPE,                                         
+	                            'http:'||REPLACE(NVL(A.IMAGE_URL, ''), '\', '/')    IMG_URL,                                                             
+	                            A.IMG_FILE_NAME IMG_FILE_NAME,                                                                                                  
+	                            A.PARENT_CATEGORY_ID PARENT_CAT_ID,                                                                                             
+	                            NVL(A.AUTH_YN, 'N') AUTH_YN,                                                                                              
+	                            A.CHA_NUM CHA_NUM,                                                                                                        
+	                            A.CATEGORY_LEVEL CAT_LEVEL,                                                                                                 
+		                        NVL(A.BILL_FLAG, 'N') SUGGESTED_PRICE,                                                                                           
+		                        A.PR_INFO PR_INFO,                                                                                                       
+		                        '' RUN_TIME,              
+	                            A.CH_51_YN IS_51CH,                                                                                                      
+		                        A.CREATE_DATE IS_NEW,                                                                                                   
+		                        A.CAPTION_YN IS_CAPTION,                                                                                                    
+		                        A.IS_HD HDCONTENT,                                                                                                         
+		                        A.RELAY_VIEW RELAY_VIEW,                                                                                                    
+		                        A.POINT POINT,                                                                                                         
+		                        A.CATEGORY_ID CATEGORY_ID,                                                                                                   
+		                        '' PRODUCT_TYPE,                                                                                                              
+	                            A.CLOSE_YN CLOSE_YN,                                                                                                      
+		                        A.SVOD_YN SVOD_YN,                                                                                                       
+		                        'N' IS_3D,                                                                                                             
+		                        '0' TEMP_PRICE,                                                                                                             
+	                            '0' EVENT_VALUE,                                                                                                             
+	                            'N' FILTER_GB,                                                                                                             
+	                            A.SERVICE_ICON SERVICE_ICON,                                                                                                  
+	                            A.PKG_YN PPS_YN,                                                                                                        
+		                        REPLACE(REPLACE(TRIM(NVL(A.CATEGORY_DESC, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n') CATEGORY_DESC,                         
+		                        NVL(A.IS_ORDER, '0') IS_ORDER,                                                                                            
+		                        A.FOCUS_FILE_NAME||';'||A.NORMAL_FILE_NAME||';'||A.SELECT_FILE_NAME FNS_FILE_NAME,                                             
+	                            A.TERR_CH TERR_CH,                                                                                                       
+	                            '' OVERSEE_NAME,                                                                                                              
+	                            A.ACTORS_DISPLAY ACTOR,                                                                                                
+	                            '' RELEASE_DATE  ,                                                                                                            
+	                            '' SERVICE_ID, '' PRO_TIME                                                                                           
+	                       FROM PT_VO_CATEGORY A,                                                                                                    
+	                            (SELECT /*+ USE_NL (A,B) */                                                                                         
+	                                    MIN(A.CATEGORY_ID)  CATEGORY_ID                                                                                    
+	              				   FROM PT_VO_CATEGORY A,                                                                                                                              
+	       		  						PT_VO_CATEGORY_MAP B                                                                                                                           
+	       		                  WHERE A.CATEGORY_ID = B.CATEGORY_ID                                                                                                                  
+	             				    AND (A.TEST_SBC = 'N' OR A.TEST_SBC IS NULL OR A.TEST_SBC = '')                                                                                    
+	       						    AND A.CATEGORY_GB = 'NSC'                                                                                                                          
+	       						    AND A.SERIES_YN = 'Y'   
+	       						    AND (REPLACE(UPPER(A.CATEGORY_NAME), ' ', '') LIKE '%'|| REPLACE(UPPER(REPLACE(REPLACE(#{keyWord},'_','\_'),'%','\%')), ' ', '')||'%' ESCAPE '\' )  
+	       						  GROUP BY A.CATEGORY_NAME                                                                                                                             
+	       		                ) Z                                                                                                                                                    
+	                      WHERE A.CATEGORY_ID = Z.CATEGORY_ID                                                                                                                          
+	                        AND NVL(A.AUTH_YN, 'N') <> 'Y'                                                                                                                             
+	                        AND (NVL(A.YOUTH_YN, '2') = '2' OR NVL(A.YOUTH_YN, '2') = #{youthYnCom})                                                                                            
+	                     UNION ALL                                                                                                                                                       
+	             	     SELECT 2 A,                                                                                                                                                       
+	                           'LIV' RESULT_TYPE,                                                                                                                                                   
+	                            B.CHNL_NAME CONTS_ID,                                                                                                                                	
+				 	 	        C.PRO_NAME CONTS_NAME, '' CAT_TYPE, '' IMG_URL, A.SERVICE_ID||'.jpg' IMG_FILE_NAME,                                                                                           
+				 	 	        ''  PARENT_CAT_ID, '' AUTH_YN,                                                                                                                                  
+						        C.PRO_SUB_NO CHA_NUM, '' CAT_LEVEL, '' SUGGESTED_PRICE,                                                                                                                 
+						        C.AGE_GRD PR_INFO, '' RUN_TIME, '' IS_51CH,                                                                                                                  
+						        A.PRO_TIME IS_NEW, '' IS_CAPTION, '' HDCONTENT, '' RELAY_VIEW, '' POINT, '' CATEGORY_ID, '' PRODUCT_TYPE, '' CLOSE_YN, '' SVOD_YN, '' IS_3D, '' TEMP_PRICE, '' EVENT_VALUE,                   
+						        '' FILTER_GB, '' SERVICE_ICON, '' PPS_YN, '' CATEGORY_DESC, '' IS_ORDER, '' FNS_FILE_NAME, '' TERR_CH, '' OVERSEE_NAME,                                                 
+						        D.VIDEO_INFO ACTOR,                                                                                                                               
+						        A.BROAD_DATE RELEASE_DATE,                                                                                                                               
+						        A.SERVICE_ID SERVICE_ID, A.PRO_TIME PRO_TIME         
+						   FROM IMCSUSER.PT_PG_PLAN_SCHE A,                                                                                                                  	
+						        ( SELECT SERVICE_ID, CHNL_NAME FROM IMCSUSER.PT_CD_PLAY_CHNL WHERE FILTERING_CODE IN ( '8','9','10','11','12','13','14','15')                   
+						                                                                       AND (NVL(YOUTH_YN, '2') = '2' OR NVL(YOUTH_YN, '2') = #{youthYnCom})  ) B,            	
+						        IMCSUSER.PT_LE_AV_EPG C,                                                                                                                     	
+						       IMCSUSER.PT_PG_PGM_CUS D                                                                                                                      	
+						  WHERE A.BROAD_DATE = TO_CHAR(SYSDATE, 'YYYYMMDD')                                                                                                  	
+						    AND TO_CHAR(SYSDATE, 'HH24MISS') BETWEEN C.PRO_TIME AND C.PRO_ENDTIME                                                                            	
+						    AND A.SERVICE_ID = B.SERVICE_ID                                                                                                                  	
+						    AND 'CH'||A.SERVICE_ID = C.CHNL_CD                                                                                                               	
+						    AND A.BROAD_DATE = C.PRO_DATE                                                                                                                    	
+						    AND A.PRO_CD = C.PRO_CD                                                                                                                          	
+	                        AND A.PRO_CD = D.PRO_CD(+)  
+	                        AND D.VIDEO_PRE(+) = '003'   
+	                        AND (REPLACE(UPPER(C.PRO_NAME), ' ', '') LIKE '%'|| REPLACE(UPPER(REPLACE(REPLACE(#{keyWord},'_','\_'),'%','\%')), ' ', '')||'%' ESCAPE '\'                                                          
+	                            OR REPLACE(UPPER(D.VIDEO_INFO), ' ', '') LIKE '%'|| REPLACE(UPPER(REPLACE(REPLACE(#{keyWord},'_','\_'),'%','\%')), ' ', '')||'%' ESCAPE '\')           
+	                      ORDER BY A, CONTS_NAME, CONTS_ID, PARENT_CAT_ID, SERVICE_ID, PRO_TIME                                                                                                                         
+	                    ) X 
+	            ) AA                                                                                                                                                            
+	      WHERE AA.ORD_NUM >= ((TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt})) - (TO_NUMBER(#{pageCnt}) - 1))                                                                                     
+	        AND AA.ORD_NUM <= (TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt}))
+		]]>
+	</select>
+	
+	
+	<!-- <select id="searchByNSStrList" resultType="SearchByNSStrResponseVO">
+		<![CDATA[
+		SELECT * 
+	       FROM (SELECT X.a0 result_type, X.a1 conts_id, X.a2 conts_name, X.a3 cat_type, X.a4 img_url, X.a5 img_file_name,
+	       				X.a6 parent_cat_id, X.a7 auth_yn, X.a8 cha_num, X.a9 cat_level, X.a10 suggested_price,  
+	                    X.a11 pr_info, X.a12 run_time, X.a13 is_51ch, X.a14 is_new, X.a17 is_caption, X.a18 hdcontent, X.a19 relay_view, X.a20 point,                                                                                              
+	                    X.a23 product_type, X.a25 close_yn, X.a26 svod_yn, X.a27 is_3d, X.a28 temp_price, X.a29 event_value,                                                                                                     
+	                    X.a31 filter_gb, X.a32 service_icon, X.a33 pps_yn, X.a34 category_desc, X.a35 is_order, X.a36 fns_file_name,                                                                                                            
+	                    X.a37 terr_ch, X.a38 oversee_name, X.a39 actor, X.a40 release_date, rownum ORD_NUM  
+	               FROM (SELECT 0 a, a0, a1, a2, a3, a4, min(a5) a5,                                                                                                                 
+	                            FNC_GET_CATE_ID_LIST_SCHOOL(a1, 'NSC', #{youthYnCom}) a6,                                                                            
+	                            a7, a8, max(a9) a9, a10,                                                                                                                             
+	                            a11, a12, a13, max(a14) a14, a17, a18, a19, a20,                                                                                                      
+	                            max(a22) a22, a23, a25, a26, a27, a28, a29,                                                                                             
+	                            a31, a32, a33, a34, a35, a36,                                                                                                                
+	                            a37, a38, a39, a40, '' a42, '' a43                                                                                                      
+	                       FROM (SELECT 'ALB'            a0,                                                                                                                 
+	                                    E.contents_id           a1,                                                                                                          
+	                                     A.adi_album_name          a2,                                                                                                       
+	                                    '' a3,                                                                                                                               
+	                                    '' a4,                                                                                                                               
+	                                    X.content_value    a5,                                                                                                               
+	                                    j.category_id a6,                                                                                                                    
+	                                    'N' a7,                                                                                                                              
+	                                    E.cha_num               a8,                                                                                                          
+	                                    TO_CHAR(TO_NUMBER(j.category_level) + 1) a9,                                                                                         
+	                                    case when TO_NUMBER(NVL(X.suggested_price, '0'))>0                                          
+	                                         then 'Y'                                                                                                                        
+	                                         else 'N' end a10,                                                                                                               
+	                                    NVL(X.rating, '') a11,                                                                                                               
+	                                    DECODE(TO_CHAR(TO_NUMBER(SUBSTR(X.display_run_time,1,2))*60 + TO_NUMBER(SUBSTR(X.display_run_time,3,2))), '0', '1',                  
+	                                          TO_CHAR(TO_NUMBER(SUBSTR(X.display_run_time,1,2))*60 + TO_NUMBER(SUBSTR(X.display_run_time,3,2))) ) a12,                       
+	                                    UPPER(NVL(X.audio_type, ''))      a13,                                                                             
+	                                    E.create_date a14,                                                            
+	                                    case when nvl(X.DUBBING,'N') = 'Y' then 'D' when NVL(X.smi_yn,'N')='Y' and NVL(X.smi_imp_yn,'N') ='Y' then 'Y' else 'N' end a17,                                         
+	                                    NVL(X.hdcontent, 'N')              a18,                                                                            
+	                                    'N' a19,                                                                                                           
+	                                    TO_CHAR(round(TO_NUMBER(NVL(A.point_sum,'0'))                                                                      
+	                                          /(case when NVL(A.point_cnt,'0')= '0' then 1 else TO_NUMBER(NVL(A.point_cnt,'0')) end), 0))  a20,            
+	                                    j.category_id a22,                                                                                                 
+	                                    '' a23,                                                                                                           
+	                                    'N' a25,                                                                                                           
+	                                    'N' a26,                                                                                                           
+	                                    NVL(X.is_3d, 'N') a27,                                                                                             
+	                                    NVL(X.suggested_price, '0') a28,                                                                                   
+	                                    NVL(X.event_value, '0') a29,                                                                                       
+	                                    CASE WHEN NVL(X.category, '') = 'K' OR NVL(X.category, '') = 'F' THEN NVL(X.category, '') ELSE 'N' END a31,        
+		                                A.service_icon a32,                                                                                                
+		                                '' a33,                                                                                                            
+		                                '' a34,                                                                                                            
+	                                    '' a35,                                                                                                            
+		                                '' a36,                                                                                                            
+	                                    Y.COM_CD    a37  ,                                                                                                 
+	                                    X.PRODUCER a38,                                                                                                    
+	                                    X.actors_display a39,                                                                                              
+	                                    X.release_date a40                                                                                                 
+	                               FROM PT_VO_CATEGORY J,                                                                                                  
+	                                    PT_VO_CATEGORY_MAP E,                                                                                              
+	                                    (SELECT D.content_value, C.suggested_price,                                                                        
+	                                            C.rating, C.display_run_time, B.audio_type, C.DUBBING, B.smi_yn, B.smi_imp_yn, B.is_3d, C.event_value, E.album_type,  
+	                                            C.category, C.PRODUCER, C.actors_display, C.release_date, E.nsc_album_id, D.poster_type, B.HDCONTENT       
+	                                      FROM IMCSUSER.PT_PD_CONTENTS_MST A, IMCSUSER.PT_LA_CONTENT_ASSET B,                                              
+	                                           IMCSUSER.PT_LA_TITLE_ASSET C, IMCSUSER.PT_LA_POSTER_ASSET D,                                                
+	                                           IMCSUSER.PT_LA_PACKAGE_ASSET E                                                                              
+	                                     WHERE B.adi_product_id  = A.asset_id                                                                              
+	                                       AND C.adi_product_id    = B.adi_product_id                                                                      
+	                                       AND E.adi_product_id    = C.adi_product_id                                                                      
+	                                       AND D.adi_product_id(+) = E.adi_product_id) X,                                                                  
+	                                    IMCSUSER.PT_LA_ALBUM_MST A,                                                                                        
+	                                    (select COM_CD ,COM_NAME  from imcsuser.pt_cd_com_cd  where grp_id = 'PUBLICCH'  ) Y                               
+	                              WHERE (J.test_sbc = 'N' or J.test_sbc is null or J.test_sbc = '')                                                        
+	                                AND (J.series_yn = 'N' or J.series_yn is null or J.series_yn = '')                                                                                
+	                                AND A.adi_album_id = E.contents_id                                                                                                                
+	                                AND X.nsc_album_id = A.adi_album_id                                                                                                               
+	                                AND E.category_id = J.category_id                                                                                                                 
+	                                AND J.category_gb = 'NSC'                                                                                                                         
+	                                and X.poster_type = 'P'                                                                                                                           
+	                                and X.category  = Y.COM_NAME(+)                                                                                                                   
+	                                AND (NVL(J.YOUTH_YN, '2') = '2' or NVL(J.YOUTH_YN, '2') = #{youthYnCom})   
+	                                AND (replace(upper(A.adi_album_name), ' ', '') LIKE '%'|| replace(upper(replace(replace(#{keyWord},'_','\_'),'%','\%')), ' ', '')||'%' ESCAPE '\'
+	                                    or replace(upper(X.ACTORS_DISPLAY), ' ', '') LIKE '%'|| replace(upper(replace(replace(#{keyWord},'_','\_'),'%','\%')), ' ', '')||'%' ESCAPE '\'   )            
+	                                AND NOT EXISTS (SELECT /*+ LEADING(AA) */  'x'                                                                                                    
+	                                                  FROM IMCSUSER.PT_LA_PACKAGE_ASSET AA,                                                                                           
+	                                                       IMCSUSER.PT_LA_TITLE_ASSET BB                                                                                              
+	                                                 WHERE AA.adi_product_id = BB.adi_product_id                                                                                      
+	                                                   AND NVL(BB.rating, '') = '06'                                                                                                  
+	                                                   AND A.adi_album_id = AA.nsc_album_id)                                                                                          
+	                                AND J.category_id = (select min(category_id) from PT_VO_CATEGORY_MAP X where X.contents_id = A.adi_album_id AND X.category_id = J.category_id )    
+	                	        ) X,                                                                                                                                                     
+	                	        (select category_id from pt_vo_category                                                                                                                  
+	                              where category_gb = 'NSC'                                                                                                                                  
+	                              START WITH category_id = #{catId}                                                                                                         
+	                            CONNECT BY PRIOR category_id = parent_category_id                                                                                                     
+	                                         and category_gb = 'NSC'                                                                                                                               
+	                            ) Y                                                                                                                                                   
+	                      WHERE X.a6 = Y.category_id  
+	                      group by a0, a1, a2, a3, a4, a7, a8, a10, a11, a12, a13, a17, a18, a19, a20, a23, a25, a26, a27, a28, a29, a31, a32, a33, a34, a35, a36, a37, a38, a39, a40                                                                                                                                
+	                     union  all                                                                                                                                                   
+	                     SELECT 1 a,                                                                                                                                                  
+	                            'CAT' a0,                                                                                                                                             
+	                            A.category_id  a1,                                                                                                   
+	                            A.category_name a2,                                                                                                  
+	                            case when A.series_yn = 'Y' then 'SER' else NVL(A.category_type, '') end a3,                                         
+	                            'http:'||REPLACE(NVL(A.image_url, ''), '\', '/')    a4,                                                             
+	                            A.img_file_name a5,                                                                                                  
+	                            A.parent_category_id a6,                                                                                             
+	                            NVL(A.auth_yn, 'N') a7,                                                                                              
+	                            A.cha_num a8,                                                                                                        
+	                            A.category_level a9,                                                                                                 
+		                        NVL(A.bill_flag, 'N') a10,                                                                                           
+		                        A.pr_info a11,                                                                                                       
+		                        DECODE(TO_CHAR(TO_NUMBER(SUBSTR(A.run_time,1,2))*60 + TO_NUMBER(SUBSTR(A.run_time,3,2))) , '0', '1' ,                
+		                                      TO_CHAR(TO_NUMBER(SUBSTR(A.run_time,1,2))*60 + TO_NUMBER(SUBSTR(A.run_time,3,2)))  ) a12,              
+	                            A.ch_51_yn a13,                                                                                                      
+		                        A.create_date a14,                                                                                                   
+		                        A.caption_yn a17,                                                                                                    
+		                        A.is_hd a18,                                                                                                         
+		                        A.relay_view a19,                                                                                                    
+		                        A.point a20,                                                                                                         
+		                        A.category_id a22,                                                                                                   
+		                        '' a23,                                                                                                              
+	                            A.close_yn a25,                                                                                                      
+		                        A.svod_yn a26,                                                                                                       
+		                        'N' a27,                                                                                                             
+		                        '0' a28,                                                                                                             
+	                            '0' a29,                                                                                                             
+	                            'N' a31,                                                                                                             
+	                            A.service_icon a32,                                                                                                  
+	                            A.pkg_yn a33,                                                                                                        
+		                        REPLACE(REPLACE(TRIM(NVL(A.category_desc, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n') a34,                         
+		                        NVL(A.is_order, '0') a35,                                                                                            
+		                        A.focus_file_name||';'||A.normal_file_name||';'||A.select_file_name a36,                                             
+	                            A.terr_ch a37,                                                                                                       
+	                            '' a38,                                                                                                              
+	                            A.actors_display a39,                                                                                                
+	                            '' a40  ,                                                                                                            
+	                            '' a42, '' a43                                                                                           
+	                       FROM PT_VO_CATEGORY A,                                                                                                    
+	                            (SELECT /*+ USE_NL (A,B) */                                                                                         
+	                                    MIN(A.category_id)  category_id                                                                                    
+	              				   FROM PT_VO_CATEGORY A,                                                                                                                              
+	       		  						PT_VO_CATEGORY_MAP B                                                                                                                           
+	       		                  WHERE A.CATEGORY_ID = B.CATEGORY_ID                                                                                                                  
+	             				    AND (A.test_sbc = 'N' or A.test_sbc is null or A.test_sbc = '')                                                                                    
+	       						    AND A.category_gb = 'NSC'                                                                                                                          
+	       						    AND A.series_yn = 'Y'   
+	       						    AND (replace(upper(A.category_name), ' ', '') LIKE '%'|| replace(upper(replace(replace(#{keyWord},'_','\_'),'%','\%')), ' ', '')||'%' ESCAPE '\' )  
+	       						  GROUP BY A.category_name                                                                                                                             
+	       		                ) Z                                                                                                                                                    
+	                      WHERE A.category_id = Z.category_id                                                                                                                          
+	                        AND NVL(A.auth_yn, 'N') <> 'Y'                                                                                                                             
+	                        AND (NVL(A.YOUTH_YN, '2') = '2' or NVL(A.YOUTH_YN, '2') = #{youthYnCom})                                                                                            
+	                     union all                                                                                                                                                       
+	             	     SELECT 2 a,                                                                                                                                                       
+	                           'LIV' a0,                                                                                                                                                   
+	                            B.CHNL_NAME a1,                                                                                                                                	
+				 	 	        C.PRO_NAME a2, '' a3, '' a4, A.SERVICE_ID||'.jpg' a5,                                                                                           
+				 	 	        ''  a6, '' a7,                                                                                                                                  
+						        C.PRO_SUB_NO a8, '' a9, '' a10,                                                                                                                 
+						        C.AGE_GRD a11, '' a12, '' a13,                                                                                                                  
+						        A.PRO_TIME a14, '' a17, '' a18, '' a19, '' a20, '' a22, '' a23, '' a25, '' a26, '' a27, '' a28, '' a29,                   
+						        '' a31, '' a32, '' a33, '' a34, '' a35, '' a36, '' a37, '' a38,                                                 
+						        D.VIDEO_INFO a39,                                                                                                                               
+						        A.BROAD_DATE a40,                                                                                                                               
+						        A.SERVICE_ID a42, A.PRO_TIME a43         
+						   from IMCSUSER.PT_PG_PLAN_SCHE A,                                                                                                                  	
+						        ( SELECT SERVICE_ID, CHNL_NAME FROM IMCSUSER.PT_CD_PLAY_CHNL WHERE FILTERING_CODE IN ( '8','9','10','11','12','13','14','15')                   
+						                                                                       AND (NVL(YOUTH_YN, '2') = '2' or NVL(YOUTH_YN, '2') = #{youthYnCom})  ) B,            	
+						        IMCSUSER.PT_LE_AV_EPG C,                                                                                                                     	
+						       IMCSUSER.PT_PG_PGM_CUS D                                                                                                                      	
+						  where A.BROAD_DATE = to_char(sysdate, 'YYYYMMDD')                                                                                                  	
+						    AND TO_CHAR(SYSDATE, 'HH24MISS') BETWEEN C.PRO_TIME AND C.PRO_ENDTIME                                                                            	
+						    and A.SERVICE_ID = B.SERVICE_ID                                                                                                                  	
+						    and 'CH'||A.SERVICE_ID = C.CHNL_CD                                                                                                               	
+						    and A.BROAD_DATE = C.PRO_DATE                                                                                                                    	
+						    and A.PRO_CD = C.PRO_CD                                                                                                                          	
+	                        and A.PRO_CD = D.PRO_CD(+)  
+	                        and D.VIDEO_PRE(+) = '003'   
+	                        AND (replace(upper(C.PRO_NAME), ' ', '') LIKE '%'|| replace(upper(replace(replace(#{keyWord},'_','\_'),'%','\%')), ' ', '')||'%' ESCAPE '\'                                                          
+	                            or replace(upper(D.VIDEO_INFO), ' ', '') LIKE '%'|| replace(upper(replace(replace(#{keyWord},'_','\_'),'%','\%')), ' ', '')||'%' ESCAPE '\')           
+	                      order by a, a2, a1, a6, a42, a43                                                                                                                         
+	                    ) X 
+	            ) AA                                                                                                                                                            
+	      WHERE AA.ORD_NUM >= ((TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt})) - (TO_NUMBER(#{pageCnt}) - 1))                                                                                     
+	        AND AA.ORD_NUM <= (TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt}))
+		]]>
+	</select> -->
+	<select id="getPosterImageFileName" resultType="String">
+		SELECT /*+USE_NL(X M P)*/
+					   MAX(content_value) POSTER_IMG_FILE_NAME
+				  FROM PT_VO_CATEGORY_MAP M,
+					   (SELECT A.category_id,
+							   case when NVL(A.close_yn , 'N') = 'Y' then MAX(B.rank_no) else MIN(B.rank_no) end rank_no
+						  FROM (SELECT category_id, close_yn FROM PT_VO_CATEGORY
+								 WHERE NVL(series_yn, 'N') = 'Y'
+								   AND category_gb = 'NSC'
+								 START WITH category_id = #{contsId}
+								 CONNECT BY PRIOR category_id = parent_category_id) A,
+							   PT_VO_CATEGORY_MAP B
+						 WHERE A.category_id = B.category_id
+						 GROUP BY A.category_id, A.close_yn ) X,
+					   IMCSUSER.PT_LA_ALBUM_POSTER P
+				 WHERE M.category_id = X.category_id
+				   AND M.rank_no = X.rank_no
+				   AND M.contents_id = P.album_id
+				   AND P.screen_type = 'N'
+				   AND P.poster_type = 'P'
+				   AND P.service_yn = 'Y'
+	</select>
+	
+</mapper> 

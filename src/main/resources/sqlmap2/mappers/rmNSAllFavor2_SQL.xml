@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom2.imcs.api.rmNSAllFavor.RmNSAllFavorDao2">
+	
+	<!-- 찜목록 삭제 -->
+	<delete id="rmNSAllFavor" parameterType="kr.co.wincom.imcs.api.rmNSAllFavor.RmNSAllFavorRequestVO" >
+		DELETE
+		  FROM PT_VO_FAVORITE A
+		 WHERE A.sa_id = #{saId}
+		       and (A.contents_id in ( select C.contents_id from pt_vo_category B , pt_vo_category_map C 
+		                                where B.category_id = C.category_id
+		                                      and B.category_gb = #{contsGb} )
+		                                      or A.contents_id in ( select asset_id from imcsuser.pt_la_Package_asset
+		                                                             where adi_album_id in
+		                                                         ( select C.contents_id from pt_vo_category B , pt_vo_category_map C
+		                                                            where B.category_id = C.category_id and B.category_gb = #{contsGb} )) 
+		    ) 
+	</delete>
+
+</mapper> 
+	
+	

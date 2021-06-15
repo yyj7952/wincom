@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom2.imcs.api.rmFXFavorite.RmFXFavoriteDao2">
+	
+	<!-- 찜목록 삭제 -->
+	<delete id="delFavorite" parameterType="kr.co.wincom.imcs.api.rmFXFavorite.RmFXFavoriteRequestVO" >
+		 DELETE FROM
+		 (   
+		     SELECT * FROM SMARTUX.PT_UX_FAVORITE
+		 	 WHERE p_idx_sa = mod(substr(#{saId}, -2), 33)
+			   AND P_IDX_YEAR IN ( mod(to_number(to_char(sysdate,'YY'))-1,10), mod(to_number(to_char(sysdate,'YY')),10) )
+		      AND sa_id    = #{saId}
+		      AND contents_id = #{albumListId}
+			   AND service_type IN ('I','K','B','S')
+		 )
+	</delete>
+
+</mapper> 
+	
+	

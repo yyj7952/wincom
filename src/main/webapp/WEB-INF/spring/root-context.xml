@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+		xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xmlns:p="http://www.springframework.org/schema/p"
+		xmlns:context="http://www.springframework.org/schema/context"
+		xmlns:aop="http://www.springframework.org/schema/aop"
+		xmlns:tx="http://www.springframework.org/schema/tx"
+		xmlns:task="http://www.springframework.org/schema/task"
+		xmlns:util="http://www.springframework.org/schema/util"
+		xmlns:mvc="http://www.springframework.org/schema/mvc"
+		xsi:schemaLocation="http://www.springframework.org/schema/beans
+					http://www.springframework.org/schema/beans/spring-beans-3.2.xsd
+					http://www.springframework.org/schema/context
+					http://www.springframework.org/schema/context/spring-context-3.2.xsd
+					http://www.springframework.org/schema/aop
+					http://www.springframework.org/schema/aop/spring-aop-3.2.xsd
+					http://www.springframework.org/schema/tx
+					http://www.springframework.org/schema/tx/spring-tx-3.2.xsd
+					http://www.springframework.org/schema/task
+					http://www.springframework.org/schema/task/spring-task-3.2.xsd
+					http://www.springframework.org/schema/util
+					http://www.springframework.org/schema/util/spring-util-3.2.xsd
+					http://www.springframework.org/schema/mvc
+					http://www.springframework.org/schema/mvc/spring-mvc-3.2.xsd">
+	
+	<!-- <util:properties id="config" location="classpath:resources/curation.properties" /> -->
+	
+	<!-- Property -->
+	<!-- 1. Property 로딩 시, 외부 Property 로 함께 로딩하여 메모리에 담아놓는다. -->
+	<!-- 2. getProperty 를 호출할 경우 static 한 property 를 참조할 수 있다. (property 수정 시, was 재기동 필요)-->
+	<!-- 3. GlobalCom 의 getProperties 를 호출할 경우 dynamic 한 property 를 참조할 수 있다. (property 수정 시, was 재기동 하지 않고 적용)-->
+	<bean id="propertyConfigurer" class="kr.co.wincom.imcs.common.property.ImcsProperties">
+		<property name="locations">
+			<list>
+				<value>classpath:resources/filepath.properties</value>
+			</list>
+		</property>
+	</bean>
+	
+	<!-- DB #1 -->
+	<!-- 개발  -->
+	<!-- 쿼리찍기 -->
+	<bean id="dataSourceSpied" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close" >
+ 	  	<property name="driverClassName" value="oracle.jdbc.driver.OracleDriver" />
+		<property name="url" value="jdbc:oracle:thin:@172.21.151.201:1521:mylgdev1" />
+		<property name="username" value="VODUSER" />
+		<property name="password" value="VODUSER2008" />
+		<!-- <property name="url" value="jdbc:oracle:thin:@123.140.17.231:1521:mylgtb" />
+		<property name="username" value="VODUSER" />
+		<property name="password" value="VODUSER2008" /> -->
+		<!-- <property name="url" value="jdbc:oracle:thin:@192.168.188.12:1521:homedb" />
+		<property name="username" value="voduser" />
+		<property name="password" value="voduser00!" /> -->
+		<property name="initialSize" value="5" />
+		<property name="minIdle" value="50" />
+		<property name="maxActive" value="100" />
+		<property name="maxIdle" value="100" />
+		<property name="maxWait" value="10000" />
+		<property name="poolPreparedStatements" value="true" />
+		<property name="maxOpenPreparedStatements" value="10" />
+<!-- 		<property name="validationQuery" value="SELECT 1 FROM dual" />
+		<property name="validationQueryTimeout" value="10" />
+		<property name="testOnBorrow" value="true" />
+		<property name="testWhileIdle" value="true" />
+		<property name="testOnReturn" value="true" /> -->
+	</bean>
+
+    <bean id="dataSource" class="net.sf.log4jdbc.Log4jdbcProxyDataSource">
+        <constructor-arg ref="dataSourceSpied" />
+        <property name="logFormatter">
+            <bean class="net.sf.log4jdbc.tools.Log4JdbcCustomFormatter">
+                <property name="loggingType" value="MULTI_LINE" />
+                <property name="sqlPrefix" value="SQL         :  "/>
+            </bean>
+        </property>
+    </bean>
+    
+	<!-- JNDI -->
+    <!-- <bean id="dataSourceSpied1" class="org.springframework.jndi.JndiObjectFactoryBean">
+           <property name="jndiName" value="java:/comp/env/jdbc/api1" />
+    </bean> -->
+	
+	<!-- <bean id="dataSource" class="net.sf.log4jdbc.Log4jdbcProxyDataSource">
+        <constructor-arg ref="dataSourceSpied1" />
+        <property name="logFormatter">
+            <bean class="net.sf.log4jdbc.tools.Log4JdbcCustomFormatter">
+                <property name="loggingType" value="MULTI_LINE" />
+                <property name="sqlPrefix" value="SQL         :  "/>
+            </bean>
+        </property>
+    </bean> -->
+    
+	<!-- mybatis sql session template -->
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="dataSource" />
+		<property name="typeAliasesPackage" value="kr.co.wincom.imcs" />
+		<property name="configLocation" value="classpath:sqlmap/sql-mapper-config.xml" />
+		<property name="mapperLocations" value="classpath:sqlmap/mappers/*.xml" />
+	</bean>
+	
+	<bean id="sqlSessionTemplate" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg ref="sqlSessionFactory" />
+	</bean>
+	
+	<bean id="ds1Scanner" class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+        <property name="basePackage" value="kr.co.wincom" />
+        <property name="annotationClass" value="org.springframework.stereotype.Repository"/>
+        <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory"/>
+	</bean>
+	
+	<!-- DB #2 -->
+	<!-- 개발  -->
+	<!-- 쿼리찍기 -->
+	<bean id="dataSourceSpied2" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close" >
+ 	  	<property name="driverClassName" value="oracle.jdbc.driver.OracleDriver" />
+ 	  	<property name="url" value="jdbc:oracle:thin:@172.21.151.202:1521:mylgdev2" />
+		<property name="username" value="VODUSER" />
+		<property name="password" value="VODUSER2008" />
+		<!-- <property name="url" value="jdbc:oracle:thin:@123.140.17.231:1521:mylgtb" />
+		<property name="username" value="VODUSER" />
+		<property name="password" value="VODUSER2008" /> -->
+		<!-- <property name="url" value="jdbc:oracle:thin:@192.168.188.12:1521:homedb" />
+		<property name="username" value="voduser" />
+		<property name="password" value="voduser00!" /> -->
+		<property name="initialSize" value="5" />
+		<property name="minIdle" value="50" />
+		<property name="maxActive" value="100" />
+		<property name="maxIdle" value="100" />
+		<property name="maxWait" value="200000" />
+		<property name="poolPreparedStatements" value="true" />
+		<property name="maxOpenPreparedStatements" value="10" />
+		<!-- <property name="validationQuery" value="SELECT 1 FROM dual" />
+		<property name="validationQueryTimeout" value="10" />
+		<property name="testOnBorrow" value="true" />
+		<property name="testWhileIdle" value="true" />
+		<property name="testOnReturn" value="true" /> -->
+	</bean>
+	
+    <bean id="dataSource2" class="net.sf.log4jdbc.Log4jdbcProxyDataSource">
+        <constructor-arg ref="dataSourceSpied2" />
+        <property name="logFormatter">
+            <bean class="net.sf.log4jdbc.tools.Log4JdbcCustomFormatter">
+                <property name="loggingType" value="MULTI_LINE" />
+                <property name="sqlPrefix" value="SQL         :  "/>
+            </bean>
+        </property>
+    </bean>
+	
+	<!-- mybatis sql session template -->
+ 	<bean id="sqlSessionFactory2" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="dataSource2" />
+		<property name="typeAliasesPackage" value="kr.co.wincom2.imcs" />
+		<property name="configLocation" value="classpath:sqlmap2/sql-mapper-config2.xml" />
+		<property name="mapperLocations" value="classpath:sqlmap2/mappers/*.xml" />
+	</bean>
+	
+	<bean id="sqlSessionTemplate2" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg ref="sqlSessionFactory2" />
+	</bean>
+
+	<bean id="ds2Scanner" class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+        <property name="basePackage" value="kr.co.wincom2" />
+        <property name="annotationClass" value="org.springframework.stereotype.Repository"/>
+        <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory2"/>
+	</bean>
+	
+</beans>

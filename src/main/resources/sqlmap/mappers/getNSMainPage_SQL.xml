@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSMainPage.GetNSMainPageDao">
+	
+	<!-- 행정동 코드 조회 -->
+	<select id="getDongYn" resultType="String" >
+		SELECT B.STB_PLAY_IP1 AS DONG_YN 
+		  FROM IMCSUSER.PT_LV_NODE_INFO B ,
+		       IMCSUSER.PT_LV_DONG_INFO C,
+		       PT_VO_CUSTOM_ID D 
+		 WHERE D.SA_ID = #{saId}
+		   AND D.MAC_ADDR = #{stbMac}
+		   AND C.DONG_CD = D.HJDONG_NO
+		   AND B.SUB_NODE_CD = C.NSC_SUB_NODE_CD
+	</select>
+	
+	
+	<!-- 가입자 조회 -->
+	<select id="getTestSbc" resultType="String" >
+	     SELECT CASE WHEN TEST_SBC = 'Y' THEN TEST_SBC ELSE 'N' END AS TEST_SBC
+	       FROM PT_VO_CUSTOM_ID
+	      WHERE SA_ID = #{saId}
+	        AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	
+	<!-- 실시간 인기채널 프로그램 조회 -->
+	<select id="getChnlList" resultType="GetNSMainPageChannelVO" >
+		<![CDATA[
+		SELECT SERVICE_ID, STB_PLAY_IP1 AS LIVE_IP1, M3U8_FILE1 AS LIVE_FILE_NAME1, STB_PLAY_IP2 AS LIVE_IP2, M3U8_FILE1 AS LIVE_FILE_NAME2,
+		      STB_PLAY_IP3 AS LIVE_IP3, M3U8_FILE1 AS LIVE_FILE_NAME3, STB_PLAY_IP1 AS LIVE_IP4, M3U8_FILE2 AS LIVE_FILE_NAME4, 
+		      STB_PLAY_IP2 AS LIVE_IP5, M3U8_FILE2 AS LIVE_FILE_NAME5, STB_PLAY_IP3 AS LIVE_IP6, M3U8_FILE2 AS LIVE_FILE_NAME6,
+		      ICON_URL AS IMG_URL, ICON_FILE_NAME AS IMG_FILE_NAME, CHANNELNUMBER AS CHANNEL_NO, SUB_NODE_PORT1 AS LIVE_PORT, 
+		      CDN_LOCAL_TYP AS VOD_SERVER1_TYPE, CDN_NEAR_TYP AS VOD_SERVER2_TYPE, CDN_CENTER_TYP AS VOD_SERVER3_TYPE
+		 FROM (
+		       SELECT DISTINCT E.RANKING,
+		              A.SERVICE_ID,
+		              A.SORT_NO,
+		              B.STB_PLAY_IP1,
+		              B.STB_PLAY_IP2,
+		              B.STB_PLAY_IP3,
+		              DECODE(B.CDN_LOCAL_TYP, '1', NVL(A.M3U8_FILE1, ''), '2', NVL(A.M3U8_FILE1_N, '')) M3U8_FILE1,
+		              DECODE(B.CDN_LOCAL_TYP, '1', NVL(A.M3U8_FILE2, ''), '2', NVL(A.M3U8_FILE2_N, '')) M3U8_FILE2,
+		              'http:'||REPLACE(A.ICON_URL,'\','/') ICON_URL,
+		              A.ICON_FILE_NAME,
+		              A.CHANNELNUMBER,
+		              B.SUB_NODE_PORT1,
+		              B.CDN_LOCAL_TYP,
+		              B.CDN_NEAR_TYP,
+		              B.CDN_CENTER_TYP
+		]]>
+		<if test='baseGb == "N" and dongYn =="Y" '>
+				FROM IMCSUSER.PT_CD_PLAY_CHNL A,
+					 IMCSUSER.PT_LV_NODE_INFO B,
+					 IMCSUSER.PT_LV_DONG_INFO C,
+					 PT_VO_CUSTOM_ID D,
+		</if>
+		<if test='baseGb == "N" and dongYn =="N" '>
+				FROM IMCSUSER.PT_CD_PLAY_CHNL A,
+					 IMCSUSER.PT_LV_NODE_INFO B,
+					 IMCSUSER.PT_LV_DONG_INFO C,
+		</if>
+		<if test='baseGb == "Y"'>
+				FROM IMCSUSER.PT_CD_PLAY_CHNL A,
+					 IMCSUSER.PT_LV_NODE_INFO B,
+					 IMCSUSER.PT_LV_RANGE_IP_INFO C,
+					 PT_VO_CUSTOM_ID D,
+		</if>
+					 AVBM_QBIC_3MIN_TB E
+					 
+					 
+		<if test='nscType == "PAD"'>
+				WHERE A.FILTERING_CODE in ('8', '9', '10', '11', '12', '13', '14', '15')
+		</if>
+		<if test='nscType != "PAD"'>
+				WHERE A.FILTERING_CODE in ('1', '3', '5', '7', '9', '11', '15')
+		</if>
+		
+		<if test='testSbc != "N"'>
+				  AND A.SORT_NO <![CDATA[<>]]> '999'	
+		</if>
+		<if test='baseGb == "N" and dongYn =="Y" '>
+				  AND D.SA_ID = #{saId}
+				  AND D.MAC_ADDR = #{stbMac}
+				  AND C.DONG_CD = D.HJDONG_NO
+				  AND B.SUB_NODE_CD = C.NSC_SUB_NODE_CD
+				  AND (NVL(A.YOUTH_YN, '2') = '2' OR NVL(A.YOUTH_YN, '2') = #{youthYnCom})
+		</if>
+		<if test='baseGb == "N" and dongYn =="N" '>
+				  AND B.SUB_NODE_CD = C.NSC_SUB_NODE_CD
+				  AND (NVL(A.YOUTH_YN, '2') = '2' OR NVL(A.YOUTH_YN, '2') = #{youthYnCom})
+		</if>
+		<if test='baseGb == "Y"'>
+				  AND D.SA_ID = #{saId}
+				  AND D.MAC_ADDR = #{stbMac}
+				  AND C.SUB_NODE_CD = #{nodeCd}
+				  AND C.RANGE_IP_CD = #{rbaseCode}
+				  AND B.SUB_NODE_CD = C.SUB_NODE_CD
+				  AND (NVL(A.YOUTH_YN, '2') = '2' OR NVL(A.YOUTH_YN, '2') = #{youthYnCom})
+		</if>
+				  AND E.CH_NO = A.CHANNELNUMBER
+			    ORDER BY E.RANKING, TO_NUMBER(A.SORT_NO), A.CHANNELNUMBER, A.SERVICE_ID 
+			)
+	</select>
+	
+	
+	
+	
+	<!-- 서브 카테고리 정보 조회 -->
+	<select id="getSubList" resultType="GetNSMainPageSubVO" >
+		<![CDATA[
+		SELECT X.RESULT_TYPE, X.CONTS_ID, X.CONTS_NAME, '' AS CAT_TYPE, X.IMG_FILE_NAME, X.CAT_ID, 'N' AS AUTH_YN, X.CHA_NUM, 
+	           X.CAT_LEVEL, X.SUGGESTED_PRICE, X.PR_INFO, X.RUN_TIME, X.IS_51CH, X.IS_CAPTION, X.HDCONTENT, 'N' AS RELAY_VIEW, X.POINT,
+		       X.SORT_NO, X.PRODUCT_TYPE, 'N' AS CLOSE_YN, 'N' AS SVOD_YN, X.IS_3D, X.TEMP_PRICE, X.FILTER_GB, X.SERVICE_ICON, 
+	           X.TERR_CH, X.OVERSEER_NAME, X.ACTOR, X.RELEASE_DATE, X.GENRE_GB, X.SERIES_DESC, X.REAL_HD, X.RANKING
+		  FROM (
+		        SELECT RESULT_TYPE, CONTS_ID, CONTS_NAME, IMG_FILE_NAME, CAT_ID, CHA_NUM, CAT_LEVEL, SUGGESTED_PRICE, PR_INFO, 
+	                   RUN_TIME, IS_51CH, IS_CAPTION, HDCONTENT, POINT, SORT_NO, PRODUCT_TYPE, SORT_NO_TEMP, IS_3D, TEMP_PRICE, ALBUM_TYPE, FILTER_GB, 
+	                   SERVICE_ICON, TERR_CH, OVERSEER_NAME, ACTOR, RELEASE_DATE, RANKING, GENRE_GB, SERIES_DESC, REAL_HD
+		          FROM (SELECT 'ALB' RESULT_TYPE,
+		                       E.CONTENTS_ID AS CONTS_ID,
+		                       A.ADI_ALBUM_NAME AS CONTS_NAME,
+		                       PO.CONTENT_VALUE AS IMG_FILE_NAME,
+		                       J.CATEGORY_ID AS CAT_ID,
+		                       E.CHA_NUM AS CHA_NUM,
+		                       TO_CHAR(TO_NUMBER(J.CATEGORY_LEVEL) + 1) AS CAT_LEVEL,
+		                       CASE WHEN TO_NUMBER(NVL(T.SUGGESTED_PRICE, '0'))>0 AND SUBSTR(P.PRODUCT_TYPE, 1, 1) <> '0' THEN 'Y' ELSE 'N' END SUGGESTED_PRICE,
+		                       NVL(T.RATING, '') AS PR_INFO,
+		                       DECODE(TO_CHAR(TO_NUMBER(SUBSTR(T.DISPLAY_RUN_TIME,1,2))*60 + TO_NUMBER(SUBSTR(T.DISPLAY_RUN_TIME,3,2))) , '0', '1' ,
+		                             TO_CHAR(TO_NUMBER(SUBSTR(T.DISPLAY_RUN_TIME,1,2))*60 + TO_NUMBER(SUBSTR(T.DISPLAY_RUN_TIME,3,2)))) AS RUN_TIME,
+		                       UPPER(NVL(C.AUDIO_TYPE, '')) AS IS_51CH,
+		                       /*CASE WHEN C.SMI_YN = 'Y' AND C.SMI_IMP_YN = 'Y' THEN 'Y' ELSE 'N' END A17,*/
+		                       CASE WHEN NVL(T.DUBBING, 'N') = 'Y' THEN 'D' WHEN NVL(C.SMI_YN, 'N')='Y' AND NVL(C.SMI_IMP_YN, 'N') ='Y' THEN 'Y' ELSE 'N' END IS_CAPTION,
+		                       NVL(C.HDCONTENT, 'N') AS HDCONTENT,
+		                       TO_CHAR(ROUND(TO_NUMBER(NVL(A.POINT_SUM,'0'))                                                                         
+	                                /(CASE WHEN NVL(A.POINT_CNT,'0')= '0' THEN 1 ELSE TO_NUMBER(NVL(A.POINT_CNT,'0')) END), 0)) AS POINT,
+		                       RANK_NO AS SORT_NO,
+		                      -- J.CATEGORY_ID A22,
+		                       P.PRODUCT_TYPE,
+		                       J.SORT_NO SORT_NO_TEMP,
+		                       NVL(C.IS_3D, 'N') AS IS_3D,
+		                       NVL(T.SUGGESTED_PRICE, '0') AS TEMP_PRICE,
+		                       DECODE(PA.ALBUM_TYPE, '3D', '1', 'HD', '2', 'SH', '3', 'SD', '4', 'PR', '5', '6') AS ALBUM_TYPE,
+		                       CASE WHEN NVL(T.CATEGORY, '') = 'K' OR NVL(T.CATEGORY, '') = 'F' THEN NVL(T.CATEGORY, '') ELSE 'N' END AS FILTER_GB,
+		                       CASE WHEN NVL(J.NSC_GB, 'LTE') = 'UFX' THEN A.SERVICE_ICON_UFLIX ELSE A.SERVICE_ICON_HDTV END SERVICE_ICON,
+		                       X.COM_CD AS TERR_CH,
+		                       T.DIRECTOR AS OVERSEER_NAME,
+		                       T.ACTORS_DISPLAY AS ACTOR,
+		                       A.RELEASE_DATE,
+		                       F.RANKING,
+		                       CASE WHEN NVL(T.GENRE_LARGE, '')= '방송' THEN 'T' ELSE 'V' END GENRE_GB,
+		                       A.SERIES_NO AS SERIES_DESC,
+		                       NVL(A.IS_RH, 'N') AS REAL_HD
+		                  FROM PT_VO_CATEGORY J,
+		                       PT_VO_CATEGORY_MAP E,
+		                       IMCSUSER.PT_LA_CONTENT_ASSET C,
+		                       IMCSUSER.PT_LA_TITLE_ASSET T,
+		                       (SELECT * FROM IMCSUSER.PT_LA_POSTER_ASSET WHERE POSTER_TYPE = #{posterType} ) PO,
+		                       IMCSUSER.PT_LA_PACKAGE_ASSET PA,
+		                       IMCSUSER.PT_PD_PACKAGE P,
+		                       IMCSUSER.PT_PD_PACKAGE_DETAIL PD,
+		                       IMCSUSER.PT_LA_ALBUM_MST A,
+		                       AVBM_QBIC_TNSVOD_TB F,
+		                       ( SELECT COM_CD, COM_NAME  FROM IMCSUSER.PT_CD_COM_CD   WHERE GRP_ID = 'PUBLICCH' ) X
+		                 WHERE E.CATEGORY_ID = F.CATEGORY_ID
+		                   AND E.CONTENTS_ID = PA.NSC_ALBUM_ID
+		                   AND C.ADI_PRODUCT_ID = T.ADI_PRODUCT_ID
+		                   AND T.ADI_PRODUCT_ID = PA.ADI_PRODUCT_ID
+		                   AND PA.ADI_PRODUCT_ID = PO.ADI_PRODUCT_ID(+)
+		                   AND PD.CONTENTS_ID = PA.ASSET_ID
+		                   AND P.PRODUCT_ID = PD.PRODUCT_ID
+		                   AND A.ADI_ALBUM_ID = E.CONTENTS_ID
+		                   AND PA.NSC_ALBUM_ID = A.ADI_ALBUM_ID
+		                   AND E.CATEGORY_ID = J.CATEGORY_ID
+		                   AND F.CONTENT_ID =  E.CONTENTS_ID
+		                   AND T.CATEGORY = X.COM_NAME(+)
+		                   AND (F.RANKING BETWEEN '32001' AND '32010' OR  F.RANKING BETWEEN '32101' AND '32110')
+		   	         ) X                   
+		         ORDER BY RANKING, SORT_NO, CONTS_ID, ALBUM_TYPE DESC, PRODUCT_TYPE
+		       ) X
+		]]>
+	</select>
+	
+	
+	
+		
+	<!-- 스틸이미지명 조회 -->	
+	<select id="getStillImage" resultType="StillImageVO" >
+	   SELECT 'http:'||REPLACE(NVL(A.MAIN_IMG_URL, ''), '\', '/') AS IMG_URL,
+		      A.MAIN_IMG_FILE_NAME AS IMG_FILE_NAME,
+		      A.IMG_FLAG AS IMG_FLAG
+		 FROM IMCSUSER.PT_LA_ALBUM_IMG A
+		WHERE A.ADI_ALBUM_ID = #{contsId}
+		  AND A.IMG_FLAG = 'N'
+		ORDER BY TO_NUMBER(ADI_ALBUM_SEQ) DESC
+	</select>
+	
+	
+	
+	<!-- 시리즈 카테고리 ID 조회 -->
+	<select id="getSerCatInfo" resultType="String" >
+		SELECT B.CATEGORY_ID AS SER_CAT_ID
+		  FROM PT_VO_CATEGORY_MAP A, PT_VO_CATEGORY B
+		 WHERE A.CONTENTS_ID = #{contsId}
+		   AND A.CATEGORY_ID = B.CATEGORY_ID
+		   AND B.SERIES_YN = 'Y'
+		   AND B.CATEGORY_GB = 'NSC'
+		   AND NVL(B.NSC_GB, 'LTE') = #{nscType}
+		   AND (B.TEST_SBC = 'N' OR B.TEST_SBC IS NULL OR B.TEST_SBC = '')
+		   AND ROWNUM = 1
+	</select>
+	
+	
+	<!-- 메인 카테고리 정보 조회 -->
+	<select id="getNSMainList" resultType="GetNSMainPageMainVO" >
+		SELECT RESULT_TYPE, GENRE_GB, CAT_ID, CAT_NAME, CAT_TYPE, IMAGE_URL, IMG_FILE_NAME, PARENT_CAT_ID,
+		       AUTH_YN,  CHA_NUM, CAT_LEVEL, PRICE, PR_INFO, RUN_TIME, CH_51_YN AS IS_51CH, IS_NEW, IS_CAPTION, IS_HD, RELAY_VIEW,
+		       POINT, SORT_NO, CLOSE_YN,  SVOD_YN, PKG_YN PPS_YN, CATEGORY_DESC, IS_ORDER,  NO_CACHE,  SERVICE_ICON, CONTS_CNT,
+		       FOCUS_FILE_NAME, NORMAL_FILE_NAME, SELECT_FILE_NAME, PPM_YN, PPM_PROD_ID, TERR_CH, '' AS SER_CAT_ID
+		  FROM
+		       (SELECT /*+ FULL(A) */
+		           'CAT' RESULT_TYPE, A.CATEGORY_ID AS CAT_ID, A.CATEGORY_NAME AS CAT_NAME,
+		            CASE WHEN A.SERIES_YN = 'Y' THEN 'SER' ELSE NVL(A.CATEGORY_TYPE, '') END CAT_TYPE,
+		            'http:'||REPLACE(NVL(A.IMAGE_URL, ''), '\', '/') AS IMAGE_URL, A.IMG_FILE_NAME,
+		            A.PARENT_CATEGORY_ID AS PARENT_CAT_ID, NVL(A.AUTH_YN, 'N') AUTH_YN, A.CHA_NUM, 
+		            A.CATEGORY_LEVEL AS CAT_LEVEL, NVL(A.BILL_FLAG, 'N') AS PRICE, '' AS PR_INFO, RUN_TIME,
+ 		            A.CH_51_YN, A.CREATE_DATE AS IS_NEW, A.CAPTION_YN AS IS_CAPTION, A.IS_HD, A.RELAY_VIEW,
+		            A.POINT, A.SORT_NO, NVL(A.CLOSE_YN, 'N') CLOSE_YN, A.SVOD_YN, A.PKG_YN,
+		            REPLACE(REPLACE(TRIM(NVL(A.CATEGORY_DESC, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n') CATEGORY_DESC,
+		            NVL(A.IS_ORDER, '0') IS_ORDER, NVL(A.NO_CACHE, 'N') NO_CACHE,
+		            CASE WHEN NVL(A.NSC_GB, 'LTE') = 'UFX' THEN A.SERVICE_ICON_UFLIX ELSE A.SERVICE_ICON_HDTV END SERVICE_ICON,                                                                                             
+		            A.CONTENTS_COUNT AS CONTS_CNT, A.FOCUS_FILE_NAME, A.NORMAL_FILE_NAME, A.SELECT_FILE_NAME, A.PPM_YN, A.PPM_PROD_ID,   																						
+		            A.TERR_CH, B.COM_CD GENRE_GB
+		       FROM PT_VO_CATEGORY A, IMCSUSER.PT_CD_COM_CD B
+		      WHERE A.PARENT_CATEGORY_ID = B.MAX_VALUE
+		        AND (A.TEST_SBC = #{testSbc} OR A.TEST_SBC = 'N' OR A.TEST_SBC IS NULL OR A.TEST_SBC = '')
+		        AND A.CATEGORY_GB = 'NSC'
+		        AND NVL(A.NSC_GB, 'LTE') = #{nscType}
+		        AND (NVL(A.YOUTH_YN, '2') = '2' OR NVL(A.YOUTH_YN, '2') = #{youthYnCom})
+		        AND B.GRP_ID = 'SUGGEST'
+		    ) X
+		ORDER BY PARENT_CAT_ID, SORT_NO, CAT_ID
+	</select>	
+	<!--  DECODE(TO_CHAR(TO_NUMBER(SUBSTR(A.RUN_TIME,1,2)) * 60 + TO_NUMBER(SUBSTR(A.RUN_TIME,3,2))), '0', '1',
+		 				TO_CHAR(TO_NUMBER(SUBSTR(A.RUN_TIME,1,2)) * 60 + TO_NUMBER(SUBSTR(A.RUN_TIME,3,2))) ) RUN_TIME, 쿼리 에러 -->
+
+
+	<!-- 하위레벨 카테고리 여부 조회 -->
+	<select id="getParentCatYn" resultType="CateInfoVO" >
+		SELECT CASE WHEN COUNT(CATEGORY_ID) <![CDATA[>]]> 0 THEN 'Y' ELSE 'N' END AS PARENT_CAT_ID, COUNT(CATEGORY_ID) AS COUNT 
+		  FROM PT_VO_CATEGORY B 
+		 WHERE B.PARENT_CATEGORY_ID = TRIM(#{catId})
+		   AND (B.TEST_SBC = #{testSbc} OR B.TEST_SBC = 'N' OR B.TEST_SBC IS NULL OR B.TEST_SBC = '')
+		   AND B.CATEGORY_GB = 'NSC'
+	</select>
+	
+</mapper>
+	
+	
+	

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getCopyCache.GetCopyCacheDao">
+	
+	<!-- 1. 캐쉬버전 정보 중복 체크 -->
+	<select id="getCacheChk" parameterType="GetCopyCacheRequestVO" resultType="String">
+		SELECT 1 
+          FROM DUAL 
+         WHERE EXISTS (
+                SELECT 'X' 
+                  FROM MCUSTUSER.NPT_CA_API_VERSION_INFO${server99} A 
+                 WHERE A.API_ID = #{apiName}
+                   AND A.VERSION_KEY= #{versionKey}
+                   AND VTS_ID = #{vtsId}
+               )
+	</select>
+	
+	<!-- 2. 캐쉬버전 정보 insert -->
+	<update id="insertCacheVersion" parameterType="GetCopyCacheRequestVO">           
+		INSERT INTO MCUSTUSER.NPT_CA_API_VERSION_INFO${server99} (API_ID, VERSION_KEY, VTS_ID , CACHE_VERSION, VTS_CURRENT_VERSION, APPLY_DT) 
+           VALUES (#{apiName}, #{versionKey}, #{vtsId}, #{cacheVer}, #{vtsCrtVer}, TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS'))                   
+	</update>
+	
+	
+	<!-- 3. 캐쉬버전 정보 update -->
+	<insert id="updateCacheVersion" parameterType="GetCopyCacheRequestVO">
+		UPDATE MCUSTUSER.NPT_CA_API_VERSION_INFO${server99}
+           SET CACHE_VERSION = #{cacheVer},
+	           <if test='copyFlag == "0"'> 
+	           		VTS_CURRENT_VERSION = #{vtsCrtVer},
+	           </if>
+               		APPLY_DT = TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS')
+         WHERE API_ID = #{apiName}
+                   AND VERSION_KEY= #{versionKey}
+                   AND VTS_ID = #{vtsId}
+	</insert> 
+</mapper> 

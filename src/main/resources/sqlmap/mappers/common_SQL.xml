@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.common.CommonDao">
+
+	<!-- 오늘날짜/시간 조회 (YYYYMMDDHH24MISS)-->
+	<select id="getSysdate" resultType="String">
+		SELECT /* CTIS.Common */
+		       TO_CHAR(SYSDATE,'YYYYMMDDHH24MISS') AS DB_DATE
+		  FROM DUAL    
+	</select>
+	
+	<!-- 오늘날짜/시간 조회 (YYYYMMDD) -->
+	<select id="getSysdateYMD" resultType="String" >
+		<![CDATA[
+			SELECT TO_CHAR(SYSDATE, 'YYYYMMDD') AS DB_DATE
+		    FROM DUAL
+		]]>		
+	</select>
+	
+	<!-- 이미지 관련 IP정보 조회 -->
+	<select id="getIpInfo" resultType="ImageServerVO">
+		<![CDATA[
+			SELECT 'http://'||A.PAR_SERVER_IP||A.IMG_PATH AS t_imgsvrip1, 'http://'||A.PAR_SERVER_IP_2||A.IMG_PATH dr_imgsvrip
+			FROM PT_VO_IMGSRV_LIST A
+			WHERE A.SERVER_NM = #{serverName}
+		]]>
+	</select>
+	
+	<!-- 이미지 관련 IP정보 조회 -->
+	<select id="getImgNodeIp" resultType="ImageServerVO">
+		<![CDATA[
+			SELECT 'cirtspt://'||B.stb_play_ip1||'/' t_imgsvrip1,
+                   'cirtspt://'||B.stb_play_ip2||'/' t_imgsvrip2,
+                   'cirtspt://'||B.stb_play_ip3||'/' t_imgsvrip3
+	         FROM PT_VO_CUSTOM_ID A,
+                   IMCSUSER.PT_LV_NODE_INFO B,
+                   IMCSUSER.PT_LV_DONG_INFO C
+             WHERE A.sa_id = #{saId}
+               AND A.mac_addr = #{stbMac}
+               AND C.dong_cd = A.hjdong_no
+               AND B.sub_node_cd = C.sub_node_cd
+               AND B.CDN_POLICY = '1'
+		]]>
+	</select>
+
+</mapper>

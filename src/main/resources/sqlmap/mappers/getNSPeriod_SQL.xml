@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSPeriod.GetNSPeriodDao">
+	
+	<!-- 가입자 해피콜완료 여부 조회 -->
+	<select id="getVodUseYn" resultType="String" >
+			SELECT VOD_USE_YN AS YN_VOD_OPEN
+			  FROM PT_VO_CUSTOM_ID
+			 WHERE SA_ID    = #{saId}
+			   AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	
+	<!-- 가입자 연령정보 조회 -->
+	<select id="getPrInfo" resultType="String" >
+			SELECT NVL(RATING, '0') AS PR_INFO
+			  FROM PT_VO_CUSTOM_RATING
+			 WHERE SA_ID	= #{saId}
+			   AND MAC_ADDR	= #{stbMac}
+	</select>
+	
+	
+	<!-- 카테고리 업데이트 주기 조회 -->
+	<select id="getCateUpdPeriod" resultType="String" >
+		    SELECT CATEGORY_UPD_PERIODE
+			  FROM PT_VO_CATEGORY_UPDATE
+		  	 ORDER BY CATEGORY_UPD_PERIODE
+	</select>
+	
+	
+	<!-- 버전정보 조회 (Guide VOD, 카테고리 리스트)	 -->
+	<select id="getVodVersion" resultType="ComVersionVO" >
+		    SELECT VERSION_TYPE, VOD_VERSION AS VERSION, TO_NUMBER(DOWNLOAD_CNT) AS DOWNLOAD_CNT
+			  FROM PT_VO_VOD_VERSION
+			 ORDER BY VERSION_TYPE
+	</select>
+	
+	
+	<!-- 서브 카테고리 VERSION 조회 -->
+	<select id="getSubVersion" resultType="ComVersionVO" >
+			SELECT /*+ INDEX(B PT_VO_CATEGORY_UNITED_IDX_08) */
+			       A.VOD_VERSION AS VERSION, A.CATEGORY_ID AS CAT_ID, B.CATEGORY_NAME AS CAT_NAME
+			  FROM PT_VO_I20_VERSION A,
+				   PT_VO_CATEGORY B
+		 	 WHERE A.CATEGORY_ID    = B.CATEGORY_ID
+			   AND B.CATEGORY_LEVEL = '1'
+			   AND B.CATEGORY_GB    = 'NSC'
+			 ORDER BY A.CATEGORY_ID
+	</select>	
+	
+	<!-- 컨텐츠 업데이트 주기 조회 -->
+	<select id="getConUpdPeriod" resultType="String" >
+			SELECT CONTENTS_UPD_PERIODE
+			  FROM PT_VO_CONTENTS_UPDATE
+			 ORDER BY CONTENTS_UPD_PERIODE
+	</select>
+	
+	
+	<!-- EPG 스케줄 업데이트 주기 조회 -->
+	<select id="getPSIUpdPeriod" resultType="String" >
+			SELECT CHNL_UPD_PERIODE PSI_UPD_PERIODE
+			  FROM PT_VO_CHNL_UPDATE
+			 ORDER BY CHNL_UPD_PERIODE
+	</select>
+		
+</mapper>
+	
+	
+	

@@ -1,0 +1,90 @@
+#########NoSQL Config#########
+1) TEST_MODE
+  - Y로 설정 시 무조건 oracle에서 처리
+2) REDIS_BLOCKING
+  - REDIS 요청에 대해 무조건 oracle에서 처리하도록 설정
+3) HBASE_BLOCKING
+  - HBASE 요청에 대해 무조건 oracle에서 처리하도록 설정
+4) LOG_PATH, LOG_PATTERN, LOG_FILE_SIZE, LOG_LEVEL, LOG_TYPE
+  - LOG_PATH : 로그파일 위치, LOG_PATTERN : 롤링될 시 저장패턴, LOG_FILE_SIZE : 지정사이즈 이상 로그가 쌓이면 롤링, LOG_LEVEL : 로깅할 레벨 지정, LOG_TYPE : 로그 쌓는 방식 지정
+5) RESPONSE_CHECK_TIME_MICRO
+  - 지정한 시간 이상 걸리는 요청에 대해 로깅하도록 설정
+6) RESPONSE_ALL_CHECK
+  - 모든 요청에 대한 응답 값을 로깅하도록 설정 (RESPONSE_CHECK_TIME_MICRO에 지정한 시간이상 걸리는 요청에 대한 설정)
+7) RESPONSE_CHECK_LIST
+  - 지정한 SQL_ID의 요청만 로깅하도록 설정(RESPONSE_ALL_CHECK가 N으로 설정 했을 시 동작한다, RESPONSE_CHECK_TIME_MICRO에 지정한 시간이상 걸리는 요청에 대한 설정)
+8) STATS_LOGGING_HBASE_BIRTH_TURN_OFF, STAT_TYPE_BIRTH, STAT_TYPE_REFRESH, STAT_TYPE_DISABLE
+  - HBASE의 통계데이터를 쌓기위한 설정
+6) REDIS_SERVER_NUM
+  - REDIS 서버 갯수 지정
+7) REDIS_SERVER_[서버번호],REDIS_PORT_[서버번호]
+  - REDIS_SERVER_NUM에 지정한 서버 갯수만큼 IP/PORT정보 셋팅
+---------------------------------------------------------------------------
+[20151008.Dreambug] 유플러스 운영팀으로부터 상용 REDIS 서버 설정을 아래와 같이 설정해달라고 요청받음
+CTV#1 - NSQLRS05, NSQLRS06
+CTV#2 - NSQLRS07, NSQLRS08
+CTV#3 - NSQLRS09, NSQLRS10
+---------------------------------------------------------------------------
+8) REDIS_CONNECTION_THREAD_COUNT_MAX
+  - REDIS의 POOL갯수 지정
+9) LONG_RUNNING_[SQL_ID]
+  - SQL_ID를 지정하여 TRUE로 설정 시 더티캐시일 경우 더티캐시를 내려준 후 뒤에서 재캐싱하는 방식으로 변경 됨(기본적으로 더티캐시일 경우 재캐싱한 후 데이터를 내려 줌)
+10) LONG_QUERY_OMD_CHECK_INTERVAL_TIME_SEC
+  - LONG_RUNNING_[SQL_ID]에 지정한 SQL_ID에 대해 지정시간 이상 걸릴 시 skip
+11) LONG_QUERY_EXECUTOR_RETRY_SLEEP_TIME_SEC
+  - LONG_RUNNING_[SQL_ID]에 지정된 요청 retry시 sleep시간 지정
+12) LONG_QUERY_EXECUTOR_RETRY_COUNT
+  - LONG_RUNNING_[SQL_ID]에 지정된 요청의 최대 retry 횟수 지정
+13) LONG_QUERY_EXECUTOR_THREAD_MAX
+  - LONG_RUNNING_[SQL_ID]에 지정된 요청에 대해 동시 실행 횟수 지정
+14) DB_USER, DB_PASS, DB_DRIVER, DB_CONNECTION_URL
+  - DB설정 (TB_NOSQL_HDTV_HBASE_CVER_WFAIL에 장애 기록하기 위해)
+15) HBASE_ZK_SERVER_NUM
+  - HBASE ZOOKEEPER 갯수 지정
+16) HBASE_ZK_SERVER_[서버번호]
+  - HBASE_ZK_SERVER_NUM에 지정한 서버 갯수만큼 IP셋팅
+---------------------------------------------------------------------------
+[20151008.Dreambug] 유플러스 운영팀으로부터 상용 HBASE 서버 설정을 아래와 같이 설정해달라고 요청받음
+=> CNS 쪽으로부터 NSQLHD01, NSQLHD07 서버는 HBASE 에서 사용하지 않아야 한다고 전달받음
+CTV#1 - NSQLHD02, NSQLHD03, NSQLHD04, NSQLHD05, NSQLHD06
+CTV#2 - NSQLHD02, NSQLHD03, NSQLHD04, NSQLHD05, NSQLHD06
+CTV#3 - NSQLHD02, NSQLHD03, NSQLHD04, NSQLHD05, NSQLHD06
+---------------------------------------------------------------------------
+17) HBASE_POOL_MAX_CONNECTION
+  - HBASE 최대 POOL갯수 지정
+18) CHK_LEVEL_[레벨번호]_INITIAL_INTERVAL, CHK_LEVEL_[레벨번호]_LAST_INTERVAL, CHK_LEVEL_[레벨번호]_TRANSIT_MULTIPLE
+  - CONSISTENCY CHECK를 위한 레벨 별 설정
+  - CHK_LEVEL_[레벨번호]_INITIAL_INTERVAL : 지정된 요청부터 CONSISTENCY CHECK를 시작
+  - CHK_LEVEL_[레벨번호]_LAST_INTERVAL : 지정된 요청까지 CONSISTENCY CHECK
+  - CHK_LEVEL_[레벨번호]_TRANSIT_MULTIPLE : 지정된 간격마다 CONSISTENCY CHECK
+  # 캐시가 재갱신되면 초기화
+19) [SQL_ID]=CHK_LEVEL_[레벨번호]
+  - SQL_ID를 지정하게 되면 지정한 체크레벨에 맞게 CONSISTENCY CHECK
+  
+ #########TempDB Config#########
+ 1) TEST_MODE
+   - Y로 설정 시 고정되어 있는 테스트용 토픽ID로 요청하게 됨
+ 2) LOG_PATH, LOG_PATTERN, LOG_FILE_SIZE, LOG_LEVEL, LOG_TYPE
+   - LOG_PATH : 로그파일 위치, LOG_PATTERN : 롤링될 시 저장패턴, LOG_FILE_SIZE : 지정사이즈 이상 로그가 쌓이면 롤링, LOG_LEVEL : 로깅할 레벨 지정, LOG_TYPE : 로그 쌓는 방식 지정
+ 3) WRITE_THROUGH_KAFKA
+   - 기본적으로 처리요청에 대해 KAFKA에 기록한 후 따로 떠있는 TempDB Consumer가 HBASE에 기록 하도록 되어 있는데 N으로 설정 시 HBASE에 기록하고 실패시에만 KAFKA에 기록하도록 설정된다.
+ 4) FULL_KAFKA_BLOCKING
+   - Y로 설정할 경우 KAFKA사용을 안하게 된다.
+ 5) RUNTIME_KAFKA_BLOCKING_TIME_MILLI
+   - KAFKA 에러발생 시 지정된 시간만큼 어떠한 요청도 받아들이지 않는다.
+ 6) HBASE_ZOOKEEPER_QUORUM
+   - HBASE ZOOKEEPER 서버 지정
+ 7) KAFKA_PRODUCER_METADATA_BROKERLIST
+   - KAFKA PRODUCE BROKER 서버 지정
+ 8) CONSUMER_UserWatchTempdb_NUM_THREADS
+   - TempDB Consumer에서 생성할 thread 갯수 지정
+   - Consumer를 여러 개 띄울 경우 100/n을 해서 지정한다.
+ 9) CONSUMER_UserWatchTempdbHistory_NUM_THREADS
+   - TempDB ConsumerHistory에서 생성할 thread 갯수 지정
+   - ConsumerHistory를 여러 개 띄울 경우 100/n을 해서 지정한다.
+   
+=> 2015.10.07 
+TempDB Consumer 는 상용서버 3대에 각 하나씩 올라가 있으며, 99서버에서는 TempDB Consumer 를 돌리지 않는다 => 99서버에도 TempDB Consumer 를 돌리게 되면 상용서버에서 처리해야 하는 내용이 99에서도 분산되어 처리 되기 때문에 Log 추적이 어려움
+상용서버에 올라가는 TempDB Consumer 는 각각 34개의 Thread 갯수를 가지며 (Guide 가 100/n 이나, 100개가 넘더라도 상관없음. 갯수가 많아지면 서버에 부하가 가게되나 대부분의 Thread 가 놀고 있기 때문에.)
+99서버의 TempDB Consumer 는 Thread 갯수를 0 으로 조절해 놓음. (실제 기동은 되지 않음.) 
+ 

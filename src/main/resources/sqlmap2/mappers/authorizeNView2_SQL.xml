@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom2.imcs.api.authorizeNView.AuthorizeNViewDao2">
+	
+	<insert id="insertWatchHisNScreen2" parameterType="kr.co.wincom.imcs.api.authorizeNView.AuthorizeNViewRequestVO">
+	INSERT INTO PT_VO_WATCH_HISTORY    
+	     (sa_id            ,                           
+	      mac_addr         ,                           
+	      buy_date         ,                           
+	      product_id       ,                           
+	      contents_id      ,                           
+	      watch_fdate      ,                           
+	      watch_edate      ,                           
+	      pattern_type     ,                           
+	      request_type     ,                           
+	      cha_no           ,                           
+	      appl_type        ,                           
+	      PVS_TRANS_YN     ,                           
+	      UFLIX_YN         ,                           
+	      p_idx_sa         ,                           
+	      p_idx_day        ,                           
+		  asset_id		   ,
+		  PVS_TRANS_NO								
+	      )                                            
+	  VALUES                      
+	     (#{nSaId}                           
+	      , #{nStbMac}                                  
+	      <choose>
+			<when test='nBuyDate.equals("N")'>
+				, #{watchDate}
+			</when>
+			<otherwise>
+				, #{nBuyDate}
+			</otherwise>
+		  </choose>
+		  
+		  <choose>
+		  	<when test='fvodFlag.equals("0")'>
+			    , (select asset_id
+				  from imcsuser.pt_la_package_asset
+				 where adi_album_id = #{productId}
+				   and album_type IN ('HD'))
+			    , (select asset_id
+				  from imcsuser.pt_la_package_asset
+				 where adi_album_id = #{productId}
+				   and album_type IN ('HD'))
+		  	</when> 
+		  	<otherwise>
+		  		, #{productId}
+				<choose>
+					<when test='nBuyDate.equals("N")'>
+						, #{assetId}
+					</when>
+					<otherwise>
+						, #{productId}
+					</otherwise>
+				</choose> 
+		  	</otherwise>
+		  </choose>                     
+	      , #{watchDate}         
+	      , #{watchDate}        
+	      ,'4'
+	      , #{reqType}
+	      , #{chaNo}
+	      , #{applType}
+	      , #{udrTransYn}             
+	      , 'N'                      
+	      , mod(#{pIdxSa}, 33)                       
+	      , SUBSTR(#{watchDate}, 7, 2)   
+		  , ''
+		  , 'V'    								
+	     )      
+	</insert> 
+	
+	<update id="updateSetTimeNScreen" parameterType="kr.co.wincom.imcs.api.authorizeNView.AuthorizeNViewRequestVO">
+	UPDATE /*+ index(A IDX_PT_VO_SET_TIME_02_PTT) */ PT_VO_SET_TIME_PTT A  
+	   SET WATCH_DATE = TO_CHAR(sysdate, 'YYYYMMDDHH24MISS') 
+	 WHERE sa_id = #{nSaId}    			                                
+	   AND adi_album_id = #{albumId}                                   
+		AND nscn_cust_no = #{nscnCustNo}									
+	   AND P_IDX_SA = mod(#{pIdxSa}, 33)      
+	</update>
+	
+	
+	<insert id="insertSetTimeNScreen" parameterType="kr.co.wincom.imcs.api.authorizeNView.AuthorizeNViewRequestVO">
+	INSERT INTO PT_VO_SET_TIME_PTT(p_idx_day, sa_id, adi_album_id, nscn_cust_no, link_time, watch_date, p_idx_sa)     
+	  values(substr(TO_CHAR(SYSDATE,'YYYYMMDD'), 7, 2),                                                               
+         #{nSaId},                                                                                              
+         #{albumId},                                                                                             
+         #{nscnCustNo},			                                                                                         
+         '1' ,                                    		                                                         
+         TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS'),                                                                
+		  mod(#{pIdxSa}, 33))
+	</insert> 
+	
+	<select id="setTimeNScreenChk" resultType="String">
+	SELECT /*+ index(A IDX_PT_VO_SET_TIME_02_PTT) */  TO_NUMBER(NVL(A.link_time,'1'))
+		  FROM PT_VO_SET_TIME_PTT A
+		 WHERE A.sa_id =  #{nSaId}
+		   AND A.adi_album_id = #{albumId}
+		   AND A.P_IDX_SA = #{modIdxSa}
+		   AND A.nscn_cust_no = #{nscnCustNo}
+	</select> 
+	
+	<!-- 시청 콘텐츠 메타 정보 저장 -->
+	<insert id="insWatchMeta" parameterType="kr.co.wincom.imcs.api.authorizeNView.AuthorizeNViewRequestVO">
+	 INSERT INTO PT_VO_WATCH_META
+       (
+        P_IDX_DAY, P_IDX_SA, SA_ID, MAC_ADDR, WATCH_FDATE, CONTENTS_ID, CONTENTS_NAME, CAT_ID, ALBUM_ID,
+        SUGGESTED_PRICE, PAY_YN, TERR_YN, TERR_PERIOD, PREVIEW_PERIOD, RATING_CD, RUN_TIME, ONAIR_DATE,
+        CP_ID, CP_ID_UFLIX, CONTENTS_FILESIZE, SERIES_NO        
+       )
+	   VALUES
+	       (
+	        SUBSTR(#{watchDate}, 7, 2),
+	        mod(#{pIdxSa}, 33),
+	        #{nSaId},
+	        #{nStbMac},
+	        #{watchDate},
+	        <choose>
+			<when test='nBuyDate.equals("N")'>
+				#{assetId},
+			</when>
+			<otherwise>
+				#{productId},
+			</otherwise>
+		  	</choose>
+	        #{assetName},
+	        #{catId},
+	        #{albumId},
+	        #{suggestedPrice},
+	        #{payYn},
+	        #{terrYn},
+	        #{terrPeriod},
+	        #{previewPeriod},
+	        #{ratingCd},
+	        #{runTime},
+	        #{onairDate},
+	        #{cpId},
+	        #{cpIdUflix},
+			#{contentFileSize},
+			#{seriesNo}
+	       )
+	</insert>
+</mapper> 

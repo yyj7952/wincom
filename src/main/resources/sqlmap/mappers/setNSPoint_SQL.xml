@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.setNSPoint.SetNSPointDao">
+	
+	<!-- 평점 존재 여부 조회 -->
+	<select id="pointChk" resultType="Integer">
+		SELECT 1 
+		  FROM DUAL 
+		 WHERE EXISTS (
+		        SELECT POINT 
+		          FROM PT_VO_CUSTOM_POINT_NSC 
+		         WHERE SA_ID = #{saId}
+		           AND MAC_ADDR = #{stbMac}
+		           AND ALBUM_ID = #{contsId}
+		       )
+	</select>
+	
+	
+	<!-- 평점 정보 수정 -->
+	<update id="updatePoint" parameterType="SetNSPointRequestVO">
+		UPDATE PT_VO_CUSTOM_POINT_NSC
+		   SET POINT    = #{point}/2,
+		   	   INSERT_DATE = TO_CHAR( SYSDATE, 'YYYYMMDDHH24MISS')
+		 WHERE SA_ID    = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+		   AND ALBUM_ID = #{contsId}
+	</update> 
+	
+	
+	<!-- 평점 정보 등록 -->
+	<insert id="insertPoint" parameterType="SetNSPointRequestVO">
+		INSERT INTO PT_VO_CUSTOM_POINT_NSC (SA_ID, MAC_ADDR, ALBUM_ID, POINT, INSERT_DATE) 
+		VALUES (#{saId}, #{stbMac}, #{contsId}, #{point}/2, TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS'))
+	</insert>
+	
+	
+	<!-- 앨범 ID 조회 -->
+	<select id="getAlbumId" resultType="java.lang.String">
+		SELECT ADI_ALBUM_ID
+	      FROM IMCSUSER.PT_LA_CONTENTS_POINT_NSC
+	     WHERE ADI_ALBUM_ID = #{contsId}
+	       AND CATEGORY_GB = 'NSC'
+	       AND ROWNUM = 1
+	</select>
+	
+	<!-- 앨범 평점 등록 -->
+	<insert id="insertAlbPoint" parameterType="SetNSPointRequestVO">
+		INSERT INTO IMCSUSER.PT_LA_CONTENTS_POINT_NSC (ADI_ALBUM_ID, POINT_SUM, POINT_CNT, CATEGORY_GB, CREATE_DATE)
+		VALUES ( #{contsId}, #{point}, '1', 'NSC', TO_CHAR(SYSDATE, 'YYYYMMDD') )
+	</insert>
+	
+	<!-- 앨범 평점 수정 -->
+	<update id="updateAlbPoint" parameterType="SetNSPointRequestVO">
+		UPDATE IMCSUSER.PT_LA_CONTENTS_POINT_NSC
+          SET POINT_SUM = NVL(TO_CHAR(TO_NUMBER(POINT_SUM) + TO_NUMBER(#{point})), #{point}),
+              POINT_CNT = NVL(TO_CHAR(TO_NUMBER(POINT_CNT) + 1), '1')
+        WHERE ADI_ALBUM_ID = #{contsId}
+          AND CATEGORY_GB = 'NSC'
+	</update> 
+	
+</mapper> 

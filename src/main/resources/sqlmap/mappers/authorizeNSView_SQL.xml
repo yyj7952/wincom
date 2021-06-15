@@ -1,0 +1,691 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.authorizeNSView.AuthorizeNSViewDao">
+
+	<resultMap type="HashMap" id="mAlbumPoster">
+		<result property="CONTENT_VALUE" column="CONTENT_VALUE" javaType="String"/>
+		<result property="SECOND_VALUE" column="SECOND_VALUE" javaType="String"/>
+		<result property="POSTER_TYPE" column="POSTER_TYPE" javaType="String"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="nSysdateInfo">
+		<result property="SYSDATE_CURRENT" column="SYSDATE_CURRENT" javaType="String"/>
+		<result property="SYSDATE_1YEARAGO" column="SYSDATE_1YEARAGO" javaType="String"/>
+		<result property="WATCH_DATE" column="WATCH_DATE" javaType="String"/>		
+	</resultMap>
+	
+	<resultMap type="HashMap" id="nWatchSubscriptionInfo">
+		<result property="TERR_TYPE" column="TERR_TYPE" javaType="String"/>
+		<result property="AGO_DATE" column="AGO_DATE" javaType="String"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mProductBuy">
+		<result property="DATA_CHK" column="DATA_CHK" javaType="String"/>
+		<result property="PRODUCT_ID" column="PRODUCT_ID" javaType="String"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mCdnIp">
+		<result property="VOD_SERVER1" column="VOD_SERVER1" javaType="String"/>
+		<result property="VOD_SERVER2" column="VOD_SERVER2" javaType="String"/>
+		<result property="VOD_SERVER3" column="VOD_SERVER3" javaType="String"/>
+		<result property="VOD_FILE_NAME" column="VOD_FILE_NAME" javaType="String"/>
+		<result property="VOD_SERVER1_TYPE" column="VOD_SERVER1_TYPE" javaType="String"/>
+		<result property="VOD_SERVER2_TYPE" column="VOD_SERVER2_TYPE" javaType="String"/>
+		<result property="VOD_SERVER3_TYPE" column="VOD_SERVER3_TYPE" javaType="String"/>
+		<result property="VOD_IPV6_NODE1" column="VOD_IPV6_NODE1" javaType="String"/>
+		<result property="VOD_IPV6_NODE2" column="VOD_IPV6_NODE2" javaType="String"/>
+		<result property="VOD_IPV6_NODE3" column="VOD_IPV6_NODE3" javaType="String"/>
+		<result property="SERVER_IPV6_PLAY_IP1" column="SERVER_IPV6_PLAY_IP1" javaType="String"/>
+		<result property="SERVER_IPV6_PLAY_IP2" column="SERVER_IPV6_PLAY_IP2" javaType="String"/>
+		<result property="SERVER_IPV6_PLAY_IP3" column="SERVER_IPV6_PLAY_IP3" javaType="String"/>
+		<result property="SERVER_IPV6_PORT" column="SERVER_IPV6_PORT" javaType="String"/>
+		<result property="SERVER_IPV6_TYPE1" column="SERVER_IPV6_TYPE1" javaType="String"/>
+		<result property="SERVER_IPV6_TYPE2" column="SERVER_IPV6_TYPE2" javaType="String"/>
+		<result property="SERVER_IPV6_TYPE3" column="SERVER_IPV6_TYPE3" javaType="String"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mapVodProfile">
+		<result property="M3U8_TYPE" column="M3U8_TYPE" javaType="String"/>
+		<result property="CASTIS_M3U8" column="CASTIS_M3U8" javaType="String"/>
+		<result property="ONNURI_M3U8" column="ONNURI_M3U8" javaType="String"/>
+		<result property="NODE_GROUP" column="NODE_GROUP" javaType="String"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mAlbumInfo">
+		<result property="CAP_YN" column="CAP_YN" javaType="String"/>
+		<result property="CAP_FILE_NAME" column="CAP_FILE_NAME" javaType="String"/>
+		<result property="CAP_FILE_SIZE" column="CAP_FILE_SIZE" javaType="String"/>
+		<result property="SMI_YN" column="SMI_YN" javaType="String"/>
+		<result property="SMI_IMP_YN" column="SMI_IMP_YN" javaType="String"/>
+		<result property="CONT_WATERMARK" column="CONT_WATERMARK" javaType="String"/>
+		<result property="SMI_LANGUAGE" column="SMI_LANGUAGE" javaType="String"/>
+		<result property="MYCUT_YN" column="MYCUT_YN" javaType="String"/>
+		<result property="CP_PROPERTY" column="CP_PROPERTY" javaType="String"/>
+		<result property="CP_PROPERTY_UFX" column="CP_PROPERTY_UFX" javaType="String"/>
+		<result property="CONTS_360" column="CONTS_360" javaType="String"/>
+		<result property="EXT_META_GB" column="EXT_META_GB" javaType="String"/>
+		<result property="CAP_FILE2_NAME" column="CAP_FILE2_NAME" javaType="String"/>
+		<result property="CAP_FILE2_SIZE" column="CAP_FILE2_SIZE" javaType="String"/>
+		<result property="CAP_FILE_ENCRYPT_YN" column="CAP_FILE_ENCRYPT_YN" javaType="String"/>
+		<result property="CAP_FILE_LANGUAGE_YN" column="CAP_FILE_LANGUAGE_YN" javaType="String"/>
+		<result property="CP_ID" column="CP_ID" javaType="String"/>
+		<result property="OPENING_SKIP_TIME" column="OPENING_SKIP_TIME" javaType="String"/>
+		<result property="ENDING_SKIP_TIME" column="ENDING_SKIP_TIME" javaType="String"/>
+		<result property="FOURD_REPLAY_YN" column="FOURD_REPLAY_YN" javaType="String"/>
+		<result property="FOURD_REPLAY_CONT_VALUE" column="FOURD_REPLAY_CONT_VALUE" javaType="String"/>
+		<result property="MUSIC_YN" column="MUSIC_YN" javaType="String"/>
+		<result property="VR_YN" column="VR_YN" javaType="String"/>
+	</resultMap>
+	
+	
+	
+	<!-- 가입자 가입상품 정보조회 -->
+	<select id="getCustomProduct" parameterType="AuthorizeNSViewRequestVO" resultType="String">
+	SELECT A.productcd
+	  FROM PT_VO_CUSTOM_PRODUCT A
+	 WHERE A.sa_id = #{saId}
+	   AND A.mac_addr = #{stbMac}
+	   AND A.xcion_billing_typ = 'P'
+	</select>
+
+	<!-- 앨범 편성된 상품 정보 조회 -->
+	<select id="getAlbumProduct" parameterType="AuthorizeNSViewRequestVO" resultType="AuthorizeNSCateVO">
+	SELECT distinct case when SVOD_YN = 'Y' then svod_prod_id  when PPM_YN = 'Y' then ppm_prod_id end AS PROD_ID,
+	       case when SVOD_YN = 'Y' then 'SVOD'  when PPM_YN = 'Y' then 'PPM' end AS CAT_TYPE,
+	       category_level AS CAT_LEVEL,                   
+	       category_id AS CAT_ID,
+	       category_name AS CAT_NAME,
+	       CASE WHEN series_yn = 'Y' THEN category_id END AS CAT_ID_SVOD,
+	       CASE WHEN series_yn = 'Y' THEN category_name END AS CAT_NAME_SVOD
+	  FROM PT_VO_CATEGORY
+	 WHERE (svod_yn = 'Y' OR ppm_yn = 'Y')
+	   AND category_gb = 'NSC'
+	 START WITH category_id IN (
+	                            SELECT category_id || ''
+	                              FROM PT_VO_CATEGORY_MAP
+	                             WHERE contents_id = #{albumId}
+	                           )
+	 CONNECT BY PRIOR parent_category_id = category_id
+	 ORDER BY CAT_TYPE, CAT_LEVEL, CAT_ID, CAT_NAME, CAT_ID_SVOD, CAT_NAME_SVOD	 
+	</select>
+	
+
+	<!-- 앨범 편성된 상품정보 조회 -->
+	<select id="getAlbumProductRelation" parameterType="AuthorizeNSViewRequestVO" resultType="ContTypeVO">
+	SELECT 1 AS DATA_CHK, PRODUCT_CD, UFLIX_FLAG, IMCS_PRODUCT_TYPE, P_PRODUCT_ID
+	 FROM (SELECT /*+ LEADING(E C B D) USE_NL(E C B D) */ DISTINCT B.IMCS_PRODUCT_ID PRODUCT_CD, DECODE(NVL(B.IMCS_UFLIX_PROD_YN,'N'), #{uflixYn}, 0), NVL(B.IMCS_UFLIX_PROD_YN,'N') AS UFLIX_FLAG,
+				   B.IMCS_PRODUCT_TYPE, D.P_PRODUCT_ID
+	         FROM IMCSUSER.PT_PD_PACKAGE_UNITED B,
+	              IMCSUSER.PT_PD_PACKAGE_DETAIL C,
+	              IMCSUSER.PT_PD_PACKAGE_RELATION D,
+	              IMCSUSER.PT_LA_PACKAGE_ASSET E
+	        WHERE B.IMCS_PRODUCT_ID = C.PRODUCT_ID
+	          AND D.PRODUCT_ID = B.IMCS_PRODUCT_ID
+	          AND C.CONTENTS_ID = E.ASSET_ID
+	          AND E.NSC_ALBUM_ID = #{albumId}
+	          AND B.IMCS_PRODUCT_TYPE IN ('0', '3')
+	        ORDER BY B.IMCS_PRODUCT_TYPE DESC, DECODE(NVL(B.IMCS_UFLIX_PROD_YN,'N'), #{uflixYn}, 0, 1), DECODE(B.IMCS_PRODUCT_ID, '31030', 0, 1)
+	      ) X
+	</select>
+
+
+
+	<select id="getProductBuy" parameterType="AuthorizeNSViewRequestVO" resultMap="mProductBuy">
+	SELECT 1 AS DATA_CHK, PRODUCTCD AS PRODUCT_ID
+	 FROM (SELECT /*+ USE_NL(A D B C E) */ distinct d.PRODUCT_ID PRODUCTCD
+	         FROM PT_VO_NSC_PRODUCT A,
+	              IMCSUSER.PT_PD_PACKAGE_UNITED B,
+	              imcsuser.PT_PD_PACKAGE_DETAIL C,
+	              imcsuser.PT_PD_PACKAGE_RELATION D,
+	              IMCSUSER.PT_LA_PACKAGE_ASSET E
+	        WHERE A.SBC_CONT_NO = #{saId}
+	          AND A.MAC_ADDR    = #{stbMac}
+	          AND A.prod_cd    = D.p_product_id
+	          AND B.imcs_product_id = C.product_id
+	          AND D.product_id = B.imcs_product_id
+	          and C.CONTENTS_ID = E.ASSET_ID
+	          AND E.NSC_ALBUM_ID = #{albumId}
+	          AND B.imcs_product_type = '3'
+	      ) X
+	</select>
+
+
+
+	<!-- 컨텐츠 DRM 여부 조회 -->
+	<select id="getWaterMarkYn" parameterType="AuthorizeNSViewRequestVO" resultType="String">
+	SELECT 'Y'
+	  FROM DUAL
+	 WHERE EXISTS ( SELECT watermark_yn
+	                  FROM PT_VO_CATEGORY
+	                 WHERE watermark_yn = 'Y'
+	                 START WITH category_id in (SELECT category_id || ''
+	                                              FROM PT_VO_CATEGORY_MAP
+	                                             WHERE contents_id = #{albumId} )
+	               CONNECT BY PRIOR parent_category_id = category_id )
+	</select>
+
+	<select id="getAlbumInfo" parameterType="AuthorizeNSViewRequestVO" resultMap="mAlbumInfo">
+	SELECT DISTINCT 1 AS CAP_YN,
+	       CASE WHEN  D.SMI_YN = 'Y' AND  MAX(D.SMI_YN)='Y'  THEN MAX(E.SMI_FILE_NAME) ELSE '' END AS CAP_FILE_NAME,
+	       E.SMI_FILE_SIZE AS CAP_FILE_SIZE, D.SMI_YN AS SMI_YN, MAX(D.SMI_YN) AS SMI_IMP_YN,
+	       C.WATERMARK_YN AS CONT_WATERMARK, E.SMI_LANGUAGE AS SMI_LANGUAGE, D.MYCUT_YN AS MYCUT_YN,
+	       MAX(G.CP_PROPERTY) AS CP_PROPERTY, MAX(H.CP_PROPERTY) AS CP_PROPERTY_UFX,
+	       NVL(MAX(D.CONTS_360),'N') AS CONTS_360, NVL(MAX(B.EXT_META_GB),'0000') AS EXT_META_GB,
+	       E.SMI_FILE_NAME_ENC AS CAP_FILE2_NAME, E.SMI_FILE_SIZE_ENC AS CAP_FILE2_SIZE, E.SMI_ENCRYPT_YN AS CAP_FILE_ENCRYPT_YN,
+	       NVL(E.SMI_REPEAT_YN, 'N') AS CAP_FILE_LANGUAGE_YN, D.CP_ID,
+			B.OPENING_END_TIME AS OPENING_SKIP_TIME, B.ENDING_BGN_TIME AS ENDING_SKIP_TIME, DECODE(A.VOD_TYPE, 'D', 'Y', 'N') AS FOURD_REPLAY_YN, MAX(C.CONTENT_VALUE) AS FOURD_REPLAY_CONT_VALUE,
+			DECODE(B.MUSIC_CONT_TYPE, 'C', 'Y', 'B', 'Y', 'D', 'Y', 'T', 'Y', 'N') AS MUSIC_YN, CASE WHEN B.VR_TYPE IS NOT NULL and B.VR_TYPE != 'V3S' THEN 'Y' ELSE 'N' END AS VR_YN		
+	  FROM IMCSUSER.PT_LA_ALBUM_INFO A ,
+	       IMCSUSER.PT_LA_ALBUM_SUB B ,
+	       IMCSUSER.PT_LA_ASSET_INFO C ,
+	       IMCSUSER.PT_LA_ALBUM_PLATFORM D ,
+	       IMCSUSER.PT_LA_ALBUM_SMI E ,
+	       IMCSUSER.PT_CD_CP_MST G, IMCSUSER.PT_CD_CP_MST H
+	 WHERE A.ALBUM_ID = #{albumId}
+		AND A.ALBUM_ID = B.ALBUM_ID
+		AND B.ALBUM_ID = C.ALBUM_ID
+		AND C.SCREEN_TYPE = 'N'
+		AND C.ALBUM_ID = D.ALBUM_ID
+		AND C.SCREEN_TYPE = D.SCREEN_TYPE
+		AND D.ALBUM_ID = E.ALBUM_ID
+		AND D.SCREEN_TYPE = E.SCREEN_TYPE
+	   AND ( G.CP_ID(+) = D.CP_ID AND H.CP_ID(+) = D.CP_ID_UFLIX )
+	 GROUP BY E.SMI_FILE_SIZE, D.SMI_YN, C.WATERMARK_YN, E.SMI_LANGUAGE, D.MYCUT_YN,
+			   E.SMI_FILE_NAME_ENC, E.SMI_FILE_SIZE_ENC, E.SMI_ENCRYPT_YN, E.SMI_REPEAT_YN, D.CP_ID,
+			  B.OPENING_END_TIME, B.ENDING_BGN_TIME, A.VOD_TYPE, B.MUSIC_CONT_TYPE, B.VR_TYPE	
+	</select>
+
+
+	<!-- 이어보기 시간정보 조회 -->
+	<select id="getLinkTime" parameterType="AuthorizeNSViewRequestVO" resultType="String">
+	SELECT /*+ index(A IDX_PT_VO_SET_TIME_02_PTT_N) */  TO_NUMBER(A.link_time)
+	  FROM PT_VO_SET_TIME_PTT_NSC A
+	 WHERE A.sa_id = #{saId}
+	   AND A.adi_album_id = #{albumId}
+	   AND A.P_IDX_SA = #{modIdxSa}
+	   AND A.nscn_cust_no = #{nscnCustNo}
+	</select>
+
+	<!-- 장르정보 조회 (대장르, 중장르, 소장르) -->
+	<select id="getGenreString" parameterType="AuthorizeNSViewRequestVO" resultType="GenreInfoVO">
+	SELECT B.GENRE_LARGE, B.GENRE_MID, B.GENRE_SMALL, D.SUGGESTED_PRICE,
+	       DECODE(C.TERR_YN, '1', 'Y', 'N') as TERR_YN, C.TERR_PERIOD,
+	       SUBSTR(C.TERR_ED_DATE, 1, 8) as TERR_ED_DATE, A.ONAIR_DATE, NVL(C.PREVIEW_PERIOD,'Y') AS PREVIEW_PERIOD,
+	       D.ASSET_NAME, B.RATING_CD, B.RUN_TIME, C.CP_ID_UFLIX, MAX(case when SUBSTR(D.ASSET_ID,16,2) = 'M2' then D.CONTENT_FILESIZE  end) AS CONTENT_FILESIZE,
+	       A.SERIES_NO
+	   FROM IMCSUSER.PT_LA_ALBUM_INFO A,
+	        IMCSUSER.PT_LA_ALBUM_SUB B,
+	        IMCSUSER.PT_LA_ALBUM_PLATFORM C,
+	        IMCSUSER.PT_LA_ASSET_INFO D
+   	  WHERE A.ALBUM_ID = #{albumId}
+	    AND A.ALBUM_ID = B.ALBUM_ID
+	    AND B.ALBUM_ID = C.ALBUM_ID
+	    AND C.ALBUM_ID = D.ALBUM_ID
+	    AND C.SCREEN_TYPE = 'N'
+	    AND C.SCREEN_TYPE = D.SCREEN_TYPE
+	  GROUP BY B.GENRE_LARGE, B.GENRE_MID, B.GENRE_SMALL, D.SUGGESTED_PRICE, C.TERR_YN, C.TERR_PERIOD, C.TERR_ED_DATE,
+			   A.ONAIR_DATE, C.PREVIEW_PERIOD, D.ASSET_NAME, B.RATING_CD, B.RUN_TIME, C.CP_ID, C.CP_ID_UFLIX, A.SERIES_NO
+	</select>
+
+	<!-- 오늘날짜 시간 조회 -->
+	<select id="getSysdateInfo" resultMap="nSysdateInfo" >
+			SELECT TO_CHAR(SYSDATE, 'YYYYMMDD') SYSDATE_CURRENT, TO_CHAR(ADD_MONTHS(SYSDATE, -12), 'YYYYMMDD') SYSDATE_1YEARAGO, TO_CHAR(sysdate, 'YYYYMMDDHH24MISS') AS WATCH_DATE FROM DUAL
+	</select>
+
+
+	<!-- // 2018.08.03 - 시청UDR 유/무료 설정 프로젝트로 아래 로직 추가 -->
+	<select id="getNScreenWatchSubscriptionInfo" parameterType="AuthorizeNViewRequestVO" resultMap="nWatchSubscriptionInfo">
+	  SELECT terr_type, ago_date
+	    FROM
+	  (
+	 	SELECT '1' as terr_type, TO_CHAR(ADD_MONTHS(SYSDATE,-12*TO_NUMBER(PPV_PERIOD)),'YYYYMMDD') as ago_date
+	 	  FROM IMCSUSER.PT_CD_FREE_PERIOD
+	 	 WHERE GENRE_NM = #{genreSmall}
+	 	   AND GENRE_NM NOT IN (SELECT COM_NAME FROM IMCSUSER.PT_CD_COM_CD WHERE GRP_ID = 'CJGENRE' AND MIN_VALUE = '1')
+	 	   AND GUBUN = 'HDTV'
+	 	   AND TRIM(NVL(PPV_PERIOD, '')) IS NOT NULL
+	 	   AND ROWNUM = 1
+	  	UNION
+	 	SELECT '2' as terr_type, TO_CHAR(ADD_MONTHS(SYSDATE,-12*TO_NUMBER(PPV_PERIOD)),'YYYYMMDD') as ago_date
+	 	  FROM IMCSUSER.PT_CD_FREE_PERIOD A,
+	 		   IMCSUSER.PT_CD_COM_CD B
+	 	 WHERE A.GENRE_NM = #{genreSmall}
+	 	   AND A.GENRE_NM = B.COM_NAME
+	 	   AND B.GRP_ID = 'CJGENRE'
+	 	   AND B.MIN_VALUE = '1'
+	 	   AND A.GUBUN = 'HDTV'
+	 	   AND TRIM(NVL(A.PPV_PERIOD, '')) IS NOT NULL
+	 	   AND ROWNUM = 1
+	  	ORDER BY ago_date
+	  )
+	  WHERE ROWNUM = 1
+	</select>
+
+
+	<!-- 시청이력저장 -->
+	<insert id="setWatchHist" parameterType="AuthorizeNSViewRequestVO">
+		INSERT INTO PT_VO_WATCH_HISTORY_NSC
+		 ( SA_ID, MAC_ADDR
+		   ,BUY_DATE
+		   ,PRODUCT_ID
+		   ,CONTENTS_ID
+		   ,WATCH_FDATE
+		   ,WATCH_EDATE
+		   ,PATTERN_TYPE
+		   ,REQUEST_TYPE
+		   ,APPL_TYPE
+		   ,VIEW_TYPE
+		   ,UFLIX_YN
+		   ,P_IDX_SA
+		   ,P_IDX_DAY
+		   ,ASSET_ID
+		   ,PVS_TRANS_NO
+		 )
+		VALUES
+		(  #{saId}
+			 ,#{stbMac}
+			 ,#{watchDate}
+			 ,#{productId}
+			 ,#{albumId}
+			 ,#{watchDate}
+			 ,#{watchDate}
+			 ,'4'
+			 ,#{reqType}
+			 ,#{appType}
+			 ,#{viewType}
+			 ,#{fxType}
+			 ,MOD(#{pIdxSa}, 33)
+			 ,SUBSTR(#{watchDate}, 7, 2)
+			 ,#{kidsGb}
+			 ,'V'
+		  )
+	</insert>
+
+
+	<!-- SET_TIME 테이블 이어보기 시간 설정 -->
+	<update id="updatePtVoSetTimePtt" parameterType="AuthorizeNSViewRequestVO">
+        UPDATE /*+ index(A IDX_PT_VO_SET_TIME_02_PTT_N) */ PT_VO_SET_TIME_PTT_NSC A
+		   SET WATCH_DATE = TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS')
+		 WHERE sa_id = #{saId}
+		   AND adi_album_id = #{albumId}
+			AND nscn_cust_no = #{nscnCustNo}
+		   AND P_IDX_SA = MOD(#{idxSa}, 33)	
+	</update>
+
+
+	<!-- SET_TIME 테이블 이어보기 시간 설정  -->
+	<insert id="insertPtVoSetTimePtt" parameterType="AuthorizeNSViewRequestVO">
+	INSERT INTO PT_VO_SET_TIME_PTT_NSC(p_idx_sa, p_idx_day, nscn_cust_no, sa_id, adi_album_id, link_time, watch_date)
+	  values(MOD(#{idxSa}, 33),
+	         SUBSTR(TO_CHAR(SYSDATE,'YYYYMMDD'), 7, 2),
+	         #{nscnCustNo},
+	         #{saId},
+	         #{albumId},
+	         '1' ,
+	         TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS') )
+	</insert>
+
+
+	<!-- 앨범 포스터 정보 조회-->
+	<select id="getAlbumPoster" parameterType="AuthorizeNSViewRequestVO" resultMap="mAlbumPoster">
+	SELECT A.CONTENT_VALUE, A.SECOND_VALUE, A.POSTER_TYPE
+	 FROM IMCSUSER.PT_LA_ALBUM_POSTER A
+	WHERE A.album_id = #{albumId}
+	  AND A.screen_type = 'N'
+	  AND A.poster_type IN ('Z', 'X')
+	  AND A.service_yn = 'Y'
+	</select>
+
+	<!-- Live Hevc 다운로드 컨텐츠 파일정보 조회 -->
+	<select id="getLiveHevcFileName" parameterType="AuthorizeNSViewRequestVO" resultType="String">
+	SELECT NVL(E.CONTENT_VALUE, '')
+	  FROM IMCSUSER.PT_LA_PACKAGE_ASSET D,
+	       IMCSUSER.PT_LA_CONTENT_ASSET E
+	 WHERE D.ADI_PRODUCT_ID = E.ADI_PRODUCT_ID
+	   AND SUBSTR(D.ADI_PRODUCT_ID,16,2) = 'M9'
+	   AND D.NSC_ALBUM_ID = #{albumId}
+	</select>
+
+
+	<!-- 노드 정보 조회 (와이파이): RANGE_IP_CD 길이 '2' -->
+	<select id="getNodeCd01" resultType="String">
+		SELECT SUB_NODE_CD AS NODE_CD
+		  FROM IMCSUSER.PT_LV_RANGE_IP_INFO
+		 WHERE RANGE_IP_CD LIKE #{nodeGroup}||'%%'
+		   AND LENGTH(RANGE_IP_CD) >= 2
+		   AND LENGTH(RANGE_IP_CD) <![CDATA[ <= ]]> 3
+		   AND NVL(USE_YN, 'Y') = 'Y'
+		 ORDER BY RANGE_IP_CD
+	</select>
+	
+	<!-- 노드 정보 조회 (와이파이): RANGE_IP_CD 길이 '3' -->
+	<select id="getNodeCd02" resultType="String">
+		SELECT SUB_NODE_CD AS NODE_CD
+		  FROM IMCSUSER.PT_LV_RANGE_IP_INFO
+		 WHERE RANGE_IP_CD LIKE #{nodeGroup}||'%%'
+		   AND LENGTH(RANGE_IP_CD) >= 3
+		   AND LENGTH(RANGE_IP_CD)  <![CDATA[ <= ]]> 4
+		   AND NVL(USE_YN, 'Y') = 'Y'
+		 ORDER BY RANGE_IP_CD
+	</select>
+
+	<!-- 지역노드 정보 조회 -->
+	<select id="getNodeCd" resultType="String">
+	SELECT SUB_NODE_CD
+	  FROM IMCSUSER.PT_LV_RANGE_IP_INFO
+	 WHERE RANGE_IP_CD = #{baseCondi}
+	   AND NVL(USE_YN, 'Y') = 'Y'
+	</select>
+	
+	<select id="getCdnIp" parameterType="AuthorizeNSViewRequestVO" resultMap="mCdnIp">
+	SELECT distinct 
+	       case when #{fourdReplayYn} = 'N' then 'http://'||B.stb_play_ip1||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' else 'rtsp://'||B.stb_play_ip1||':80/' end AS VOD_SERVER1, 
+	       case when #{fourdReplayYn} = 'N' then 'http://'||B.stb_play_ip2||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' else 'rtsp://'||B.stb_play_ip2||':80/' end AS VOD_SERVER2,
+	       case when #{fourdReplayYn} = 'N' then 'http://'||B.stb_play_ip3||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' else 'rtsp://'||B.stb_play_ip3||':80/' end AS VOD_SERVER3,
+	       B.CDN_LOCAL_TYP AS VOD_SERVER1_TYPE, B.CDN_NEAR_TYP AS VOD_SERVER2_TYPE, B.CDN_CENTER_TYP AS VOD_SERVER3_TYPE,
+	       NVL(B.IPV6_FLAG1,'I') AS VOD_IPV6_NODE1, NVL(B.IPV6_FLAG2,'I') AS VOD_IPV6_NODE2, NVL(B.IPV6_FLAG3, 'I') AS VOD_IPV6_NODE3,
+	       B.IPV6_PLAY_IP1 AS SERVER_IPV6_PLAY_IP1, B.IPV6_PLAY_IP2 AS SERVER_IPV6_PLAY_IP2, B.IPV6_PLAY_IP3 AS SERVER_IPV6_PLAY_IP3, B.SUB_NODE_PORT1 AS SERVER_IPV6_PORT,
+		   B.CDN_LOCAL_TYP AS SERVER_IPV6_TYPE1, B.CDN_NEAR_TYP AS SERVER_IPV6_TYPE2, B.CDN_CENTER_TYP AS SERVER_IPV6_TYPE3 
+	    FROM IMCSUSER.PT_LV_NODE_INFO B,
+	       IMCSUSER.PT_LV_RANGE_IP_INFO C
+	 WHERE C.sub_node_cd = #{nodeCd}
+	   AND B.sub_node_cd = C.sub_node_cd	
+
+	</select>
+	
+	
+	<select id="getCdnIp02" parameterType="AuthorizeNSViewRequestVO" resultMap="mCdnIp">
+	SELECT distinct
+	       case when #{fourdReplayYn} = 'N' then 'http://'||B.stb_play_ip1||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' else 'rtsp://'||B.stb_play_ip1||':80/' end AS VOD_SERVER1,
+	       case when #{fourdReplayYn} = 'N' then 'http://'||B.stb_play_ip2||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' else 'rtsp://'||B.stb_play_ip2||':80/' end AS VOD_SERVER2,
+	       case when #{fourdReplayYn} = 'N' then 'http://'||B.stb_play_ip3||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' else 'rtsp://'||B.stb_play_ip3||':80/' end AS VOD_SERVER3,
+	       B.CDN_LOCAL_TYP AS VOD_SERVER1_TYPE , B.CDN_NEAR_TYP AS VOD_SERVER2_TYPE , B.CDN_CENTER_TYP AS VOD_SERVER3_TYPE,
+	       NVL(B.IPV6_FLAG1,'I') AS VOD_IPV6_NODE1, NVL(B.IPV6_FLAG2,'I') AS VOD_IPV6_NODE2, NVL(B.IPV6_FLAG3, 'I') AS VOD_IPV6_NODE3,
+	       B.IPV6_PLAY_IP1 AS SERVER_IPV6_PLAY_IP1, B.IPV6_PLAY_IP2 AS SERVER_IPV6_PLAY_IP2, B.IPV6_PLAY_IP3 AS SERVER_IPV6_PLAY_IP3, B.SUB_NODE_PORT1 AS SERVER_IPV6_PORT,
+		   B.CDN_LOCAL_TYP AS SERVER_IPV6_TYPE1, B.CDN_NEAR_TYP AS SERVER_IPV6_TYPE2, B.CDN_CENTER_TYP AS SERVER_IPV6_TYPE3
+	   FROM PT_VO_CUSTOM_ID A,
+	       IMCSUSER.PT_LV_NODE_INFO B,
+	       IMCSUSER.PT_LV_DONG_INFO C
+	 WHERE A.sa_id = #{saId}
+	   AND A.mac_addr = #{stbMac}
+	   AND C.dong_cd = A.hjdong_no
+	   AND B.sub_node_cd = C.nsc_sub_node_cd
+	</select>
+	
+	<select id="getCdnIp03" parameterType="AuthorizeNSViewRequestVO" resultMap="mCdnIp">
+	SELECT 'http://'||B.stb_play_ip1||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' AS VOD_SERVER1,
+	       'http://'||B.stb_play_ip2||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' AS VOD_SERVER2,
+	       'http://'||B.stb_play_ip3||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' AS VOD_SERVER3,
+	       NVL(E.CONTENT_VALUE, '') AS VOD_FILE_NAME, B.CDN_LOCAL_TYP AS VOD_SERVER1_TYPE , B.CDN_NEAR_TYP AS VOD_SERVER2_TYPE, B.CDN_CENTER_TYP AS VOD_SERVER3_TYPE,
+	       NVL(B.IPV6_FLAG1,'I')AS VOD_IPV6_NODE1, NVL(B.IPV6_FLAG2,'I')AS VOD_IPV6_NODE2, NVL(B.IPV6_FLAG3, 'I') AS VOD_IPV6_NODE3,
+	       B.IPV6_PLAY_IP1 AS SERVER_IPV6_PLAY_IP1, B.IPV6_PLAY_IP2 AS SERVER_IPV6_PLAY_IP2, B.IPV6_PLAY_IP3 AS SERVER_IPV6_PLAY_IP3, B.SUB_NODE_PORT1 AS SERVER_IPV6_PORT,
+		   B.CDN_LOCAL_TYP AS SERVER_IPV6_TYPE1, B.CDN_NEAR_TYP AS SERVER_IPV6_TYPE2, B.CDN_CENTER_TYP AS SERVER_IPV6_TYPE3
+	    FROM IMCSUSER.PT_LV_NODE_INFO B,
+	       IMCSUSER.PT_LV_RANGE_IP_INFO C,
+	       IMCSUSER.PT_LA_PACKAGE_ASSET D,
+	       IMCSUSER.PT_LA_CONTENT_ASSET E
+	 WHERE C.sub_node_cd = #{nodeCd}
+	   AND B.sub_node_cd = C.sub_node_cd
+	   AND D.ADI_PRODUCT_ID = E.ADI_PRODUCT_ID
+	   AND SUBSTR(D.ADI_PRODUCT_ID,16,2) = #{bitRate}
+	   AND D.NSC_ALBUM_ID = #{albumId}
+	   AND ROWNUM = 1	
+	</select>
+	
+	<select id="getCdnIp04" parameterType="AuthorizeNSViewRequestVO" resultMap="mCdnIp">
+	SELECT 'http://'||B.stb_play_ip1||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' AS VOD_SERVER1,
+	       'http://'||B.stb_play_ip2||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' AS VOD_SERVER2,
+	       'http://'||B.stb_play_ip3||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' AS VOD_SERVER3,
+	       NVL(E.CONTENT_VALUE, '') AS VOD_FILE_NAME, B.CDN_LOCAL_TYP AS VOD_SERVER1_TYPE, B.CDN_NEAR_TYP AS VOD_SERVER2_TYPE, B.CDN_CENTER_TYP AS VOD_SERVER3_TYPE,
+	       NVL(B.IPV6_FLAG1,'I') AS VOD_IPV6_NODE1, NVL(B.IPV6_FLAG2,'I') AS VOD_IPV6_NODE2, NVL(B.IPV6_FLAG3, 'I') AS VOD_IPV6_NODE3,
+	       B.IPV6_PLAY_IP1 AS SERVER_IPV6_PLAY_IP1, B.IPV6_PLAY_IP2 AS SERVER_IPV6_PLAY_IP2, B.IPV6_PLAY_IP3 AS SERVER_IPV6_PLAY_IP3, B.SUB_NODE_PORT1 AS SERVER_IPV6_PORT,
+		   B.CDN_LOCAL_TYP AS SERVER_IPV6_TYPE1, B.CDN_NEAR_TYP AS SERVER_IPV6_TYPE2, B.CDN_CENTER_TYP AS SERVER_IPV6_TYPE3
+	  FROM PT_VO_CUSTOM_ID A,
+	       IMCSUSER.PT_LV_NODE_INFO B,
+	       IMCSUSER.PT_LV_DONG_INFO C,
+	       IMCSUSER.PT_LA_PACKAGE_ASSET D,
+	       IMCSUSER.PT_LA_CONTENT_ASSET E
+	 WHERE A.sa_id = #{saId)
+	   AND A.mac_addr = #{stbMac}
+	   AND C.dong_cd = A.hjdong_no
+	   AND B.sub_node_cd = C.nsc_sub_node_cd
+	   AND D.ADI_PRODUCT_ID = E.ADI_PRODUCT_ID
+	   AND SUBSTR(D.ADI_PRODUCT_ID,16,2) = #{bitRate}
+	   AND D.NSC_ALBUM_ID = #{albumId}
+	   AND ROWNUM = 1	
+	</select>
+	
+	<select id="getStreamingCdnIp01" parameterType="AuthorizeNSViewRequestVO" resultMap="mCdnIp">
+	SELECT distinct
+	       case when #{fourdReplayYn} = 'N' then 'http://'||B.stb_play_ip1||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' else 'rtsp://'||B.stb_play_ip1||':80/' end AS VOD_SERVER1,
+	       case when #{fourdReplayYn} = 'N' then 'http://'||B.stb_play_ip2||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' else 'rtsp://'||B.stb_play_ip2||':80/' end AS VOD_SERVER2,
+	       case when #{fourdReplayYn} = 'N' then 'http://'||B.stb_play_ip3||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' else 'rtsp://'||B.stb_play_ip3||':80/' end AS VOD_SERVER3,
+	      B.CDN_LOCAL_TYP AS VOD_SERVER1_TYPE, B.CDN_NEAR_TYP AS VOD_SERVER2_TYPE, B.CDN_CENTER_TYP AS VOD_SERVER3_TYPE,
+	      NVL(B.IPV6_FLAG1,'I') AS VOD_IPV6_NODE1, NVL(B.IPV6_FLAG2,'I') AS VOD_IPV6_NODE2, NVL(B.IPV6_FLAG3, 'I') AS VOD_IPV6_NODE3,
+	      B.IPV6_PLAY_IP1 AS SERVER_IPV6_PLAY_IP1, B.IPV6_PLAY_IP2 AS SERVER_IPV6_PLAY_IP2, B.IPV6_PLAY_IP3 AS SERVER_IPV6_PLAY_IP3, B.SUB_NODE_PORT1 AS SERVER_IPV6_PORT,
+		  B.CDN_LOCAL_TYP AS SERVER_IPV6_TYPE1, B.CDN_NEAR_TYP AS SERVER_IPV6_TYPE2, B.CDN_CENTER_TYP AS SERVER_IPV6_TYPE3
+	 FROM IMCSUSER.PT_LV_NODE_INFO B,
+	      IMCSUSER.PT_LV_BASE_INFO C
+	WHERE C.BASE_CD = '1234567890'
+	  AND B.sub_node_cd = C.nsc_sub_node_cd	
+	</select>
+	
+	<select id="getStreamingCdnIp02" parameterType="AuthorizeNSViewRequestVO" resultMap="mCdnIp">
+	SELECT 'http://'||B.stb_play_ip1||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' AS VOD_SERVER1,
+	       'http://'||B.stb_play_ip2||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' AS VOD_SERVER2,
+	       'http://'||B.stb_play_ip3||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' AS VOD_SERVER3,
+	       NVL(E.CONTENT_VALUE, '') AS VOD_FILE_NAME,
+	       B.CDN_LOCAL_TYP AS VOD_SERVER1_TYPE, B.CDN_NEAR_TYP AS VOD_SERVER2_TYPE, B.CDN_CENTER_TYP AS VOD_SERVER3_TYPE,
+	       NVL(B.IPV6_FLAG1,'I') AS VOD_IPV6_NODE1, NVL(B.IPV6_FLAG2,'I') AS VOD_IPV6_NODE2, NVL(B.IPV6_FLAG3, 'I') AS VOD_IPV6_NODE3,
+	       B.IPV6_PLAY_IP1 AS SERVER_IPV6_PLAY_IP1, B.IPV6_PLAY_IP2 AS SERVER_IPV6_PLAY_IP2, B.IPV6_PLAY_IP3 AS SERVER_IPV6_PLAY_IP3, B.SUB_NODE_PORT1 AS SERVER_IPV6_PORT,
+		   B.CDN_LOCAL_TYP AS SERVER_IPV6_TYPE1, B.CDN_NEAR_TYP AS SERVER_IPV6_TYPE2, B.CDN_CENTER_TYP AS SERVER_IPV6_TYPE3
+	  FROM IMCSUSER.PT_LV_NODE_INFO B,
+	       IMCSUSER.PT_LV_BASE_INFO C,
+	       IMCSUSER.PT_LA_PACKAGE_ASSET D,
+	       IMCSUSER.PT_LA_CONTENT_ASSET E
+	 WHERE C.BASE_CD = '1234567890'
+	   AND B.sub_node_cd = C.nsc_sub_node_cd
+	   AND D.ADI_PRODUCT_ID = E.ADI_PRODUCT_ID
+	   AND SUBSTR(D.ADI_PRODUCT_ID,16,2) = #{bitRate}
+	   AND D.NSC_ALBUM_ID = #{albumId}
+	   AND ROWNUM = 1
+	</select>
+
+	<select id="getStreamingCdnIp03" parameterType="AuthorizeNSViewRequestVO" resultMap="mCdnIp">
+	SELECT distinct
+	       case when #{fourdReplayYn} = 'N' then 'http://'||B.stb_play_ip1||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' else 'rtsp://'||B.stb_play_ip1||':80/' end AS VOD_SERVER1,
+	       case when #{fourdReplayYn} = 'N' then 'http://'||B.stb_play_ip2||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' else 'rtsp://'||B.stb_play_ip2||':80/' end AS VOD_SERVER2,
+	       case when #{fourdReplayYn} = 'N' then 'http://'||B.stb_play_ip3||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' else 'rtsp://'||B.stb_play_ip3||':80/' end AS VOD_SERVER3,
+	       B.CDN_LOCAL_TYP AS VOD_SERVER1_TYPE, B.CDN_NEAR_TYP AS VOD_SERVER2_TYPE, B.CDN_CENTER_TYP AS VOD_SERVER3_TYPE,
+	       NVL(B.IPV6_FLAG1,'I') AS VOD_IPV6_NODE1, NVL(B.IPV6_FLAG2,'I') AS VOD_IPV6_NODE2, NVL(B.IPV6_FLAG3, 'I') AS VOD_IPV6_NODE3,
+	       B.IPV6_PLAY_IP1 AS SERVER_IPV6_PLAY_IP1, B.IPV6_PLAY_IP2 AS SERVER_IPV6_PLAY_IP2, B.IPV6_PLAY_IP3 AS SERVER_IPV6_PLAY_IP3, B.SUB_NODE_PORT1 AS SERVER_IPV6_PORT,
+		   B.CDN_LOCAL_TYP AS SERVER_IPV6_TYPE1, B.CDN_NEAR_TYP AS SERVER_IPV6_TYPE2, B.CDN_CENTER_TYP AS SERVER_IPV6_TYPE3
+	  FROM IMCSUSER.PT_LV_DONG_INFO A ,
+	       IMCSUSER.PT_LV_NODE_INFO B
+	 WHERE A.DONG_CD = '1234567890'
+	   and A.NSC_SUB_NODE_CD = B.SUB_NODE_CD	
+	</select>
+	
+	<select id="getStreamingCdnIp04" parameterType="AuthorizeNSViewRequestVO" resultMap="mCdnIp">
+	SELECT 'http://'||B.stb_play_ip1||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' AS VOD_SERVER1,
+	       'http://'||B.stb_play_ip2||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' AS VOD_SERVER2,
+	       'http://'||B.stb_play_ip3||case when #{nodeGroup} = 'Z' then '' else ':' || b.SUB_NODE_PORT1 end || '/' AS VOD_SERVER3,
+	       NVL(E.CONTENT_VALUE, '') AS VOD_FILE_NAME, B.CDN_LOCAL_TYP AS VOD_SERVER1_TYPE, B.CDN_NEAR_TYP AS VOD_SERVER2_TYPE, B.CDN_CENTER_TYP AS VOD_SERVER3_TYPE,
+	       NVL(B.IPV6_FLAG1,'I') AS VOD_IPV6_NODE1, NVL(B.IPV6_FLAG2,'I') AS VOD_IPV6_NODE2, NVL(B.IPV6_FLAG3, 'I') AS VOD_IPV6_NODE3,
+	       B.IPV6_PLAY_IP1 AS SERVER_IPV6_PLAY_IP1, B.IPV6_PLAY_IP2 AS SERVER_IPV6_PLAY_IP2, B.IPV6_PLAY_IP3 AS SERVER_IPV6_PLAY_IP3, B.SUB_NODE_PORT1 AS SERVER_IPV6_PORT,
+		   B.CDN_LOCAL_TYP AS SERVER_IPV6_TYPE1, B.CDN_NEAR_TYP AS SERVER_IPV6_TYPE2, B.CDN_CENTER_TYP AS SERVER_IPV6_TYPE3
+	  FROM IMCSUSER.PT_LV_DONG_INFO A ,
+	       IMCSUSER.PT_LV_NODE_INFO B,
+	       IMCSUSER.PT_LA_PACKAGE_ASSET D,
+	       IMCSUSER.PT_LA_CONTENT_ASSET E
+	 WHERE A.DONG_CD = '1234567890'
+	   and A.NSC_SUB_NODE_CD = B.SUB_NODE_CD
+	   AND D.ADI_PRODUCT_ID = E.ADI_PRODUCT_ID
+	   AND SUBSTR(D.ADI_PRODUCT_ID,16,2) = #{bitRate}
+	   AND D.NSC_ALBUM_ID = #{albumId}
+	   AND ROWNUM = 1
+	</select>
+
+	<!-- 발급 가능 쿠폰 리스트 조회 -->
+	<select id="getCpnPossibleList" parameterType="AuthorizeNSViewRequestVO" resultType="ComCpnVO">
+		SELECT SMARTUX.F_GET_CPN_COND_POSSIBLE_LIST(#{catId}, #{albumId}, #{screenType_cpnCondPossible}, #{genreInfo}, '0', 
+		        DECODE(#{productType}, '1', 'Y', 'N'), 'Y', '2' , #{saId}) AS CPN_INFO,
+		       REPLACE(SMARTUX.F_GET_CPN_COND_POSSIBLE_LIST(#{catId}, #{albumId}, #{screenType_cpnCondPossible}, #{genreInfo}, '0', 
+		        DECODE(#{productType}, '1', 'Y', 'N'), 'Y', '2' , #{saId}), '\b', '|') AS CPN_INS_INFO 
+		  FROM DUAL
+	</select>
+
+	<!-- 쿠폰 존재 여부 체크 -->
+	<select id="getCpnChk" parameterType="AuthorizeNSViewRequestVO" resultType="Integer">
+		SELECT COUNT(*) AS CPN_CNT
+		  FROM SMARTUX.PT_CPM_COUPON_BOX_ACTION 
+		 WHERE SA_ID = #{saId}
+		   AND CPEVT_ID = #{cpevtId}
+		   AND ALBUM_ID = #{albumId}
+		   AND PT_SAID = MOD(#{pIdxSa}, 33)
+		   AND SYSTEM_GB = #{systemGb_cpnCondPossible}
+	</select>
+
+	<!-- 쿠폰 정보 입력 -->
+	<insert id="insCpnInfo" parameterType="AuthorizeNSViewRequestVO">
+		INSERT INTO SMARTUX.PT_CPM_COUPON_BOX_ACTION (PT_SAID, PT_DAY, ORD_NO, CPEVT_ID, SA_ID, 
+		        SYSTEM_GB, CPN_NO, BUY_AUTH_NO, REG_DATE, STATUS, RETRY_CNT, BUY_TYPE, ALBUM_ID) 
+		VALUES (MOD(#{pIdxSa}, 33), SUBSTR(TO_CHAR(SYSDATE, 'YYYYMMDD'), 7, 2),
+		        SMARTUX.SEQ_PT_CPM_COUPON_BOX_ACTION.NEXTVAL, #{cpevtId}, #{saId}, #{systemGb_cpnCondPossible}, '' , 
+		        #{saId}||TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS'), TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS'), 'N', '0', '2', #{albumId})
+	</insert> 
+
+	<!-- 스탬프 리스트 조회 -->
+	<select id="getStmPossibleList" parameterType="AuthorizeNSViewRequestVO" resultType="ComCpnVO">
+	  	SELECT SMARTUX.F_GET_STM_COND_POSSIBLE(#{saId}, #{catId}, #{albumId}, #{screenType}, #{genreInfo}, '0', 
+		        DECODE(#{productType}, '1', 'Y', 'N'), 'Y', '2') AS STM_INFO,
+		       REPLACE(SMARTUX.F_GET_STM_COND_POSSIBLE(#{saId}, #{catId}, #{albumId}, #{screenType}, #{genreInfo}, '0', 
+		        DECODE(#{productType}, '1', 'Y', 'N'), 'Y', '2' ), '\b', '|') AS STM_INS_INFO 
+		  FROM DUAL
+	</select>
+
+	<!-- 스탬프 존재 여부 체크 -->
+	<select id="getStmChk" parameterType="AuthorizeNSViewRequestVO" resultType="Integer">
+		SELECT COUNT(*) AS CPN_CNT
+		  FROM SMARTUX.PT_CPM_STAMP_BOX_ACTION 
+		 WHERE SA_ID = #{saId}
+		   AND CPEVT_ID = #{stmpId}
+		   AND ALBUM_ID = #{albumId}
+		   AND PT_SAID = MOD(#{pIdxSa}, 33)
+	</select>
+
+	<!-- 스탬프 정보 입력 -->
+	<insert id="insStmInfo" parameterType="AuthorizeNSViewRequestVO">
+		INSERT INTO SMARTUX.PT_CPM_STAMP_BOX_ACTION (PT_SAID, PT_DAY, ORD_NO, STAMP_ID, SA_ID, 
+		        SYSTEM_GB, BUY_AUTH_NO, REG_DATE, STATUS, RETRY_CNT, ALBUM_ID, BUY_TYPE) 
+		VALUES (MOD(#{pIdxSa}, 33), SUBSTR(TO_CHAR(SYSDATE, 'YYYYMMDD'), 7, 2),
+		        SMARTUX.SEQ_PT_CPM_STAMP_BOX_ACTION.NEXTVAL, #{stmpId}, #{saId}, #{systemGb},  
+		        #{saId}||#{buyingDate}, TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS'), 'N', '0', #{albumId}, '2')
+	</insert> 
+
+	<!-- 사용가능 쿠폰 리스트보 조회 -->
+	<select id="getUseCpnPossibleList" parameterType="AuthorizeNSViewRequestVO" resultType="ComCpnVO">
+		SELECT SMARTUX.F_GET_CPN_USE_POSSIBLE_LIST(#{saId}, #{catId}, #{albumId}, #{screenType}, #{genreInfo}, '0', 
+		        DECODE(#{productType}, '1', 'Y', 'N'), 'Y') AS USE_CPN_INFO 
+		  FROM DUAL
+	</select>
+
+	<!-- 구간정보 이미지 조회 -->
+	<select id="getFmInfo" parameterType="AuthorizeNSViewRequestVO" resultType="FmInfoVO">
+	SELECT NVL(N.FM_YN, 'N') AS FM_YN, NVL(N.ADI_PRODUCT_ID, '') AS ADI_PROD_ID
+	  FROM IMCSUSER.PT_LA_ALBUM_MST M,
+	       ( SELECT #{albumId} AS ALBUM_ID,
+	                 NVL(C.FM_YN, 'N') AS FM_YN,
+	                 A.ADI_PRODUCT_ID
+	           FROM IMCSUSER.PT_LA_PACKAGE_ASSET A,
+	                IMCSUSER.PT_LB_BRO_MATERIAL B,
+	                IMCSUSER.PT_LA_CONTENT_ASSET C
+	          WHERE A.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID
+	            AND B.ASSET_ID = C.ASSET_ID
+	            AND A.NSC_ALBUM_ID = #{albumId}
+	            AND SUBSTR(C.ASSET_ID, 16, 2) = 'M2'
+	            AND (NVL(B.QD_YN, 'N') = 'N' OR (NVL(B.QD_YN, 'N') = 'Y' AND NVL(B.QD_FLAG, 'N') = '2'))
+	            AND NVL(C.FM_YN, 'N') = 'Y' ) N
+	 WHERE M.ADI_ALBUM_ID = #{albumId}
+	   AND M.ADI_ALBUM_ID = N.ALBUM_ID (+)
+	</select>
+
+	<!-- HEVC_YN을 체크하기 위하여 ASSET_ID 조회 -->
+	<select id="getAssetId" parameterType="AuthorizeNSViewRequestVO" resultType="String">
+	SELECT ASSET_ID
+	  FROM IMCSUSER.PT_LA_PACKAGE_ASSET
+	 WHERE NSC_ALBUM_ID = #{albumId}
+	   AND SUBSTR(ADI_PRODUCT_ID, 16, 2) IN ('MA', 'M9')
+	</select>
+
+	<!-- 시즌여부(HDTV) 조회 -->
+	<select id="getSeasonInfo" resultType="java.lang.String">
+		<![CDATA[
+			SELECT distinct 1
+			  FROM IMCSUSER.PT_LA_SEASON_SERIES_MAP A,
+			       IMCSUSER.PT_LA_ALBUM_GROUP B,
+			       IMCSUSER.PT_LA_ALBUM_RELATION C,
+			       PT_VO_CATEGORY D
+			WHERE A.series_id_imcs = B.album_group_id
+			  AND NVL(A.season_type, 'R') = 'R'
+			  AND B.group_type = 'S'
+			  AND B.album_group_id = C.album_group_id
+			  AND B.group_type = C.group_type
+			  AND C.album_id = #{albumId}
+			  AND A.series_id_imcs = D.series_id
+			  AND D.category_gb = 'NSC'
+			  AND NVL(d.test_sbc,'N') = 'N'
+		]]>
+	</select>
+
+	<select id="getVodProfile" parameterType="AuthorizeNSViewRequestVO" resultMap="mapVodProfile">
+	SELECT /*+ INDEX(A PT_LA_M3U8_INFO_IDX01) */
+	       A.M3U8_TYPE, A.M3U8_FILE_1 AS CASTIS_M3U8, A.M3U8_FILE_2 AS ONNURI_M3U8, NVL(A.NODE_GROUP,'N') AS NODE_GROUP
+	  FROM IMCSUSER.PT_LA_M3U8_INFO A
+	 WHERE A.M3U8_ID = #{albumId}
+	   AND NVL(A.service_yn, 'Y') = 'Y'	
+	</select>
+	
+		<!-- 시청 콘텐츠 메타 정보 저장 -->
+	<insert id="insWatchMeta" parameterType="AuthorizeNSViewRequestVO">
+	 INSERT INTO MCUSTUSER.NPT_VO_WATCH_META
+       (
+        P_IDX_DAY, P_IDX_SA, SA_ID, MAC_ADDR, WATCH_FDATE, CONTENTS_ID, CONTENTS_NAME, CAT_ID, ALBUM_ID,
+        SUGGESTED_PRICE, PAY_YN, TERR_YN, TERR_PERIOD, PREVIEW_PERIOD, RATING_CD, RUN_TIME, ONAIR_DATE,
+        CP_ID, CP_ID_UFLIX, CONTENTS_FILESIZE, SERIES_NO        
+       )
+	   VALUES
+	       (
+	        SUBSTR(#{watchDate}, 7, 2),
+	        mod(#{pIdxSa}, 33),
+	        #{saId},
+	        #{stbMac},
+	        #{watchDate},
+	        #{albumId},
+	        #{assetName},
+	        #{catId},
+	        #{albumId},
+	        #{suggestedPrice},
+	        #{payYn},
+	        #{terrYn},
+	        #{terrPeriod},
+	        #{previewPeriod},
+	        #{ratingCd},
+	        #{runTime},
+	        #{onairDate},
+	        #{cpId},
+	        #{cpIdUflix},
+			#{contentFilesize},
+			#{seriesNo}
+	       )
+	</insert>
+	
+	<select id="getKidsGb" parameterType="AuthorizeNSViewRequestVO" resultType="String">
+	SELECT DECODE(ACTORS_DISPLAY, 'B', 'B', 'K')
+	  FROM PT_VO_CATEGORY
+	 WHERE CATEGORY_ID = #{catId}
+	   AND CATEGORY_GB = 'NSC'
+	   AND NSC_GB = 'KID'
+	</select>
+	
+</mapper> 

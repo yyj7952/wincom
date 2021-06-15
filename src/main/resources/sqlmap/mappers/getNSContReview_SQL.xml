@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSContReview.GetNSContReviewDao">
+
+	<select id="getWatchaReviewList" parameterType="GetNSContReviewRequestVO" resultType="GetNSContReviewResponseVO">
+		SELECT NAME,      
+			       CONTENT,   
+			       RATING,    
+			       WRITE_DT,
+			       REVIEW_FLAG   
+			 FROM (           
+			       SELECT ROWNUM      rnum,    
+			              X.NAME      NAME,    
+			              X.CONTENT   CONTENT, 
+			              X.RATING    RATING,  
+			              X.WRITE_DT  WRITE_DT,
+			              'W'         REVIEW_FLAG
+			         FROM (                    
+			               SELECT NAME,        
+			                      CONTENT,     
+			                      RATING,      
+			                      TO_CHAR(TO_DATE(write_dt, 'YYYY-MM-DD PM HH:MI::SS', 'NLS_DATE_LANGUAGE = KOREAN'), 'YYYYMMDDHH24MISS') WRITE_DT  
+			                 FROM IMCSUSER.PT_WC_WATCHA_COMMENT  
+			                WHERE ALBUM_ID = #{albumId}      
+			                  AND USE_YN = 'Y'                   
+			             ORDER BY RATING DESC, WRITE_DT DESC     
+			              ) X                                    
+			      )               
+		<if test="!pageCnt.equals('0'.toString())">
+		WHERE  RNUM <![CDATA[>=]]> #{startNum}
+          AND  RNUM <![CDATA[<=]]> #{endNum}
+        </if>
+	</select>
+	
+	<select id="getWatchaReviewList2" parameterType="GetNSContReviewRequestVO" resultType="GetNSContReviewResponseVO">
+		SELECT NAME,      
+			       CONTENT,   
+			       RATING,    
+			       WRITE_DT,
+			       REVIEW_FLAG   
+			 FROM (           
+			       SELECT ROWNUM      		rnum,    
+			              C.AUTHOR      	NAME,    
+			              C.CINE_COMMENT    CONTENT, 
+			              C.SCORE    RATING,  
+			              TO_CHAR(C.INSERT_DATE, 'YYYYMMDDHH24MISS') WRITE_DT,
+			              'C'         REVIEW_FLAG
+			         FROM (                    
+			               SELECT AUTHOR,        
+			                      CINE_COMMENT,     
+			                      SCORE,      
+			                      INSERT_DATE
+			                 FROM IMCSUSER.PT_WC_CINE_REVIEW  
+			                WHERE CINE_ID = #{cine21Id}      
+			                  AND STATUS_YN = 'Y'                   
+			             ORDER BY TO_NUMBER(ORDER_NO), TO_NUMBER(RESERVE_SEQ)
+			              ) C                                    
+			      )               
+		<if test="!pageCnt.equals('0'.toString())">
+		WHERE  RNUM <![CDATA[>=]]> #{startNum}
+          AND  RNUM <![CDATA[<=]]> #{endNum}
+        </if>
+	</select>
+		
+</mapper> 

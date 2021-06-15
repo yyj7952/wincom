@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.rmNSAlert.RmNSAlertDao">
+	
+	<!-- 알람받기 인덱스 수정  -->
+	<update id="uptAlertIndex" parameterType="RmNSAlertRequestVO" >
+		UPDATE PT_VO_ALERT 
+		   SET ALERT_IDX = TRIM(TO_CHAR(TO_NUMBER(TRIM(ALERT_IDX)) - 1)) 
+		 WHERE SA_ID    = #{saId}                                   
+		   AND MAC_ADDR = #{stbMac}                                 
+		   AND TO_NUMBER(TRIM(ALERT_IDX)) <![CDATA[>]]> ( 
+		    SELECT TO_NUMBER(TRIM(ALERT_IDX)) 
+		      FROM PT_VO_ALERT 
+		     WHERE SA_ID	= #{saId}
+		       AND MAC_ADDR	= #{stbMac}
+		       AND (CONTENTS_ID = #{contentId} OR CONTENTS_ID IN (
+		            SELECT ASSET_ID 
+		              FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+		             WHERE ADI_ALBUM_ID = #{contentId}
+		)))
+	</update>
+	
+	<!-- 알람받기 삭제 -->
+	<delete id="rmNSAlertInfo" parameterType="RmNSAlertRequestVO" >
+		DELETE
+		FROM PT_VO_ALERT A
+		WHERE A.SA_ID = #{saId}
+	 	  AND A.MAC_ADDR = #{stbMac}
+		  AND A.CONTENTS_ID = #{contentId}
+	</delete>
+</mapper> 

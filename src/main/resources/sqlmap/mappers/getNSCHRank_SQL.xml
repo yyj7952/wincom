@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSCHRank.GetNSCHRankDao">
+	
+	<!-- 노드정보 조회 -->
+	<select id="getNode" resultType="ComNodeVO" >
+		SELECT SUB_NODE_CD AS NODE_CD, RANGE_IP_CD AS RBASE_CODE             
+		 FROM IMCSUSER.PT_LV_RANGE_IP_CHNL        
+		WHERE RANGE_IP_CD = #{baseCd}
+		  AND NVL(USE_YN, 'Y') = 'Y'
+	</select>
+	
+	<!-- 동정보 조회 -->
+	<select id="getDongYn" resultType="String" >
+		SELECT B.STB_PLAY_IP1 AS DONG_YN
+	   	FROM IMCSUSER.PT_LV_NODE_INFO B  ,
+	 	    IMCSUSER.PT_LV_DONG_INFO C,
+		    PT_VO_CUSTOM_ID D
+	 	WHERE D.SA_ID = #{saId}
+	    	AND D.MAC_ADDR = #{stbMac}
+	    	AND C.DONG_CD = D.HJDONG_NO
+	    	AND B.SUB_NODE_CD = C.NSC_SUB_NODE_CD
+	</select>
+	
+	<!-- 가입자 정보 조회 -->
+	<select id="testSbc" resultType="String" >
+		SELECT 	CASE WHEN TEST_SBC = 'Y' THEN TEST_SBC ELSE 'N' END AS TEST_SBC
+		FROM PT_VO_CUSTOM_ID
+		WHERE SA_ID = #{saId}
+		AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	<!-- 실시간 인기채널 프로그램 -->
+	<select id="getNSCHRankList" resultType="GetNSCHRankResponseVO" >
+		
+		<![CDATA[
+			SELECT SERVICE_ID, STB_PLAY_IP1 AS LIVE_IP1, M3U8_FILE1 AS LIVE_FILE_NAME1, STB_PLAY_IP2 AS LIVE_IP2, M3U8_FILE1 AS LIVE_FILE_NAME2,
+			      STB_PLAY_IP3 AS LIVE_IP3,  M3U8_FILE1 AS LIVE_FILE_NAME3, STB_PLAY_IP1 AS LIVE_IP4, M3U8_FILE2 AS LIVE_FILE_NAME4, STB_PLAY_IP2 AS LIVE_IP5,
+			      M3U8_FILE2 AS LIVE_FILE_NAME5, STB_PLAY_IP3 AS LIVE_IP6,  M3U8_FILE2 AS LIVE_FILE_NAME6,  ICON_URL AS IMG_URL, ICON_FILE_NAME AS IMG_FILE_NAME,
+			      CHANNELNUMBER AS CHANNEL_NO, SUB_NODE_PORT1 AS LIVE_PORT, CDN_LOCAL_TYP AS VOD_SERVER1_TYPE, CDN_NEAR_TYP AS VOD_SERVER2_TYPE, CDN_CENTER_TYP AS VOD_SERVER3_TYPE
+			 FROM (
+			       SELECT DISTINCT E.RANKING,
+			              A.SERVICE_ID ,
+			              A.SORT_NO ,
+			              B.STB_PLAY_IP1,
+			              B.STB_PLAY_IP2 ,
+			              B.STB_PLAY_IP3 ,
+			              DECODE(B.CDN_LOCAL_TYP, '1', NVL(A.M3U8_FILE1, ''), '2', NVL(A.M3U8_FILE1_N, '')) M3U8_FILE1,
+			              DECODE(B.CDN_LOCAL_TYP, '1', NVL(A.M3U8_FILE2, ''), '2', NVL(A.M3U8_FILE2_N, '')) M3U8_FILE2,
+			              'http:'||REPLACE(A.ICON_URL,'\','/') ICON_URL,
+			              A.ICON_FILE_NAME  ,
+			              A.CHANNELNUMBER ,
+			              B.SUB_NODE_PORT1,
+			              B.CDN_LOCAL_TYP ,
+			              B.CDN_NEAR_TYP ,
+			              B.CDN_CENTER_TYP
+			        FROM AVBM_QBIC_3MIN_TB E,
+		]]>
+		<if test='baseGb == "N" and dongYn =="Y" '>
+						 IMCSUSER.PT_CD_PLAY_CHNL A,
+						 IMCSUSER.PT_LV_NODE_INFO B,
+						 IMCSUSER.PT_LV_DONG_INFO C,
+						 PT_VO_CUSTOM_ID D
+		</if>
+		<if test='baseGb == "N" and dongYn =="N" '>
+					     IMCSUSER.PT_CD_PLAY_CHNL A,
+						 IMCSUSER.PT_LV_NODE_INFO B,
+						 IMCSUSER.PT_LV_DONG_INFO C
+		</if>
+		<if test='baseGb == "Y"'>
+						 IMCSUSER.PT_CD_PLAY_CHNL A,
+						 IMCSUSER.PT_LV_NODE_INFO B,
+						 IMCSUSER.PT_LV_RANGE_IP_CHNL C
+		</if>
+		<if test='nscType == "PAD"'>
+					WHERE A.FILTERING_CODE in ('8', '9', '10', '11', '12', '13', '14', '15')
+					AND E.CH_NO = A.CHANNELNUMBER
+		</if>
+		<if test='nscType != "PAD"'>
+					WHERE A.FILTERING_CODE in ('1', '3', '5', '7', '9', '11', '15')
+					AND E.CH_NO = A.CHANNELNUMBER
+		</if>
+		<if test='testSbc == "N"'>
+		<![CDATA[	AND A.SORT_NO <> '999'	]]>
+		</if>
+		<if test='baseGb == "N" and dongYn =="Y" '>
+					AND D.SA_ID = #{saId}
+					AND D.MAC_ADDR = #{stbMac}
+					AND C.DONG_CD = D.HJDONG_NO
+					AND B.SUB_NODE_CD = C.NSC_SUB_NODE_CD
+					AND (NVL(A.YOUTH_YN, '2') = '2' or NVL(A.YOUTH_YN, '2') = #{youthYnCom})
+		</if>
+		<if test='baseGb == "N" and dongYn =="N" '>
+					AND B.SUB_NODE_CD = C.NSC_SUB_NODE_CD
+					and C.DONG_CD = '1234567890'
+					AND (NVL(A.YOUTH_YN, '2') = '2' or NVL(A.YOUTH_YN, '2') = #{youthYnCom})
+		</if>
+		<if test='baseGb == "Y"'>
+					AND C.SUB_NODE_CD = #{nodeCd}
+					AND C.RANGE_IP_CD = #{rbaseCode}
+					AND NVL(C.USE_YN, 'Y') = 'Y'
+					AND B.SUB_NODE_CD = C.SUB_NODE_CD
+					AND (NVL(A.YOUTH_YN, '2') = '2' or NVL(A.YOUTH_YN, '2') = #{youthYnCom})
+		</if>
+		<if test='pooqYn == "N"'>
+					AND NVL(A.POOQ_YN, 'N') = 'Y'
+		</if>
+		<if test='pooqYn == "P"'>
+					AND NVL(A.POOQ_YN, 'N') = 'N'
+		</if>
+					ORDER BY E.RANKING, TO_NUMBER(A.SORT_NO), A.CHANNELNUMBER, A.SERVICE_ID )
+		<if test='pageNo != "0" and pageCnt !="0" '>
+		<![CDATA[
+			WHERE ROWNUM >= ((TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt})) - (TO_NUMBER(#{pageCnt}) - 1))
+			AND  ROWNUM <= (TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt}))
+		]]>
+		</if>
+	</select>
+	
+</mapper>
+	
+	
+	

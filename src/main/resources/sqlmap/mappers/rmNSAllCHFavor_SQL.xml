@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.rmNSAllCHFavor.RmNSAllCHFavorDao">
+	
+	<!-- 선호채널 전체 삭제 -->
+	<delete id="deleteNSAllCHFavor" parameterType="RmNSAllCHFavorRequestVO">
+		DELETE
+	       FROM PT_VO_FAVORITE_CH A
+	        WHERE A.sa_id    = #{saId}
+	          AND A.mac_addr = #{stbMac}
+	</delete> 
+</mapper> 

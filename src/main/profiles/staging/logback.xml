@@ -1,0 +1,417 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true" scanPeriod="30 seconds">
+<property name="LOG_FILE" value="/data/logs/ctis/servicelog/" />
+<property name="LOG_PATTERN" value="%d{yyyy/MM/dd HH:mm:ss.SSS} - [%X{sa_id}][%X{stb_mac}][%X{uri}] %msg%n"/>
+<property name="COMMON_LOG_PATTERN" value="%d{yyyy/MM/dd HH:mm:ss.SSS} - %msg%n"/>
+
+<property name="TLOLOG_FILE" value="/data/logs/ctis/tlolog/" />
+
+<property name="API_LOG_FILE" value="/data/logs/ctis/apilog/" />
+<property name="API_LOG_PATTERN" value="%d{yyyy/MM/dd HH:mm:ss.SSS} - %msg%n"/>
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${LOG_FILE}${tlolog.index.name}_curation_api.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_curation_api.log.%d{yyyy-MM-dd}.%i</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+       			<maxFileSize>500MB</maxFileSize>
+      		</timeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>
+                ${LOG_PATTERN}
+            </pattern>
+        </encoder>
+    </appender>
+    
+    <!-- 모든 API에서 러프한 로그를 남긴다. -->
+    <appender name="apiCommonAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${LOG_FILE}${tlolog.index.name}_api_common.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_api_common.log.%d{yyyy-MM-dd}.%i</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+       			<maxFileSize>500MB</maxFileSize>
+      		</timeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${COMMON_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+	<!-- 
+	TLO_LOG 
+	-Dtlolog.index.name=[서버명]_[서버번호] <- 환경변수에 등록 필요(TLO로그 파일명으로 등록 됨)
+	-->
+    <appender name="TLO_authorizeCTVMViewAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${TLOLOG_FILE}${tlolog.index.name}_authorizeCTVMView.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${TLOLOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_authorizeCTVMView_.%d{MMddyyyy}.log</fileNamePattern>
+        </rollingPolicy>
+	    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+			<layout class="kr.co.wincom.curation.common.log.TlologLayout" />
+	    </encoder>
+    </appender>
+    <appender name="TLO_authorizeCTVSViewAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${TLOLOG_FILE}${tlolog.index.name}_authorizeCTVSView.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${TLOLOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_authorizeCTVSView_.%d{MMddyyyy}.log</fileNamePattern>
+        </rollingPolicy>
+	    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+			<layout class="kr.co.wincom.curation.common.log.TlologLayout" />
+	    </encoder>
+    </appender>
+    <appender name="TLO_getCTVContEpisodeAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${TLOLOG_FILE}${tlolog.index.name}_getCTVContEpisode.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${TLOLOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_getCTVContEpisode_.%d{MMddyyyy}.log</fileNamePattern>
+        </rollingPolicy>
+	    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+			<layout class="kr.co.wincom.curation.common.log.TlologLayout" />
+	    </encoder>
+    </appender>
+    <appender name="TLO_getCTVThumbnailAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${TLOLOG_FILE}${tlolog.index.name}_getCTVThumbnail.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${TLOLOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_getCTVThumbnail_.%d{MMddyyyy}.log</fileNamePattern>
+        </rollingPolicy>
+	    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+			<layout class="kr.co.wincom.curation.common.log.TlologLayout" />
+	    </encoder>
+    </appender>
+    <appender name="TLO_buyCTVContentAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${TLOLOG_FILE}${tlolog.index.name}_buyCTVContent.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${TLOLOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_buyCTVContent_.%d{MMddyyyy}.log</fileNamePattern>
+        </rollingPolicy>
+	    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+			<layout class="kr.co.wincom.curation.common.log.TlologLayout" />
+	    </encoder>
+    </appender>
+    <appender name="TLO_getCTVPurchasedAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${TLOLOG_FILE}${tlolog.index.name}_getCTVPurchased.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${TLOLOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_getCTVPurchased_.%d{MMddyyyy}.log</fileNamePattern>
+        </rollingPolicy>
+	    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+			<layout class="kr.co.wincom.curation.common.log.TlologLayout" />
+	    </encoder>
+    </appender>
+    <appender name="TLO_getCTVRepositedAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${TLOLOG_FILE}${tlolog.index.name}_getCTVReposited.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${TLOLOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_getCTVReposited_.%d{MMddyyyy}.log</fileNamePattern>
+        </rollingPolicy>
+	    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+			<layout class="kr.co.wincom.curation.common.log.TlologLayout" />
+	    </encoder>
+    </appender>
+    <appender name="TLO_rmCTVWatchHistAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${TLOLOG_FILE}${tlolog.index.name}_rmCTVWatchHist.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${TLOLOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_rmCTVWatchHist_.%d{MMddyyyy}.log</fileNamePattern>
+        </rollingPolicy>
+	    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+			<layout class="kr.co.wincom.curation.common.log.TlologLayout" />
+	    </encoder>
+    </appender>
+    <appender name="TLO_setCTVPassedTimeAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${TLOLOG_FILE}${tlolog.index.name}_setCTVPassedTime.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${TLOLOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_setCTVPassedTime_.%d{MMddyyyy}.log</fileNamePattern>
+        </rollingPolicy>
+	    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+			<layout class="kr.co.wincom.curation.common.log.TlologLayout" />
+	    </encoder>
+    </appender>
+    <appender name="TLO_getCTVContStatAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${TLOLOG_FILE}${tlolog.index.name}_getCTVContStat.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${TLOLOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_getCTVContStat_.%d{MMddyyyy}.log</fileNamePattern>
+        </rollingPolicy>
+	    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+			<layout class="kr.co.wincom.curation.common.log.TlologLayout" />
+	    </encoder>
+    </appender>
+    <appender name="TLO_chkCTVBuyContsAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${TLOLOG_FILE}${tlolog.index.name}_chkCTVBuyConts.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${TLOLOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_chkCTVBuyConts_.%d{MMddyyyy}.log</fileNamePattern>
+        </rollingPolicy>
+	    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+			<layout class="kr.co.wincom.curation.common.log.TlologLayout" />
+	    </encoder>
+    </appender>
+	<!-- TLO_LOG -->
+	
+	<!-- API_LOG -->
+    <appender name="API_authorizeCTVMViewAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${API_LOG_FILE}${tlolog.index.name}_authorizeCTVMView.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${API_LOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_authorizeCTVMView.log.%d{yyyy-MM-dd}.%i</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+       			<maxFileSize>500MB</maxFileSize>
+      		</timeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${API_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+    <appender name="API_authorizeCTVSViewAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${API_LOG_FILE}${tlolog.index.name}_authorizeCTVSView.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${API_LOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_authorizeCTVSView.log.%d{yyyy-MM-dd}.%i</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+       			<maxFileSize>500MB</maxFileSize>
+      		</timeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${API_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+    <appender name="API_getCTVContEpisodeAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${API_LOG_FILE}${tlolog.index.name}_getCTVContEpisode.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${API_LOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_getCTVContEpisode.log.%d{yyyy-MM-dd}.%i</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+       			<maxFileSize>500MB</maxFileSize>
+      		</timeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${API_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+    <appender name="API_getCTVThumbnailAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${API_LOG_FILE}${tlolog.index.name}_getCTVThumbnail.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${API_LOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_getCTVThumbnail.log.%d{yyyy-MM-dd}.%i</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+       			<maxFileSize>500MB</maxFileSize>
+      		</timeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${API_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+    <appender name="API_buyCTVContentAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${API_LOG_FILE}${tlolog.index.name}_buyCTVContent.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${API_LOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_buyCTVContent.log.%d{yyyy-MM-dd}.%i</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+       			<maxFileSize>500MB</maxFileSize>
+      		</timeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${API_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+    <appender name="API_getCTVPurchasedAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${API_LOG_FILE}${tlolog.index.name}_getCTVPurchased.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${API_LOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_getCTVPurchased.log.%d{yyyy-MM-dd}.%i</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+       			<maxFileSize>500MB</maxFileSize>
+      		</timeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${API_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+    <appender name="API_getCTVRepositedAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${API_LOG_FILE}${tlolog.index.name}_getCTVReposited.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${API_LOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_getCTVReposited.log.%d{yyyy-MM-dd}.%i</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+       			<maxFileSize>500MB</maxFileSize>
+      		</timeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${API_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+    <appender name="API_rmCTVWatchHistAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${API_LOG_FILE}${tlolog.index.name}_rmCTVWatchHist.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${API_LOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_rmCTVWatchHist.log.%d{yyyy-MM-dd}.%i</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+       			<maxFileSize>500MB</maxFileSize>
+      		</timeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${API_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+    <appender name="API_setCTVPassedTimeAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${API_LOG_FILE}${tlolog.index.name}_setCTVPassedTime.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${API_LOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_setCTVPassedTime.log.%d{yyyy-MM-dd}.%i</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+       			<maxFileSize>500MB</maxFileSize>
+      		</timeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${API_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+    <appender name="API_getCTVContStatAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${API_LOG_FILE}${tlolog.index.name}_getCTVContStat.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${API_LOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_getCTVContStat.log.%d{yyyy-MM-dd}.%i</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+       			<maxFileSize>500MB</maxFileSize>
+      		</timeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${API_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+    <appender name="API_chkCTVBuyContsAp" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    	<file>${API_LOG_FILE}${tlolog.index.name}_chkCTVBuyConts.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${API_LOG_FILE}%d{yyyyMM,aux}/${tlolog.index.name}_chkCTVBuyConts.log.%d{yyyy-MM-dd}.%i</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+       			<maxFileSize>500MB</maxFileSize>
+      		</timeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${API_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+	<!-- API_LOG -->
+    
+    <root level="debug">
+        <appender-ref ref="STDOUT" />
+        <appender-ref ref="FILE" />
+    </root>
+    
+    <!-- API COMMON_LOG -->
+	<logger name="APICOMM" level="INFO" additivity="false">
+		<appender-ref ref="apiCommonAp" />
+	</logger>
+	<logger name="APICOMM_authorizeCTVMView" level="INFO" additivity="false">
+		<appender-ref ref="apiCommonAp" />
+		<appender-ref ref="API_authorizeCTVMViewAp" />
+	</logger>
+	<logger name="APICOMM_authorizeCTVSView" level="INFO" additivity="false">
+		<appender-ref ref="apiCommonAp" />
+		<appender-ref ref="API_authorizeCTVSViewAp" />
+	</logger>
+	<logger name="APICOMM_getCTVContEpisode" level="INFO" additivity="false">
+		<appender-ref ref="apiCommonAp" />
+		<appender-ref ref="API_getCTVContEpisodeAp" />
+	</logger>
+	<logger name="APICOMM_getCTVThumbnail" level="INFO" additivity="false">
+		<appender-ref ref="apiCommonAp" />
+		<appender-ref ref="API_getCTVThumbnailAp" />
+	</logger>
+	<logger name="APICOMM_buyCTVContent" level="INFO" additivity="false">
+		<appender-ref ref="apiCommonAp" />
+		<appender-ref ref="API_buyCTVContentAp" />
+	</logger>
+	<logger name="APICOMM_getCTVPurchased" level="INFO" additivity="false">
+		<appender-ref ref="apiCommonAp" />
+		<appender-ref ref="API_getCTVPurchasedAp" />
+	</logger>
+	<logger name="APICOMM_getCTVReposited" level="INFO" additivity="false">
+		<appender-ref ref="apiCommonAp" />
+		<appender-ref ref="API_getCTVRepositedAp" />
+	</logger>
+	<logger name="APICOMM_rmCTVWatchHist" level="INFO" additivity="false">
+		<appender-ref ref="apiCommonAp" />
+		<appender-ref ref="API_rmCTVWatchHistAp" />
+	</logger>
+	<logger name="APICOMM_setCTVPassedTime" level="INFO" additivity="false">
+		<appender-ref ref="apiCommonAp" />
+		<appender-ref ref="API_setCTVPassedTimeAp" />
+	</logger>
+	<logger name="APICOMM_getCTVContStat" level="INFO" additivity="false">
+		<appender-ref ref="apiCommonAp" />
+		<appender-ref ref="API_getCTVContStatAp" />
+	</logger>
+	<logger name="APICOMM_chkCTVBuyConts" level="INFO" additivity="false">
+		<appender-ref ref="apiCommonAp" />
+		<appender-ref ref="API_chkCTVBuyContsAp" />
+	</logger>
+	<!-- API COMMON_LOG -->
+	
+	<!-- TLO_LOG -->
+	<logger name="TLO_authorizeCTVMView" level="INFO" additivity="false">
+		<appender-ref ref="TLO_authorizeCTVMViewAp" />
+	</logger>
+	<logger name="TLO_authorizeCTVSView" level="INFO" additivity="false">
+		<appender-ref ref="TLO_authorizeCTVSViewAp" />
+	</logger>
+	<logger name="TLO_getCTVContEpisode" level="INFO" additivity="false">
+		<appender-ref ref="TLO_getCTVContEpisodeAp" />
+	</logger>
+	<logger name="TLO_getCTVThumbnail" level="INFO" additivity="false">
+		<appender-ref ref="TLO_getCTVThumbnailAp" />
+	</logger>
+	<logger name="TLO_buyCTVContent" level="INFO" additivity="false">
+		<appender-ref ref="TLO_buyCTVContentAp" />
+	</logger>
+	<logger name="TLO_getCTVPurchased" level="INFO" additivity="false">
+		<appender-ref ref="TLO_getCTVPurchasedAp" />
+	</logger>
+	<logger name="TLO_getCTVReposited" level="INFO" additivity="false">
+		<appender-ref ref="TLO_getCTVRepositedAp" />
+	</logger>
+	<logger name="TLO_rmCTVWatchHist" level="INFO" additivity="false">
+		<appender-ref ref="TLO_rmCTVWatchHistAp" />
+	</logger>
+	<logger name="TLO_setCTVPassedTime" level="INFO" additivity="false">
+		<appender-ref ref="TLO_setCTVPassedTimeAp" />
+	</logger>
+	<logger name="TLO_getCTVContStat" level="INFO" additivity="false">
+		<appender-ref ref="TLO_getCTVContStatAp" />
+	</logger>
+	<logger name="TLO_chkCTVBuyConts" level="INFO" additivity="false">
+		<appender-ref ref="TLO_chkCTVBuyContsAp" />
+	</logger>
+	<!-- TLO_LOG -->
+    
+	<!-- API_LOG -->
+	<logger name="API_authorizeCTVMView" level="INFO" additivity="false">
+		<appender-ref ref="API_authorizeCTVMViewAp" />
+	</logger>
+	<logger name="API_authorizeCTVSView" level="INFO" additivity="false">
+		<appender-ref ref="API_authorizeCTVSViewAp" />
+	</logger>
+	<logger name="API_getCTVContEpisode" level="INFO" additivity="false">
+		<appender-ref ref="API_getCTVContEpisodeAp" />
+	</logger>
+	<logger name="API_getCTVThumbnail" level="INFO" additivity="false">
+		<appender-ref ref="API_getCTVThumbnailAp" />
+	</logger>
+	<logger name="API_buyCTVContent" level="INFO" additivity="false">
+		<appender-ref ref="API_buyCTVContentAp" />
+	</logger>
+	<logger name="API_getCTVPurchased" level="INFO" additivity="false">
+		<appender-ref ref="API_getCTVPurchasedAp" />
+	</logger>
+	<logger name="API_getCTVReposited" level="INFO" additivity="false">
+		<appender-ref ref="API_getCTVRepositedAp" />
+	</logger>
+	<logger name="API_rmCTVWatchHist" level="INFO" additivity="false">
+		<appender-ref ref="API_rmCTVWatchHistAp" />
+	</logger>
+	<logger name="API_setCTVPassedTime" level="INFO" additivity="false">
+		<appender-ref ref="API_setCTVPassedTimeAp" />
+	</logger>
+	<logger name="API_getCTVContStat" level="INFO" additivity="false">
+		<appender-ref ref="API_getCTVContStatAp" />
+	</logger>
+	<logger name="API_chkCTVBuyConts" level="INFO" additivity="false">
+		<appender-ref ref="API_chkCTVBuyContsAp" />
+	</logger>
+	<!-- API_LOG -->
+	
+	<!-- 불필요한 NoSQL로그 제거 -->
+	<logger name="org.apache.zookeeper" additivity="false" />
+	<logger name="org.apache.hadoop" additivity="false" />
+	
+</configuration>

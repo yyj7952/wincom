@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.rmNSAllFavor.RmNSAllFavorDao">
+
+	<!-- 1. 찜목록 삭제 - Oracle버전 -->
+	<delete id="rmAllFavor" parameterType="RmNSAllFavorRequestVO" >
+	DELETE                    
+	FROM PT_VO_FAVORITE A     
+	WHERE A.SA_ID = #{saId}
+	AND (A.CONTENTS_ID IN ( SELECT C.CONTENTS_ID 
+	  FROM PT_VO_CATEGORY B ,
+	       PT_VO_CATEGORY_MAP C 
+	 WHERE B.CATEGORY_ID = C.CATEGORY_ID
+	   AND B.CATEGORY_GB = #{contsGb})
+	    OR A.CONTENTS_ID IN (
+	        SELECT ASSET_ID 
+	          FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+	         WHERE ADI_ALBUM_ID IN (
+	                SELECT C.CONTENTS_ID 
+	                  FROM PT_VO_CATEGORY B ,
+	                       PT_VO_CATEGORY_MAP C 
+	                 WHERE B.CATEGORY_ID = C.CATEGORY_ID
+	                   AND B.CATEGORY_GB = #{contsGb}
+	               )
+	       ))
+	</delete>
+
+	<!-- 1. 찜목록 삭제 - Oracle버전 -->
+	<delete id="rmAllFavorMIMS" parameterType="RmNSAllFavorRequestVO" >
+		DELETE /*+ INDEX(A PK_PT_CM_FAVORITE) */ 
+		  FROM SMARTUX.PT_CM_FAVORITE A  
+		 WHERE A.p_idx_sa = mod(substr(#{saId}, -2), 33)  
+		   AND A.P_IDX_YEAR IN ( mod(to_number(to_char(sysdate,'YY'))-1,10), mod(to_number(to_char(sysdate,'YY')),10) ) 
+		   AND A.sa_id    = #{saId}  
+		   AND A.service_type IN ('V', 'U')  
+		   AND A.contents_id IN (SELECT B.contents_id  
+		                           FROM PT_VO_CATEGORY_MAP B, 
+		 			                    PT_VO_CATEGORY C 
+		 		                  WHERE A.contents_id = B.contents_id  
+		 			                AND B.category_id = C.category_id  
+		 			                AND C.category_gb = 'NSC' 
+		                          )
+	</delete>
+
+
+</mapper> 

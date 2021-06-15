@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSVODRank.GetNSVODRankDao">
+	
+	<!-- 검수 STB 여부 조회 -->
+	<select id="getTestSbc" resultType="String" >
+		SELECT CASE WHEN TEST_SBC = 'Y' THEN 'T' ELSE 'V' END VIEW_FLAG2 
+		  FROM PT_VO_CUSTOM_ID 
+		 WHERE SA_ID = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	
+	<!-- 추천 VOD 리스트 조회 -->
+	<select id="getNSVODRankList" resultType="GetNSVODRankResponseVO" >
+		SELECT ROWNUM, A.SERIES_YN, A.RELATION_YN, A.RECOMMEND_YN, A.CAT_ID, A.CAT_NAME, A.CONTS_ID, A.CONTS_NAME, 
+		       A.GENRE_NAME, A.ORDER_NO AS RANK_NO, A.CONTENT_VALUE AS IMG_FILE_NAME,
+		       A.RUNTIME, A.PR_INFO, 'N' AS IS_51_CH, A.AUDIO_TYPE, A.HDCONTENT,
+		       A.NSC_ALBUM_ID AS ALBUM_ID, A.IMAGE_URL AS WIDE_IMAGE_URL, A.POINT,
+		       DENSE_RANK() OVER(ORDER BY ORDER_NO , SERIES_YN DESC, RELATION_YN DESC) ORD_NUM,
+		       SUM(1) OVER(PARTITION BY 0) CNT, A.IS_RH AS REALHD_YN, A.SUGGESTED_PRICE
+		  FROM (
+		        SELECT DISTINCT NVL(TRIM(X.SERIES_YN), 'N') SERIES_YN, 'N' RELATION_YN, 'Y' RECOMMEND_YN,
+		               X.CAT_ID, X.CAT_NAME, X.CONTS_ID, X.CONTS_NAME,
+		               X.DISPLAY_GENRE AS GENRE_NAME, X.ORDER_NO, MAX(X.CONTENT_VALUE) AS CONTENT_VALUE,
+		               X.RUN_TIME AS RUNTIME, X.PR_INFO, X.AUDIO_TYPE, X.HDCONTENT, X.NSC_ALBUM_ID,
+		               '' IMAGE_URL, X.POINT, X.IS_RH, X.SUGGESTED_PRICE 
+		          FROM (
+		                SELECT NVL(K.CATEGORY_ID, '') AS CAT_ID,
+		                       NVL(M.CONTENTS_ID, '') AS CONTS_ID,
+		                       NVL(Y.CATEGORY_NAME, '') AS CAT_NAME,
+		                       NVL(Y.SERIES_YN, '') AS SERIES_YN,
+		                       NVL(A.ADI_ALBUM_NAME, '') AS CONTS_NAME,
+		                       K.DISPLAY_GENRE,
+		                       K.RANKING ORDER_NO,
+		                       TRIM(NVL(R.CONTENT_VALUE, '')) AS CONTENT_VALUE,
+		                       NVL(T.SUGGESTED_PRICE, '0') AS SUGGESTED_PRICE,
+		                       DECODE(TO_CHAR(TO_NUMBER(SUBSTR(K.DISPLAY_RUN_TIME, 1, 2)) * 60 + TO_NUMBER(SUBSTR(K.DISPLAY_RUN_TIME, 3, 2))), '0', '1', 
+		                        TO_CHAR(TO_NUMBER(SUBSTR(K.DISPLAY_RUN_TIME, 1, 2)) * 60 + TO_NUMBER(SUBSTR(K.DISPLAY_RUN_TIME, 3, 2)))) RUN_TIME,
+		                       CASE WHEN NVL(T.RATING, '') = '06' THEN '05' ELSE NVL(T.RATING, '') END PR_INFO,
+		                       UPPER(NVL(C.AUDIO_TYPE, '')) AUDIO_TYPE,
+		                       '' HDCONTENT,
+		                       P.NSC_ALBUM_ID,
+		                       TO_CHAR(ROUND(TO_NUMBER(NVL(A.POINT_SUM, '0')) / (CASE WHEN NVL(A.POINT_CNT, '0')= '0' THEN 1 ELSE TO_NUMBER(NVL(A.POINT_CNT, '0')) END), 0)) POINT,
+		                       NVL(A.IS_RH, 'N') IS_RH 
+		                  FROM AVBM_QBIC_TNSVOD_TB K,
+		                       PT_VO_CATEGORY_MAP M,
+		                       PT_VO_CATEGORY Y,
+		                       IMCSUSER.PT_LA_ALBUM_MST A,
+		                       IMCSUSER.PT_LA_PACKAGE_ASSET P,
+		                       IMCSUSER.PT_LA_TITLE_ASSET T,
+		                       IMCSUSER.PT_LA_CONTENT_ASSET C,
+		                       IMCSUSER.PT_LA_POSTER_ASSET R,
+		                       IMCSUSER.PT_PD_PACKAGE S,
+		                       IMCSUSER.PT_PD_PACKAGE_DETAIL D 
+		                 WHERE K.CONTENT_ID = M.CONTENTS_ID
+		                   AND K.CATEGORY_ID = M.CATEGORY_ID
+		                   AND K.CATEGORY_ID = Y.CATEGORY_ID
+		                   AND K.CATEGORY_GB = 'NSC'
+		                   AND K.CONTENT_ID = A.ADI_ALBUM_ID
+		                   AND K.CONTENT_ID = P.NSC_ALBUM_ID
+		                   AND A.ADI_ALBUM_ID = P.NSC_ALBUM_ID
+		                   AND P.ADI_PRODUCT_ID = T.ADI_PRODUCT_ID
+		                   AND P.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID
+		                   AND P.ADI_PRODUCT_ID = R.ADI_PRODUCT_ID
+		                   AND P.ASSET_ID = D.CONTENTS_ID
+		                   AND D.PRODUCT_ID = S.PRODUCT_ID
+		                   AND R.POSTER_TYPE = #{nscGb}
+		                   AND T.RATING <![CDATA[<]]> '05'
+		                   AND (NVL(C.PRE_MAPPING_YN, 'N') = 'N' OR (NVL(C.PRE_MAPPING_YN, 'N') = 'Y' AND NVL(M.VIEWING_FLAG, 'N') IN ('V', #{viewFlag1}, #{viewFlag2})))
+		                
+		                <if test='definFlag == "3" '>
+		                   AND C.HDCONTENT = 'N' 
+		                </if> 
+		                <if test='youthYn == "Y" '> 
+		                   AND K.RANKING <![CDATA[>=]]> '31000' 
+		                </if> 
+		                <if test='youthYn != "Y" '> 
+		                   AND K.RANKING <![CDATA[<]]> '31000' 
+		                </if> 
+		                <if test='genreOne != "A" and genreTwo != "A" '>
+		                   AND K.GENRE_ONE = #{genreOne}
+		                   AND K.GENRE_TWO = #{genreTwo} 
+		                </if>
+		               ) X 
+		          GROUP BY X.CAT_ID,
+		               X.CAT_NAME,
+		               X.CONTS_ID,
+		               X.CONTS_NAME,
+		               X.DISPLAY_GENRE,
+		               X.ORDER_NO,
+		               X.RUN_TIME,
+		               X.PR_INFO,
+		               X.AUDIO_TYPE,
+		               X.HDCONTENT,
+		               X.NSC_ALBUM_ID,
+		               X.POINT,
+		               X.SERIES_YN,
+		               X.IS_RH,
+		               X.SUGGESTED_PRICE 
+		          ORDER BY X.ORDER_NO
+		    ) A ORDER BY ORDER_NO, SERIES_YN DESC, RELATION_YN DESC
+	</select>
+	
+	
+	<!-- 카테고리 ID 정보 조회 -->
+	<select id="getCategoryId" resultType="String" >
+		SELECT V.CATEGORY_ID 
+		  FROM PT_VO_CATEGORY_MAP Q,
+		       PT_VO_CATEGORY V 
+		 WHERE Q.CONTENTS_ID = #{contsId}
+		   AND Q.CATEGORY_ID = V.CATEGORY_ID
+		   AND V.SERIES_YN = 'Y'
+		   AND V.CATEGORY_GB = 'NSC'
+		   AND NVL(V.NSC_GB, 'LTE') = 'LTE'
+		   AND (V.TEST_SBC = 'N' OR V.TEST_SBC IS NULL OR V.TEST_SBC = '')
+		   AND ROWNUM = 1
+	</select>		
+</mapper>
+	
+	
+	

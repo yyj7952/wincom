@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSSeriesStat.GetNSSeriesStatDao">
+
+	<resultMap type="HashMap" id="mPairInfo">
+		<result property="N_SA_ID" column="N_SA_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="N_STB_MAC" column="N_STB_MAC" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="TEST_SBC" column="TEST_SBC" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+
+	<resultMap type="HashMap" id="mBuyChk">
+		<result property="DIFF_BUY_ALBUM" column="DIFF_BUY_ALBUM" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="EXPIRED_DATE" column="EXPIRED_DATE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="BUY_DATE" column="BUY_DATE" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mLinkTime">
+		<result property="ADI_ALBUM_ID" column="ADI_ALBUM_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="LINK_TIME" column="LINK_TIME" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<!-- 페어링 체크 -->
+	<select id="getCustPairingChk" parameterType="GetNSBuyListRequestVO" resultMap="mPairInfo" >
+		SELECT A.STB_SA_ID AS N_SA_ID, A.STB_MAC AS N_STB_MAC, NVL(B.TEST_SBC,'N') TEST_SBC 
+		   FROM PT_VO_CUSTOM_ID B, 
+		        ( 
+		           SELECT STB_SA_ID, STB_MAC, M_SA_ID, M_MAC 
+		             FROM PT_VO_SBC_PAIRING_TBL 
+		            WHERE M_SA_ID = #{saId}
+		              AND M_MAC = #{stbMac}
+		              AND FLAG = 'Y' 
+		        ) A 
+		   WHERE B.SA_ID = #{saId}
+		     AND B.MAC_ADDR = #{stbMac}
+		     AND B.SA_ID = A.M_SA_ID(+) 
+		     AND B.MAC_ADDR = A.M_MAC(+) 
+	</select>
+	
+	<!-- 앨범 ID로 해당 앨범의 앨범 정보 및 svod only 여부 조회-->
+	<select id="getAlbumInfo" resultType="GetNSSeriesStatResponseVO">
+		SELECT ALBUM_ID, 
+			      MIN(C.PRODUCT_TYPE) AS PRODUCT_TYPE_MIN, 
+			      MAX(C.PRODUCT_TYPE) AS PRODUCT_TYPE_MAX, 
+			      ${@kr.co.wincom.imcs.common.util.GlobalCom@getDBMcustUser()}.NUF_GET_NSCREEN_INFO(ALBUM_ID, #{testSbc} ) AS NSC_INFO,
+			       case when MIN(C.PRODUCT_TYPE) = '0' then '24' 
+			       when MIN(C.PRODUCT_TYPE) = '2' then TO_CHAR(TO_NUMBER(MIN(C.expired_date))*60) 
+			 	  	   when MIN(C.PRODUCT_TYPE) = '3' then '' 
+			      else NVL(SUBSTR(MIN(MAXIMUM_VIEWING_LENGTH), 1, LENGTH(MIN(MAXIMUM_VIEWING_LENGTH)) - 2), '48') end VIEWING_LENGTH,
+			      H.GENRE_SMALL
+		    FROM ( 
+		       	SELECT A.ALBUM_ID,
+		       	       C.ASSET_ID,
+				       B.MAXIMUM_VIEWING_LENGTH,
+				       F.GENRE_SMALL
+		       	  FROM IMCSUSER.PT_LA_ALBUM_INFO A, 
+		                 IMCSUSER.PT_LA_ALBUM_PLATFORM B,
+		                 IMCSUSER.PT_LA_ASSET_INFO C,
+		                 IMCSUSER.PT_VO_CATEGORY_MAP D, 
+		                 IMCSUSER.PT_VO_CATEGORY E,
+		                 IMCSUSER.PT_LA_ALBUM_SUB F
+		       	 WHERE A.album_id IN 
+			 <foreach item="item" index="index" collection="arrAlbumList" separator="," open="(" close=")" >	 
+				#{item}
+			 </foreach>
+	                  AND A.album_id = B.album_id
+			   	      AND B.screen_type = 'N'
+			          AND B.album_id = C.album_id
+			          AND B.album_id = F.album_id
+			          AND C.album_id = F.album_id
+			          AND B.screen_type = C.screen_type 
+			   	      AND C.album_id = D.contents_id
+			   	      AND D.category_id = E.category_id
+			   	      AND E.category_gb = 'NSC'
+	           	    <if test="testSbc.equals('N'.toString())"> 
+						AND NVL(E.TEST_SBC,'N') = 'N'
+					</if> 
+	           	 ) H, 
+			      IMCSUSER.PT_PD_PACKAGE_DETAIL B, 
+			      IMCSUSER.PT_PD_PACKAGE C 
+			WHERE H.ASSET_ID = B.CONTENTS_ID 
+			  AND B.PRODUCT_ID = C.PRODUCT_ID 
+			GROUP BY H.ALBUM_ID, H.GENRE_SMALL
+	</select>
+	
+	<!-- 앨범 ID로 해당 앨범의 앨범 정보 및 svod only 여부 조회-->
+	<select id="getSvodAlbum" resultType="String">
+		SELECT /*+ LEADING(B C E A D) USE_NL(B C E A D) */
+		      D.ALBUM_ID
+		  FROM 
+		      IMCSUSER.PT_PD_PACKAGE_DETAIL A 
+		      , PT_VO_CUSTOM_PRODUCT B 
+		      , IMCSUSER.PT_PD_PACKAGE_RELATION C 
+		      , IMCSUSER.PT_LA_ASSET_INFO D 
+		      , IMCSUSER.PT_PD_PACKAGE E 
+		  WHERE 
+		           B.SA_ID = #{saId}
+		      AND B.MAC_ADDR = #{stbMac}
+		      AND D.ALBUM_ID IN 
+			 <foreach item="item" index="index" collection="arrSubcriptionList" separator="," open="(" close=")" >	 
+				#{item}
+			 </foreach>
+		      AND A.CONTENTS_ID = D.ASSET_ID 
+		      AND D.SCREEN_TYPE = 'N' 
+		      AND A.PRODUCT_ID = C.PRODUCT_ID 
+		      AND C.P_PRODUCT_ID = B.PRODUCTCD 
+	         AND C.PRODUCT_ID = E.PRODUCT_ID 
+	         AND E.PRODUCT_TYPE = '3' 
+		 GROUP BY D.ALBUM_ID  
+	</select>
+	
+	<!-- 구매 여부 조회-->
+	<select id="getBuyChk"  parameterType="GetNSBuyListRequestVO" resultMap="mBuyChk" >
+	<![CDATA[
+		 SELECT /*+LEADING(A X B) USE_NL(A X B)*/ DISTINCT X.ALBUM_ID AS DIFF_BUY_ALBUM, A.EXPIRED_DATE, A.BUY_DATE
+			  FROM PT_VO_BUY_NSC A,
+				   imcsuser.PT_PD_PACKAGE_DETAIL B,
+                   IMCSUSER.PT_LA_ASSET_INFO X
+			 WHERE A.SA_ID = #{saId}
+			   AND A.MAC_ADDR = #{stbMac}
+			   AND A.PRODUCT_ID = CASE WHEN A.PKG_YN = 'Y' THEN B.PRODUCT_ID ELSE X.ALBUM_ID END
+               AND X.ASSET_ID = B.CONTENTS_ID
+               AND X.ALBUM_ID IN
+			   ]]>
+									 <foreach item="item" index="index" collection="arrBuyList" separator="," open="(" close=")" >	  
+										#{item}
+									 </foreach> 
+									 <![CDATA[
+			   AND NVL(EXPIRED_DATE, '0') >= TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS')
+			   ]]>
+               AND X.SCREEN_TYPE = 'N'
+	</select>
+	
+	<!-- 앨범 ID로 해당 앨범의 앨범 정보 및 svod only 여부 조회-->
+	<select id="getNscSubscriptionInfo" resultType="String">
+		 SELECT DISTINCT X.ALBUM_ID  
+			FROM ( 
+				  SELECT PRODUCTCD 
+					FROM PT_VO_CUSTOM_PRODUCT 
+				   WHERE SA_ID = #{nsaId}
+					 AND MAC_ADDR = #{nstbMac}
+				 ) Z, 
+				(  
+				SELECT C.PRODUCT_ID, A.ALBUM_ID  
+				  FROM IMCSUSER.PT_LA_ASSET_INFO A,  
+					   IMCSUSER.PT_PD_PACKAGE_DETAIL B,  
+					   IMCSUSER.PT_PD_PACKAGE C  
+				 WHERE A.ALBUM_ID IN 
+						<foreach item="item" index="index" collection="arrSubcriptionList" separator="," open="(" close=")" >	 
+							#{item}
+						</foreach>
+					   AND A.ASSET_TYPE IN ('HD','SH')  
+					   AND A.SCREEN_TYPE = 'I'  
+					   AND A.ASSET_ID = B.CONTENTS_ID  
+					   AND C.PRODUCT_ID = B.PRODUCT_ID  
+					   AND C.PRODUCT_TYPE = '3'  
+				) X,  
+				IMCSUSER.PT_PD_PACKAGE_RELATION Y 
+			WHERE X.PRODUCT_ID = Y.PRODUCT_ID(+)  
+				AND (Z.PRODUCTCD = Y.P_PRODUCT_ID or Z.PRODUCTCD = X.PRODUCT_ID) 
+	</select>
+	
+	<!-- 구매 여부 조회-->
+	<select id="getNscBuyChk"  parameterType="GetNSBuyListRequestVO" resultMap="mBuyChk" >
+		<![CDATA[ 
+		SELECT X.ALBUM_ID AS DIFF_BUY_ALBUM, X.buy_date, X.expired_date
+				FROM (
+				SELECT P.ALBUM_ID, A.buy_date, A.expired_date
+				  FROM PT_VO_BUY A,
+					   (SELECT K.ASSET_ID, K.ALBUM_ID FROM IMCSUSER.PT_LA_ASSET_INFO K
+						 WHERE K.ALBUM_ID IN]]>
+											 <foreach item="item" index="index" collection="arrBuyList" separator="," open="(" close=")" >	 	 
+												#{item}
+											 </foreach> 
+										<![CDATA[
+						   AND SCREEN_TYPE = 'I'
+						   AND ASSET_TYPE IN ('HD','SH')) P
+				 WHERE A.sa_id = #{nsaId}
+				   AND A.expired_date > to_char(sysdate, 'yyyymmddhh24miss')
+				   AND A.product_id LIKE SUBSTR(P.ASSET_ID, 1, 17)||'%'
+				UNION
+				SELECT Z.ALBUM_ID, A.buy_date, (CASE WHEN A.expired_date = '0' THEN TO_CHAR(sysdate+1 ,'YYYYMMDDHH24MISS')
+                    ELSE A.expired_date END) AS expired_date
+				  FROM PT_VO_BUY A,
+					   ( SELECT /*+ USE_NL(P D G) */ G.product_id, P.ALBUM_ID, NVl(G.pre_sale_yn, 'N') pre_sale_yn,
+							case when Trim(G.close_date) is null                                      
+										then TO_CHAR(sysdate + 1, 'yyyymmddhh24miss')                        
+										else TO_CHAR(TO_DATE(SUBSTR(G.close_date, 1, 12), 'yyyymmddhh24mi')  
+															 + to_number(G.expired_date), 'yyyymmddhh24mi')  
+															 || substr(G.close_date, 13, 2) end expired_date 
+						   FROM IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+								IMCSUSER.PT_PD_PACKAGE G,
+								(SELECT K.asset_id, K.ALBUM_ID FROM IMCSUSER.PT_LA_ASSET_INFO K
+								  WHERE K.ALBUM_ID IN
+												 ]]>
+												 	<foreach item="item" index="index" collection="arrBuyList" separator="," open="(" close=")" >	 	 
+														#{item}
+											 		</foreach> 
+											  <![CDATA[
+								AND SCREEN_TYPE = 'I'
+									AND ASSET_TYPE IN ('HD','SH')) P
+						  WHERE D.contents_id LIKE SUBSTR(P.asset_id, 1, 17)||'%'
+							AND D.product_id = G.product_id
+							AND G.product_type = '2'
+					) Z
+				 WHERE A.sa_id = #{nsaId}
+		           AND ((A.expired_date > to_char(sysdate, 'yyyymmddhh24miss') ) or (A.expired_date = '0' AND Z.expired_date > to_char(sysdate, 'yyyymmddhh24miss'))) 
+		           AND A.product_id = Z.product_id
+				 ) X
+		]]>
+	</select>
+		
+	<!-- 시청 이력 및 이어보기 정보 조회 -->
+	<select id="getNscLinkTime"  parameterType="GetNSBuyListRequestVO" resultMap="mLinkTime" >
+		SELECT DISTINCT ADI_ALBUM_ID, A.LINK_TIME
+				FROM PT_VO_SET_TIME_PTT_NSC A                 						
+				WHERE 							              					
+				   A.SA_ID = #{saId}
+				   AND A.P_IDX_SA = MOD(SUBSTR(#{saId}, -2), 33)
+				   AND A.ADI_ALBUM_ID IN 
+						<foreach item="item" index="index" collection="arrLinkTime" separator="," open="(" close=")" >	 
+							#{item}
+						</foreach>
+				   AND A.NSCN_CUST_NO = 'M' 
+	</select>
+	
+	<!-- 시청 이력 및 이어보기 정보 조회 -->
+	<select id="getIptvLinkTime"  parameterType="GetNSBuyListRequestVO" resultMap="mLinkTime" >
+		SELECT DISTINCT ADI_ALBUM_ID, A.LINK_TIME
+				FROM PT_VO_SET_TIME_PTT A                 						
+				WHERE 							              					
+				   A.SA_ID = #{nsaId}
+				   AND A.P_IDX_SA = MOD(SUBSTR(#{nsaId}, -2), 33)
+				   AND A.ADI_ALBUM_ID IN 
+						<foreach item="item" index="index" collection="arrLinkTime" separator="," open="(" close=")" >	 
+							#{item}
+						</foreach>
+				   AND A.NSCN_CUST_NO = 'M' 
+	</select>
+	
+</mapper>

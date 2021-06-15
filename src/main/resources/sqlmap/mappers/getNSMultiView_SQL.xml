@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSMultiView.GetNSMultiViewDao">
+	<!-- 멀티뷰 채널정보 조회 -->
+	<select id="getNSMultiView" resultType="GetNSMultiViewResponseVO" >
+	   SELECT B.MULTIVIEW_ID AS MULTIVIEW_ID,
+		      B.MULTIVIEW_NAME AS MULTIVIEW_NAME,
+		      A.SERVICE_ID AS SERVICE_ID,
+		      A.CHNL_NAME AS SERVICE_NAME,
+		      A.CHNL_ENG_NAME AS SERVICE_ENG_NAME,
+		      'http:'||REPLACE(A.ICON_URL,'\','/') AS IMG_URL,
+		      A.ICON_FILE_NAME AS IMG_FILE_NAME,
+		      A.CHANNELNUMBER AS CHANNEL_NO,
+		      A.DESCRIPTION AS DESCRIPTION,
+		      DECODE(NVL(A.POOQ_YN , 'N'), 'Y', 'N', 'Y') AS POOQ_YN,
+		      A.SERVICE_ID||'.jpg' AS THM_FILE,
+		      NVL(D.RATINGS,'0.0') AS RATINGS
+		 FROM IMCSUSER.PT_CD_PLAY_CHNL A,
+		      IMCSUSER.PT_CD_MULTIVIEW_GRP B,
+		      IMCSUSER.PT_CD_MULTIVIEW_CHNL C,
+		      IMCSUSER.PT_CD_CHNL_RATINGS D
+		WHERE C.SERVICE_ID = A.SERVICE_ID
+		  AND B.MULTIVIEW_ID = C.MULTIVIEW_ID
+		  AND A.SERVICE_ID = D.SERVICE_ID(+)
+		  AND NVL(B.USE_YN, 'N') = 'Y'
+		  AND NVL(C.USE_YN, 'N') = 'Y'
+		  AND DECODE(NVL(A.POOQ_YN , 'N'), 'Y', 'N', 'Y') IN ('N', #{pooqYnCom})
+		ORDER BY TO_NUMBER(B.SORT_NO), B.MULTIVIEW_ID, TO_NUMBER(C.SORT_NO), C.SERVICE_ID
+	</select>	
+		
+</mapper>
+	
+	
+	

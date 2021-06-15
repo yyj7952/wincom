@@ -1,0 +1,555 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSSeriesList.GetNSSeriesListDao">
+
+	<resultMap type="java.util.HashMap" id="mCatInfo">
+		<result property="SERIES_ID" column="SERIES_ID" javaType="String"/>
+		<result property="CLOSE_YN" column="CLOSE_YN" javaType="String"/>
+		<result property="serno_disp_yn" column="SERNO_DISP_YN" javaType="String"/>
+		<result property="pkg_yn" column="PKG_YN" javaType="String"/>
+	</resultMap>
+	
+	<resultMap type="java.util.HashMap" id="mLastWatchNo">
+		<result property="CONTENTS_ID" column="CONTENTS_ID" javaType="String"/>
+		<result property="SERIES_NO" column="SERIES_NO" javaType="String"/>
+		<result property="WATCH_COUNT" column="WATCH_COUNT" javaType="String"/>
+	</resultMap>
+	
+	<!--  검수 STB여부 조회 -->
+	<select id="getTestSbc" parameterType="GetNSSeriesListRequestVO" resultType="String">
+        SELECT DECODE(NVL(A.test_sbc, 'N'), 'Y', 'Y', 'N') TEST_SBC
+          FROM PT_VO_CUSTOM_ID A
+         WHERE A.sa_id    = #{saId}
+           AND A.mac_addr = #{stbMac}
+	</select>
+	
+	<!--  부가요율 조회 -->
+	<select id="getVatRate" resultType="String">
+		SELECT MIN_VALUE VAT_RATE
+		  FROM IMCSUSER.PT_CD_COM_CD
+		 WHERE GRP_ID = 'SURTAXRATE'
+	</select>
+	
+	<!--  카테고리 조회 -->
+	<select id="getCateInfo1" resultMap="mCatInfo">
+	    SELECT
+	    	series_id
+	    	, NVL(close_yn, 'N') close_yn
+	    	, NVL(edu_type, 'Y') AS serno_disp_yn
+	    	, NVL(pkg_yn, 'N') AS pkg_yn
+	      FROM PT_VO_CATEGORY
+	     WHERE category_id = #{catId}
+	</select>
+	
+	<!--  카테고리 조회 -->
+	<select id="getCateInfo2" resultMap="mCatInfo">
+	    SELECT series_id, NVL(close_yn, 'N') close_yn
+	      FROM PT_VO_CATEGORY
+	     WHERE category_id = #{catId}
+	       AND NVL(test_sbc, 'N') = 'N'
+	</select>
+
+	<!--  마지막 시청회차 조회-->
+	<select id="getLastWatchNo" resultMap="mLastWatchNo">
+		SELECT contents_id, TO_CHAR(series_no) series_no, watch_count
+          FROM (
+                 SELECT M.contents_id, M.series_no, 1 as watch_count
+                   FROM PT_VO_CATEGORY_MAP M,
+                      (SELECT A.adi_album_id, A.watch_date
+                          FROM PT_VO_SET_TIME_PTT A
+                         WHERE A.sa_id = #{saId}
+                           AND A.p_idx_sa = #{idxSa}
+                           AND A.nscn_cust_no = 'M') W
+                  WHERE M.category_id = #{catId}
+                    AND M.contents_id = W.adi_album_id
+                  ORDER BY W.watch_date desc
+              )
+         WHERE rownum = 1
+	</select>
+	
+	<!--  마지막 시청회차 조회 AWS-->
+	<select id="getLastWatchNoAws" resultMap="mLastWatchNo">
+		SELECT contents_id, TO_CHAR(series_no) series_no, watch_count
+          FROM (
+                 SELECT M.contents_id, M.series_no, 1 as watch_count
+                   FROM PT_VO_CATEGORY_MAP M,
+                   		IMCSUSER.PT_LA_ASSET_INFO I,
+                   		IMCSUSER.PT_LV_ASSET_DISTR D,
+                      (SELECT A.adi_album_id, A.watch_date
+                          FROM PT_VO_SET_TIME_PTT A
+                         WHERE A.sa_id = #{saId}
+                           AND A.p_idx_sa = #{idxSa}
+                           AND A.nscn_cust_no = 'M') W
+                  WHERE M.category_id = #{catId}
+                    AND M.contents_id = W.adi_album_id
+                    AND M.contents_id = I.album_id
+                    AND I.screen_type = 'N'
+                    AND I.adi_product_id = D.adi_product_id
+                    AND SUBSTR(D.DST_STATUS, 2, 1) = '1'
+                  ORDER BY W.watch_date desc
+              )
+         WHERE rownum = 1
+	</select>
+	
+	<select id="getContSchedList1" parameterType="GetNSSeriesListRequestVO" resultType="GetNSSeriesListResponseVO" timeout="10">
+		SELECT K.*
+		  FROM
+		  ( SELECT rownum row_no, X.album_id, X.series_no, X.rank_no, X.album_name, X.series_desc,
+		           NVL(X.perform_date, X.onair_date) onair_date, X.rating_cd pr_info,
+		           REPLACE(REPLACE(TRIM(NVL(X.synopsis, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n') AS synopsis,
+		           SUBSTR(X.run_time, 1, 6) run_time, X.product_type, X.price, O.content_value img_file_name,
+		           TO_CHAR(SUM(1) OVER(PARTITION BY 0)) total_count, X.status, X.omniv_yn,
+		           X.vr_type, X.hevc_yn, X.service_icon, X.service_icon_uflix,
+		           X.release_date, X.producer, X.actors_display, X.sub_title, X.year,
+		           X.nfc_code,	X.vod_type, X.player, X.studio,
+		           case when (SELECT album_id FROM IMCSUSER.PT_LA_ASSET_INFO WHERE screen_type = 'N' and album_id = X.album_id and substr(asset_id, 16, 2) = 'MN') is not null then 'Y' else 'N' end hq_audio_yn,
+		           '' AS promotion_copy,
+		           SUM(case when X.series_no = #{rqsNo} then rownum else 0 end)
+		               OVER(PARTITION BY 0) ser_no,
+		               'N' as INAPP_BUY_YN,
+		           (select ${@kr.co.wincom.imcs.common.util.GlobalCom@getDBMconUser()}.UF_GET_ALBUM_PROPERTY(X.album_id, 'P') from dual) main_property,
+           		   (select ${@kr.co.wincom.imcs.common.util.GlobalCom@getDBMconUser()}.UF_GET_ALBUM_PROPERTY(X.album_id, 'C') from dual) sub_property,
+           		   '' as GENRE_UXTEN, X.pay_flag, X.perform_end_date, X.perform_end_time
+		      FROM
+		      ( SELECT /*+LEADING(R M A T P S) USE_NL(O D G C)*/
+		               M.contents_id album_id, M.series_no, M.rank_no,
+		               A.album_name, A.series_no series_desc, A.onair_date, T.rating_cd,
+		               T.run_time, DECODE(NVL(A.encoding_format, 'N'), 'N','N','Y','Y','0','N','1','Y','N') hevc_yn,
+		               SUBSTRB(P.summary_long, 1, 1024) synopsis, P.service_icon, P.service_icon_uflix, P.screen_type,
+		               NVL(T.music_cont_type, '') music_cont_type,
+		               NVL(T.omniview_yn, 'N') omniv_yn, T.vr_type,
+		               case when C.cuesheet_id is not null and NVL(T.music_cont_type, '') IN ('C','B')
+		                    then NVL(C.viewing_flag, 'N') else 'Y' end view_flag,
+		               case when C.cuesheet_id is not null and NVL(T.music_cont_type, '') IN ('C','B')
+		                    then NVL(C.status, '2') else '' end status,
+		               NVL(C.perform_date, '') || NVL(C.perform_time, '') perform_date,
+		               MIN(G.product_type) product_type, MAX(S.suggested_price) price,
+		               A.release_date, T.producer, T.actors_display, T.sub_title, T.year,
+		               T.nfc_code, A.vod_type, T.player, T.studio, C.pay_flag,
+		               C.perform_end_date, C.perform_end_time
+		          FROM PT_VO_CATEGORY R,
+		               PT_VO_CATEGORY_MAP M,
+		               IMCSUSER.PT_LA_ALBUM_INFO A,
+		               IMCSUSER.PT_LA_ALBUM_SUB T,
+		               IMCSUSER.PT_LA_ALBUM_PLATFORM P,
+		               IMCSUSER.PT_LA_ASSET_INFO S,
+		               IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+		               IMCSUSER.PT_PD_PACKAGE G,
+		               IMCSUSER.PT_LB_CUESHEET_MST C
+		         WHERE R.category_id = M.category_id
+		           AND M.contents_id = A.album_id
+		           AND M.contents_id = T.album_id
+		           AND M.contents_id = P.album_id
+		           AND P.screen_type = 'N'
+		           AND M.contents_id = S.album_id
+		           AND S.screen_type = P.screen_type
+		           AND S.asset_id = D.contents_id
+		           AND D.product_id = G.product_id
+		           AND M.contents_id = C.album_id(+)
+		           AND R.category_id = #{catId}
+		           AND (
+		           		(NVL(M.viewing_flag, 'V') in ('V', case when NVL(C.status, '9') = '9' then 'V' else #{viewFlag1} end, #{viewFlag2})) OR
+		           		(NVL(S.reserved_flag, 'N') IN ('R', 'P', 'X'))
+		               )
+		         GROUP BY M.contents_id, M.series_no, M.rank_no,
+		                  A.album_name, A.encoding_format, A.series_no, A.onair_date,
+		                  T.rating_cd, T.run_time, T.music_cont_type, T.omniview_yn,
+		                  P.summary_long, P.screen_type, P.service_icon, P.service_icon_uflix,
+		                  C.cuesheet_id, C.viewing_flag, C.status, C.perform_date, C.perform_time, T.vr_type,
+		                  A.release_date, T.producer, T.actors_display, T.sub_title, T.year, T.nfc_code,
+		                  A.vod_type, T.player, T.studio, C.pay_flag, C.perform_end_date, C.perform_end_time
+		         <if test="orderType.equals(''.toString())">
+		         ORDER BY M.rank_no
+		         </if>
+		         <if test="!orderType.equals(''.toString())">
+		         ORDER BY M.rank_no ${orderType}
+		         </if>		                                          
+		      ) X,
+		        IMCSUSER.PT_LA_ALBUM_POSTER O
+		     WHERE X.album_id = O.album_id
+		       AND X.screen_type = O.screen_type
+		       AND O.service_yn = 'Y'
+		       AND O.poster_type = 'P'
+		       AND X.view_flag = 'Y'
+		  ) K
+		  <if test="!pageCnt.equals('0'.toString())">
+			<if test="rqsNo.equals('0'.toString())">
+				WHERE K.row_no between #{bgnNo} and #{endNo} 
+			</if>
+			<if test="!rqsNo.equals('0'.toString())">
+			WHERE K.row_no between
+		         (trunc(ser_no / #{pageCnt}, 0) - DECODE(Mod(ser_no, #{pageCnt}), 0, 1, 0)) * #{pageCnt} + 1
+		     AND (trunc(ser_no / #{pageCnt}, 0) - DECODE(Mod(ser_no, #{pageCnt}), 0, 1, 0) + 1) * #{pageCnt}
+			</if>
+		  </if>
+	</select>
+	<select id="getContSchedList2" parameterType="GetNSSeriesListRequestVO" resultType="GetNSSeriesListResponseVO" timeout="10">
+			SELECT K.*
+			  FROM    
+			  ( SELECT rownum row_no, X.album_id, X.series_no, X.rank_no, X.album_name, X.series_desc, X.onair_date, X.rating_cd pr_info,
+			           REPLACE(REPLACE(TRIM(NVL(X.synopsis, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n') AS synopsis,         
+			           SUBSTR(X.run_time, 1, 6) run_time, X.product_type, X.price, O.content_value img_file_name,      
+			           TO_CHAR(SUM(1) OVER(PARTITION BY 0)) total_count, '' status, '' omniv_yn,
+			           X.vr_type, X.hevc_yn, X.service_icon, X.service_icon_uflix,
+			           X.release_date, X.producer, X.actors_display, X.sub_title, X.year,
+			           X.nfc_code,	X.vod_type, X.player, X.studio,	'N' hq_audio_yn, 
+			           X.promotion_copy,
+			           SUM(case when X.series_no = #{rqsNo} then rownum else 0 end)              
+			           OVER(PARTITION BY 0) ser_no,
+			           case when MAXIMUM_VIEWING_LENGTH > 2000 then 'N' else DECODE(SUBSTR(NVL(G.CP_PROPERTY_BIN,'000'), LENGTH(NVL(G.CP_PROPERTY_BIN,'000')), LENGTH(NVL(G.CP_PROPERTY_BIN,'000')) - 1), '1' , 'Y', 'N') end as INAPP_BUY_YN   
+			           , X.kids_grade, X.GENRE_UXTEN
+			      FROM                                                                          
+			      ( SELECT /*+LEADING(R M A T P S) USE_NL(O D G)*/                              
+			               M.contents_id album_id, M.series_no, M.rank_no,                      
+			               A.album_name, A.series_no series_desc, A.onair_date_display onair_date, 
+			               DECODE(NVL(A.encoding_format, 'N'), 'N','N','Y','Y','0','N','1','Y','N') hevc_yn,
+			               T.rating_cd, T.run_time, T.vr_type, SUBSTRB(P.summary_long, 1, 1024) synopsis, 
+			               P.service_icon, P.service_icon_uflix, P.screen_type,
+			               MIN(G.product_type) product_type, MAX(S.suggested_price) price,
+			               A.release_date, T.producer, T.actors_display, T.sub_title, T.year,
+			               T.nfc_code, A.vod_type, T.player, T.studio, MAX(P.promotion_copy) as promotion_copy,
+			               P.cp_id, T.kids_grade,
+			               MAX((SELECT K.name FROM IMCSUSER.PT_CD_IMCS_CD K WHERE K.gid = 'UXTEN' and K.code = P.genre_uxten_cd)) as GENRE_UXTEN,
+			               MAX(NVL(SUBSTR(P.MAXIMUM_VIEWING_LENGTH, 1, LENGTH(P.MAXIMUM_VIEWING_LENGTH) - 2), '48')/24) as MAXIMUM_VIEWING_LENGTH
+			          FROM PT_VO_CATEGORY R,                                                    
+			               PT_VO_CATEGORY_MAP M,                                                
+			               IMCSUSER.PT_LA_ALBUM_INFO A,                                         
+			               IMCSUSER.PT_LA_ALBUM_SUB T,                                          
+			               IMCSUSER.PT_LA_ALBUM_PLATFORM P,                                     
+			               IMCSUSER.PT_LA_ASSET_INFO S,                                         
+			               IMCSUSER.PT_PD_PACKAGE_DETAIL D,                                     
+			               IMCSUSER.PT_PD_PACKAGE G                                             
+			         WHERE R.category_id = M.category_id                                        
+			           AND M.contents_id = A.album_id                                           
+			           AND M.contents_id = T.album_id                                           
+			           AND M.contents_id = P.album_id                                           
+			           AND P.screen_type = 'N'                                                  
+			           AND M.contents_id = S.album_id                                           
+			           AND S.screen_type = P.screen_type                                        
+			           AND S.asset_id = D.contents_id                                           
+			           AND D.product_id = G.product_id                                          
+			           AND R.category_id = #{catId}                                            
+			           AND ( 
+			           		NVL(M.viewing_flag, 'V') in ('V', #{viewFlag1}, #{viewFlag2}) OR NVL(S.reserved_flag, 'N') IN ('R', 'P', 'X')
+			               )                                                                    
+			         GROUP BY M.contents_id, M.series_no, M.rank_no,                            
+			                  A.album_name, A.encoding_format, A.series_no, A.onair_date_display,                        
+			                  T.rating_cd, T.run_time, P.summary_long, P.screen_type,
+			                  P.service_icon, P.service_icon_uflix, T.vr_type,
+			                  A.release_date, T.producer, T.actors_display, T.sub_title, T.year, T.nfc_code,
+			                  A.vod_type, T.player, T.studio, P.cp_id, T.kids_grade      
+			         <if test="orderType.equals(''.toString())">
+			         ORDER BY M.rank_no
+			         </if>
+			         <if test="!orderType.equals(''.toString())">
+			         ORDER BY M.rank_no ${orderType}
+			         </if>         
+			                                         
+			      ) X,
+			        IMCSUSER.PT_LA_ALBUM_POSTER O,
+			        IMCSUSER.PT_CD_CP_MST G
+			     WHERE X.album_id = O.album_id
+			       AND X.screen_type = O.screen_type
+			       AND O.service_yn = 'Y'
+			       AND O.poster_type = 'P'
+			       AND G.CP_ID(+) = X.CP_ID
+			  ) K
+			  <if test="!pageCnt.equals('0'.toString())">
+				<if test="rqsNo.equals('0'.toString())">
+					WHERE K.row_no between #{bgnNo} and #{endNo}
+				</if>
+				<if test="!rqsNo.equals('0'.toString())">
+				     <choose>
+						<when test='!orderGbTmp.equals("F")'>
+							WHERE K.row_no between
+						         (trunc(ser_no / #{pageCnt}, 0) - DECODE(Mod(ser_no, #{pageCnt}), 0, 1, 0)) * #{pageCnt} + 1
+						     AND (trunc(ser_no / #{pageCnt}, 0) - DECODE(Mod(ser_no, #{pageCnt}), 0, 1, 0) + 1) * #{pageCnt}
+						</when>
+						<otherwise>
+			                WHERE K.row_no between
+	        					  trunc(ser_no - (5*(#{pageCnt}/10)-1))
+	              			  AND trunc(ser_no + (5*(#{pageCnt}/10)-1 + 1))
+						</otherwise>
+					</choose>
+				</if>
+			  </if>
+	</select>
+	
+	<select id="getContSchedListAWS" parameterType="GetNSSeriesListRequestVO" resultType="GetNSSeriesListResponseVO" timeout="10">
+			SELECT K.*
+			  FROM    
+			  ( SELECT rownum row_no, X.album_id, X.series_no, X.rank_no, X.album_name, X.series_desc, X.onair_date, X.rating_cd pr_info,
+			           REPLACE(REPLACE(TRIM(NVL(X.synopsis, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n') AS synopsis,         
+			           SUBSTR(X.run_time, 1, 6) run_time, X.product_type, X.price, O.content_value img_file_name,      
+			           TO_CHAR(SUM(1) OVER(PARTITION BY 0)) total_count, '' status, '' omniv_yn,
+			           X.vr_type, X.hevc_yn, X.service_icon, X.service_icon_uflix,
+			           X.release_date, X.producer, X.actors_display, X.sub_title, X.year,
+			           X.nfc_code,	X.vod_type, X.player, X.studio,	'N' hq_audio_yn, 
+			           X.promotion_copy,
+			           SUM(case when X.series_no = #{rqsNo} then rownum else 0 end)              
+			           OVER(PARTITION BY 0) ser_no,
+			           case when MAXIMUM_VIEWING_LENGTH > 2000 then 'N' else DECODE(SUBSTR(NVL(G.CP_PROPERTY_BIN,'000'), LENGTH(NVL(G.CP_PROPERTY_BIN,'000')), LENGTH(NVL(G.CP_PROPERTY_BIN,'000')) - 1), '1' , 'Y', 'N') end as INAPP_BUY_YN   
+			           , X.kids_grade, X.GENRE_UXTEN
+			      FROM                                                                          
+			      ( SELECT /*+LEADING(R M A T P S I) USE_NL(O D G I)*/                               
+			               M.contents_id album_id, M.series_no, M.rank_no,                      
+			               A.album_name, A.series_no series_desc, A.onair_date_display onair_date, 
+			               DECODE(NVL(A.encoding_format, 'N'), 'N','N','Y','Y','0','N','1','Y','N') hevc_yn,
+			               T.rating_cd, T.run_time, T.vr_type, SUBSTRB(P.summary_long, 1, 1024) synopsis, 
+			               P.service_icon, P.service_icon_uflix, P.screen_type,
+			               MIN(G.product_type) product_type, MAX(S.suggested_price) price,
+			               A.release_date, T.producer, T.actors_display, T.sub_title, T.year,
+			               T.nfc_code, A.vod_type, T.player, T.studio, MAX(P.promotion_copy) as promotion_copy,
+			               P.cp_id, T.kids_grade,
+			               MAX((SELECT K.name FROM IMCSUSER.PT_CD_IMCS_CD K WHERE K.gid = 'UXTEN' and K.code = P.genre_uxten_cd)) as GENRE_UXTEN,
+			               MAX(NVL(SUBSTR(P.MAXIMUM_VIEWING_LENGTH, 1, LENGTH(P.MAXIMUM_VIEWING_LENGTH) - 2), '48')/24) as MAXIMUM_VIEWING_LENGTH
+			          FROM PT_VO_CATEGORY R,                                                    
+			               PT_VO_CATEGORY_MAP M,                                                
+			               IMCSUSER.PT_LA_ALBUM_INFO A,                                         
+			               IMCSUSER.PT_LA_ALBUM_SUB T,                                          
+			               IMCSUSER.PT_LA_ALBUM_PLATFORM P,                                     
+			               IMCSUSER.PT_LA_ASSET_INFO S,                                         
+			               IMCSUSER.PT_PD_PACKAGE_DETAIL D,                                     
+			               IMCSUSER.PT_PD_PACKAGE G,
+			               IMCSUSER.PT_LV_ASSET_DISTR I                                             
+			         WHERE R.category_id = M.category_id                                        
+			           AND M.contents_id = A.album_id                                           
+			           AND M.contents_id = T.album_id                                           
+			           AND M.contents_id = P.album_id                                           
+			           AND P.screen_type = 'N'                                                  
+			           AND M.contents_id = S.album_id                                           
+			           AND S.screen_type = P.screen_type                                        
+			           AND S.asset_id = D.contents_id                                           
+			           AND D.product_id = G.product_id                                          
+			           AND R.category_id = #{catId}                                            
+			           AND ( 
+			           		NVL(M.viewing_flag, 'V') in ('V', #{viewFlag1}, #{viewFlag2}) OR NVL(S.reserved_flag, 'N') IN ('R', 'P', 'X')
+			               )         
+			           AND S.adi_product_id = I.adi_product_id                                                           
+			           AND SUBSTR(I.DST_STATUS, 2, 1) = '1'
+			         GROUP BY M.contents_id, M.series_no, M.rank_no,                            
+			                  A.album_name, A.encoding_format, A.series_no, A.onair_date_display,                        
+			                  T.rating_cd, T.run_time, P.summary_long, P.screen_type,
+			                  P.service_icon, P.service_icon_uflix, T.vr_type,
+			                  A.release_date, T.producer, T.actors_display, T.sub_title, T.year, T.nfc_code,
+			                  A.vod_type, T.player, T.studio, P.cp_id, T.kids_grade      
+			         <if test="orderType.equals(''.toString())">
+			         ORDER BY M.rank_no
+			         </if>
+			         <if test="!orderType.equals(''.toString())">
+			         ORDER BY M.rank_no ${orderType}
+			         </if>         
+			                                         
+			      ) X,
+			        IMCSUSER.PT_LA_ALBUM_POSTER O,
+			        IMCSUSER.PT_CD_CP_MST G
+			     WHERE X.album_id = O.album_id
+			       AND X.screen_type = O.screen_type
+			       AND O.service_yn = 'Y'
+			       AND O.poster_type = 'P'
+			       AND G.CP_ID(+) = X.CP_ID
+			  ) K
+			  <if test="!pageCnt.equals('0'.toString())">
+				<if test="rqsNo.equals('0'.toString())">
+					WHERE K.row_no between #{bgnNo} and #{endNo}
+				</if>
+				<if test="!rqsNo.equals('0'.toString())">
+				     <choose>
+						<when test='!orderGbTmp.equals("F")'>
+							WHERE K.row_no between
+						         (trunc(ser_no / #{pageCnt}, 0) - DECODE(Mod(ser_no, #{pageCnt}), 0, 1, 0)) * #{pageCnt} + 1
+						     AND (trunc(ser_no / #{pageCnt}, 0) - DECODE(Mod(ser_no, #{pageCnt}), 0, 1, 0) + 1) * #{pageCnt}
+						</when>
+						<otherwise>
+			                WHERE K.row_no between
+	        					  trunc(ser_no - (5*(#{pageCnt}/10)-1))
+	              			  AND trunc(ser_no + (5*(#{pageCnt}/10)-1 + 1))
+						</otherwise>
+					</choose>
+				</if>
+			  </if>
+	</select>
+	
+	<select id="getContSchedList3" parameterType="GetNSSeriesListRequestVO" resultType="GetNSSeriesListResponseVO" timeout="10">
+			SELECT K.*
+              FROM    
+              ( SELECT /*+ LEADING(X O G) USE_NL(X O G) */ rownum row_no, X.album_id, X.order_no as series_no, X.order_no as rank_no, X.album_name, X.series_desc, X.onair_date, X.rating_cd pr_info,
+                       REPLACE(REPLACE(TRIM(NVL(X.synopsis, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n') AS synopsis,         
+                       SUBSTR(X.run_time, 1, 6) run_time, X.product_type, X.price, O.content_value img_file_name,      
+                       TO_CHAR(SUM(1) OVER(PARTITION BY 0)) total_count, '' status, '' omniv_yn,
+                       X.vr_type, X.hevc_yn, X.service_icon, X.service_icon_uflix,
+                       X.release_date, X.producer, X.actors_display, X.sub_title, X.year,
+                       X.nfc_code,    X.vod_type, X.player, X.studio,    'N' hq_audio_yn, 
+                       X.promotion_copy,
+                       SUM(case when X.order_no = #{rqsNo} then rownum else 0 end)              
+                       OVER(PARTITION BY 0) ser_no,
+                       case when MAXIMUM_VIEWING_LENGTH > 2000 then 'N' else DECODE(SUBSTR(NVL(G.CP_PROPERTY_BIN,'000'), LENGTH(NVL(G.CP_PROPERTY_BIN,'000')), LENGTH(NVL(G.CP_PROPERTY_BIN,'000')) - 1), '1' , 'Y', 'N') end as INAPP_BUY_YN   
+                       , X.kids_grade, X.GENRE_UXTEN
+                  FROM                                                                          
+                  ( SELECT /*+LEADING(R A T P S D G) USE_NL(R A T P S D G)*/                              
+                           R.album_id || '' album_id, R.order_no,
+                           A.album_name, A.series_no series_desc, A.onair_date_display onair_date, 
+                           DECODE(NVL(A.encoding_format, 'N'), 'N','N','Y','Y','0','N','1','Y','N') hevc_yn,
+                           T.rating_cd, T.run_time, T.vr_type, SUBSTRB(P.summary_long, 1, 1024) synopsis, 
+                           P.service_icon, P.service_icon_uflix, P.screen_type,
+                           MIN(G.product_type) product_type, MAX(S.suggested_price) price,
+                           A.release_date, T.producer, T.actors_display, T.sub_title, T.year,
+                           T.nfc_code, A.vod_type, T.player, T.studio, MAX(P.promotion_copy) as promotion_copy,
+                           P.cp_id, T.kids_grade,
+                           MAX((SELECT K.name FROM IMCSUSER.PT_CD_IMCS_CD K WHERE K.gid = 'UXTEN' and K.code = P.genre_uxten_cd)) as GENRE_UXTEN,
+                           MAX(NVL(SUBSTR(P.MAXIMUM_VIEWING_LENGTH, 1, LENGTH(P.MAXIMUM_VIEWING_LENGTH) - 2), '48')/24) as MAXIMUM_VIEWING_LENGTH
+                      FROM IMCSUSER.PT_LA_ALBUM_RELATION R,                                                                                                
+                           IMCSUSER.PT_LA_ALBUM_INFO A,                                         
+                           IMCSUSER.PT_LA_ALBUM_SUB T,                                          
+                           IMCSUSER.PT_LA_ALBUM_PLATFORM P,                                     
+                           IMCSUSER.PT_LA_ASSET_INFO S,                                         
+                           IMCSUSER.PT_PD_PACKAGE_DETAIL D,                                     
+                           IMCSUSER.PT_PD_PACKAGE G                                             
+                     WHERE R.album_group_id = #{catId}
+                       AND R.group_type = 'P'                                       
+                       AND R.album_id = A.album_id                                           
+                       AND R.album_id = T.album_id                                           
+                       AND R.album_id = P.album_id                                           
+                       AND P.screen_type = 'N'                                                  
+                       AND R.album_id = S.album_id                                           
+                       AND S.screen_type = P.screen_type                                        
+                       AND S.asset_id = D.contents_id                                           
+                       AND D.product_id = G.product_id                                                                                                             
+                     GROUP BY R.album_id, R.order_no,                            
+                              A.album_name, A.encoding_format, A.series_no, A.onair_date_display,                        
+                              T.rating_cd, T.run_time, P.summary_long, P.screen_type,
+                              P.service_icon, P.service_icon_uflix, T.vr_type,
+                              A.release_date, T.producer, T.actors_display, T.sub_title, T.year, T.nfc_code,
+                              A.vod_type, T.player, T.studio, P.cp_id, T.kids_grade      
+                     ORDER BY R.order_no                                                     
+                  ) X,
+                    IMCSUSER.PT_LA_ALBUM_POSTER O,
+                    IMCSUSER.PT_CD_CP_MST G
+                 WHERE X.album_id = O.album_id
+                   AND X.screen_type = O.screen_type
+                   AND O.service_yn = 'Y'
+                   AND O.poster_type = 'P'
+                   AND G.CP_ID(+) = X.CP_ID
+              ) K
+			  <if test="!pageCnt.equals('0'.toString())">
+				<if test="rqsNo.equals('0'.toString())">
+					WHERE K.row_no between #{bgnNo} and #{endNo}
+				</if>
+				<if test="!rqsNo.equals('0'.toString())">
+				     <choose>
+						<when test='!orderGbTmp.equals("F")'>
+							WHERE K.row_no between
+						         (trunc(ser_no / #{pageCnt}, 0) - DECODE(Mod(ser_no, #{pageCnt}), 0, 1, 0)) * #{pageCnt} + 1
+						     AND (trunc(ser_no / #{pageCnt}, 0) - DECODE(Mod(ser_no, #{pageCnt}), 0, 1, 0) + 1) * #{pageCnt}
+						</when>
+						<otherwise>
+			                WHERE K.row_no between
+	        					  trunc(ser_no - (5*(#{pageCnt}/10)-1))
+	              			  AND trunc(ser_no + (5*(#{pageCnt}/10)-1 + 1))
+						</otherwise>
+					</choose>
+				</if>
+			  </if>
+	</select>
+	
+	<!--  앨범별 스틸 이미지 가져오기 -->
+	<select id="getStillImage" resultType="java.lang.String">
+		SELECT A.main_img_file_name
+		  FROM IMCSUSER.PT_LA_ALBUM_IMG A
+		 WHERE A.adi_album_id = #{albumId}
+		   AND A.img_flag = 'N'
+		 ORDER BY to_number(adi_album_seq)
+	</select>
+	
+	<!--  다운로드 여부 가져오기 -->
+	<select id="getDownFlag" resultType="java.lang.String">
+		SELECT case when count(*) > 0 then 'Y' else 'N' end down_flag
+		  FROM IMCSUSER.PT_LA_ASSET_INFO A,
+		       IMCSUSER.PT_LB_BRO_MATERIAL B
+		 WHERE A.album_id = #{albumId}
+		   AND A.adi_product_id || '08' = B.asset_id
+		   AND SUBSTR(A.asset_id, 16, 2) IN ('M2','M9')
+		   AND (NVL(B.qd_yn, 'N') = 'N' OR (NVL(B.qd_yn, 'N') = 'Y' AND NVL(B.qd_flag, 'N') = '2'))
+	</select>
+	
+<!-- 	<select id="getNSMusicCuesheetList" parameterType="GetNSMusicListRequestVO" resultType="GetNSMusicListResponseVO">
+		SELECT *
+		FROM(
+		     SELECT ROWNUM AS RNUM, Z.*
+	   		        FROM (SELECT A.STATUS AS SCHE_TYPE,
+	   		                     A.ALBUM_ID,
+	   		                     A.CUESHEET_ID AS QSHEET_ID,
+	   		                     A.CUESHEET_TITLE AS CONCERT_NAME,
+	   		                     (A.PERFORM_DATE || A.PERFORM_TIME) AS CONCERT_DATE,
+	   		                     A.PERFORM_PLACE AS PLACE,
+	   		                     NVL(B.OMNIVIEW_YN, 'N') AS OMNIVIEW_YN,
+	   		                     '' AS IMAGE_URL,
+	   		                     (SELECT MAIN_IMG_FILE_NAME FROM IMCSUSER.PT_LA_ALBUM_IMG WHERE ADI_ALBUM_ID = A.ALBUM_ID AND IMG_FLAG = 'M' AND ROWNUM = 1) AS IMAGE_FILE_NAME,
+	   		                     MAX(R.CATEGORY_ID) AS CATEGORY_ID,
+	   		                     SERVICE_ID AS SERVICE_ID
+	   		                FROM IMCSUSER.PT_LB_CUESHEET_MST A, PT_LA_ALBUM_SUB B,
+	   		                     PT_VO_CATEGORY R, PT_VO_CATEGORY_MAP M
+	   		               WHERE A.ALBUM_ID = B.ALBUM_ID
+	   		                 AND A.CUESHEET_TYPE = 'C'
+	   		                 AND A.VIEWING_FLAG = 'Y'
+	   		                 AND R.CATEGORY_ID = M.CATEGORY_ID
+	   		                 AND B.ALBUM_ID = M.CONTENTS_ID
+	   		                 AND R.CATEGORY_GB = 'NSC'
+				    		<if test="nRqsType.equals('2'.toString())">
+				    		 AND NVL(M.VIEWING_FLAG, 'V') IN ('V', #{viewFlag})
+				    		</if>  
+	    		           GROUP BY A.STATUS, A.ALBUM_ID, A.CUESHEET_ID, A.CUESHEET_TITLE, A.PERFORM_DATE, A.PERFORM_TIME, A.PERFORM_PLACE, NVL(B.OMNIVIEW_YN, 'N'), SERVICE_ID
+	    		           ORDER BY CONCERT_DATE DESC
+	    		         ) Z
+		      WHERE SCHE_TYPE = #{nRqsType}
+		    )
+		<if test="!pageCnt.equals('0'.toString())">
+		WHERE  RNUM <![CDATA[>=]]> #{startNum}
+          AND  RNUM <![CDATA[<=]]> #{endNum}
+        </if>
+	</select> -->
+	
+	<select id="getSeriesInfo" parameterType="GetNSMusicListRequestVO" resultType="ComSeriesInfoVO">
+		SELECT category_id, category_name, series_id, series_disp_name, order_no 
+	          FROM                                                                   
+	          (SELECT case when MIN(R.category_id) OVER (partition by R.series_id) = R.category_id then R.category_id else '' end category_id,     
+	                  case when MIN(R.category_id) OVER (partition by R.series_id) = R.category_id then R.category_name else '' end category_name, 
+	                  S.series_id, S.series_disp_name, S.order_no                     
+	             FROM PT_VO_CATEGORY R,                                               
+	                  (SELECT B.ALBUM_GROUP_ID AS series_id, B.SERIES_DISP_NAME AS series_disp_name, A.order_no
+	                     FROM IMCSUSER.PT_LA_SEASON_SERIES_MAP A,                     
+	                          IMCSUSER.PT_LA_ALBUM_GROUP B                             
+	                    WHERE A.series_id_imcs = B.ALBUM_GROUP_ID
+	                      AND B.GROUP_TYPE = 'S'                         
+	                      AND A.season_id = (SELECT MAX(season_id)                    
+	                                           FROM IMCSUSER.PT_LA_SEASON_SERIES_MAP  
+	                                          WHERE series_id_imcs = #{seriesId}
+	                                            AND NVL(season_type, 'R') = 'R'
+	                                        )    
+	                  ) S                         
+	            WHERE R.series_id = S.series_id   
+	              AND R.category_gb = 'NSC'
+	              AND decode(R.nsc_gb, 'KID', 2, 1) IN ( 2, (SELECT decode(nsc_gb, 'KID', 2, 1) FROM PT_VO_CATEGORY WHERE category_id = #{catId}) )       
+	              AND NVL(R.test_sbc, 'N') IN ('N', #{testSbc}) 
+	          )                      
+	         WHERE category_id <![CDATA[>]]> '.' 
+	         ORDER BY order_no 
+	</select>
+		
+	<!-- 데이터프리 정보 조회 -->
+	<select id="getDatafreeInfo"  parameterType="ComDataFreeVO" resultType="ComDataFreeVO">
+		<![CDATA[
+			SELECT *
+			FROM
+			(
+				SELECT NVL(DATAFREE_PRICE, '0') DATAFREE_PRICE, APPROVAL_ID, APPROVAL_PRICE
+			   	FROM IMCSUSER.PT_LA_APPROVAL_INFO										
+				WHERE TO_NUMBER(TRIM(#{price})) BETWEEN TO_NUMBER(PRICE_FROM)
+			    AND TO_NUMBER(PRICE_TO)
+			    AND NVL(APPROVAL_GB, 'N') IN (#{approvalGb}, 'N')
+			    ORDER BY DECODE(NVL(APPROVAL_GB, 'N'), #{approvalGb}, 1, 2)
+			)
+			WHERE ROWNUM = 1
+		]]>
+	</select>
+</mapper> 

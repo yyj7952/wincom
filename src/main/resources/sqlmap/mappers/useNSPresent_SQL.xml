@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.useNSPresent.UseNSPresentDao">
+
+	<!-- 구매상품과 중복 여부 체크 -->
+	<select id="getPresentDupCk" resultType="Integer">
+		<![CDATA[
+			SELECT SUM(X.CNT)
+		      FROM 
+		          (SELECT /*+ INDEX(A IDX_PT_VO_BUY_02_N) */
+		                  COUNT(A.BUY_DATE) CNT
+		             FROM PT_VO_BUY_NSC A
+		            WHERE A.SA_ID = #{saId}  
+		              AND A.MAC_ADDR = #{stbMac}
+		              AND A.PRODUCT_ID = #{albumId}
+		              AND (A.EXPIRED_DATE >= TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS') OR A.EXPIRED_DATE = '0')
+		              AND NVL(A.REFUND_YN,'N') <> 'P'
+		              AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+		            UNION 
+		           SELECT COUNT(A.PRESENT_DATE) CNT
+		             FROM PT_VO_PRESENT A
+		            WHERE A.RCV_SA_ID = #{saId}  
+		              AND A.RCV_MAC_ADDR = #{stbMac}
+		              AND A.CONTENTS_ID = #{albumId}
+		              AND NVL(A.DEL_FLG, 'N')   = 'N'
+		              AND (A.EXPIRED_DATE >= TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS') OR A.EXPIRED_DATE = '0')
+		            UNION 
+		           SELECT COUNT(A.buy_date) CNT
+		             FROM PT_VO_BUY_NSC A,
+		                  PT_VO_BUY_DETAIL_NSC B,
+		                  IMCSUSER.PT_PD_PACKAGE C,
+		                  IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+		                  IMCSUSER.PT_LA_PACKAGE_ASSET E
+		            WHERE A.SA_ID = #{saId}  
+		              AND A.MAC_ADDR = #{stbMac}
+		              AND A.SA_ID = B.SA_ID
+		              AND A.MAC_ADDR = B.MAC_ADDR
+		              AND A.BUY_DATE = B.BUY_DATE
+		              AND A.PRODUCT_ID = B.PRODUCT_ID
+		              AND A.PRODUCT_ID = C.PRODUCT_ID
+		              AND C.PRODUCT_ID = D.PRODUCT_ID
+		              AND D.CONTENTS_ID = E.ASSET_ID
+		              AND E.NSC_ALBUM_ID = B.CONTENTS_ID
+		              AND B.CONTENTS_ID = #{albumId}
+		              AND A.EXPIRED_DATE >= TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS')
+		              AND C.PRODUCT_TYPE='2'
+		              AND NVL(A.REFUND_YN,'N') <> 'P'
+		              AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+		        ) X
+		]]>
+	</select>
+
+	<!-- 이벤트타입 정보조회 -->
+	<select id="getEventType" resultType="String">
+		SELECT NVL(SUBSTR(C.MAXIMUM_VIEWING_LENGTH, 1, LENGTH(C.MAXIMUM_VIEWING_LENGTH) - 2), '48') AS EVENT_TYPE 
+		  FROM IMCSUSER.PT_LA_TITLE_ASSET C,
+		       IMCSUSER.PT_LA_PACKAGE_ASSET A 
+		 WHERE C.ADI_PRODUCT_ID = A.ADI_PRODUCT_ID
+		   AND A.NSC_ALBUM_ID = #{albumId}
+		   AND ROWNUM = 1
+	</select>
+	
+	<!-- VOD 선물사용 (PT_VO_PRESENT) 상태 업데이트 -->
+	<update id="useNSPresentUpdate" parameterType="UseNSPresentRequestVO">
+        UPDATE PT_VO_PRESENT
+		   SET USE_YN = 'Y',
+		       USE_DATE = #{currentDate},
+		       EXPIRED_DATE = TO_CHAR(TO_DATE(SUBSTR(#{currentDate}, 1, 12), 'yyyymmddhh24mi')
+		       + TO_NUMBER(#{eventType})/24, 'yyyymmddhh24mi') || SUBSTR(#{currentDate}, 13, 2)
+		 WHERE RCV_SA_ID        = #{saId} 
+		   AND RCV_MAC_ADDR     = #{stbMac}
+		   AND PRESENT_DATE     = #{presentDate}
+		   AND CONTENTS_ID      = #{albumId}
+		   AND NVL(USE_YN, 'N') = 'N'
+		   AND NVL(DEL_FLG, 'N')= 'N'
+		   AND SERVICE_GB       = 'NSC'
+	</update> 
+	
+</mapper> 

@@ -1,0 +1,745 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSPurchased.GetNSPurchasedDao">
+	<!-- 1. FX_TYPE이 N인 시청이력 리스트 -->
+	<select id="getNSPurchasedListNsc" parameterType="GetNSPurchasedRequestVO" resultType="GetNSPurchasedResponseVO" timeout="10">
+	<if test="!pageNo.equals('A'.toString()) and !pageCnt.equals('A'.toString())">
+	SELECT * FROM (
+	   SELECT A.*, ROW_NUMBER() OVER(ORDER BY BUYING_DATE desc) ORD_NUM, SUM(1) OVER(PARTITION BY 0) TOTALCNT FROM (
+	</if>
+	<if test="pageNo.equals('A'.toString()) or pageCnt.equals('A'.toString())">
+	SELECT * FROM (
+	   SELECT A.*, ROW_NUMBER() OVER(ORDER BY BUYING_DATE desc) ORD_NUM, SUM(1) OVER(PARTITION BY 0) TOTALCNT FROM (
+	</if>
+		SELECT X.CONTS_TYPE AS CONTS_TYPE,
+		  (SELECT FNC_GET_CATE_ID_LIST(X.CONTS_ID, #{contsGb}, #{nscGb}, CASE WHEN X.CONTS_TYPE='2' THEN 'Y' ELSE 'N' END) FROM DUAL) AS CAT_ID,
+		  X.ALBUM_ID AS CONTS_ID, X.CONTS_NAME, X.CHA_NUM, X.BUYING_DATE, X.BUYING_PRICE,                                                                                           
+		  X.EXPIRED_DATE, X.CP_USE_YN, X.AUTH_YN, X.RATING AS PR_INFO,                                                                                
+		  X.IS_HD, X.LICENSING_END AS LICENSING_WINDOW_END, X.POINT, X.CONTENT_VALUE AS IMG_FILE_NAME, X.CATEGORY_ID AS CATE_ID, X.SERIES_NO AS SERIES_DESC
+		  , X.GENRE_GB AS GENRE_GB, X.IS_RH AS REAL_HD,
+		  NVL((SELECT A.CATEGORY_ID||'|'||A.SERIES_NO
+		         FROM PT_VO_CATEGORY_MAP A, PT_VO_CATEGORY B
+		        WHERE A.CONTENTS_ID = X.ALBUM_ID AND NVL(A.viewing_flag, 'V') != 'N' AND A.CATEGORY_ID = B.CATEGORY_ID AND B.SERIES_YN = 'Y' AND B.CATEGORY_GB = #{contsGb}
+		          AND NVL(B.NSC_GB, 'LTE') = #{nscGb} AND (B.TEST_SBC = 'N' OR B.TEST_SBC IS NULL OR B.TEST_SBC = '') AND ROWNUM = 1), '|') SER_CAT_ID, 
+		  X.SERVICE_ICON SERVICE_GB, X.BALACE, X.PRESENT_YN, X.DATAFREE_YN DATAFREE_BUY_YN, X.DATAFREE_CP_USE_YN
+		  , X.DATAFREE_PRICE DATAFREE_BUYING_PRICE, X.DATAFREE_BALACE, X.REAL_BUYING_PRICE, X.REAL_DATAFREE_BUYING_PRICE
+		  , X.NSCREEN_YN, X.genre_small
+		   FROM                                                                                                                                        
+		       (                                                                                                                                       
+		        SELECT MAX(F.PRODUCT_TYPE) CONTS_TYPE,                                                                                               
+		               MAX(A.GENRE_NAME) CATEGORY_ID ,                                                                                              
+		               MIN(J.CONTENT_VALUE) CONTENT_VALUE,                                                                                           
+		               MAX(A.PRODUCT_ID) CONTS_ID ,                                                                                                  
+		               B.ADI_ALBUM_ID  ALBUM_ID ,                                                                                                      
+		               A.PRODUCT_NAME CONTS_NAME,                                                                                                    
+		               MAX(D.CHA_NUM) CHA_NUM,                                                                                                       
+		               A.BUY_DATE BUYING_DATE ,                                                                                                      
+		               MAX(NVL(A.BUY_AMT, 0)) BUYING_PRICE ,                                                                                         
+		               CASE WHEN A.REFUND_YN = 'P' THEN 'Y' ELSE 'N' END PRESENT_YN,                                                                 
+		               CASE WHEN A.REFUND_YN = 'P' THEN '' ELSE MAX(A.EXPIRED_DATE) END EXPIRED_DATE,                                                
+		               MAX(NVL(A.CP_USE_YN, 'N')) CP_USE_YN,                                                                                         
+		               MAX(NVL(D.AUTH_YN, 'N')) AUTH_YN  ,                                                                                           
+		               CASE WHEN MAX(NVL(G.RATING, ''))= '06' THEN '05' ELSE MAX(NVL(G.RATING, '')) END  RATING,                                     
+		               MAX(H.HDCONTENT) IS_HD,                                                                                                       
+		               MAX(G.LICENSING_WINDOW_END) LICENSING_END,                                                                                    
+		               TO_CHAR(ROUND(TO_NUMBER(NVL(B.POINT_SUM,'0'))                                                                                   
+		                             /(CASE WHEN NVL(B.POINT_CNT,'0')= '0' THEN 1 ELSE TO_NUMBER(NVL(B.POINT_CNT,'0')) END), 0)) POINT,              
+		               MAX(B.SERIES_NO) SERIES_NO,                                                                                                     
+		               CASE WHEN MAX(NVL(G.GENRE_LARGE, ''))= '방송' THEN 'T' ELSE 'V' END GENRE_GB,                                                   
+		               MAX(NVL(B.IS_RH, 'N')) IS_RH,                                                                                                   
+		               MAX(B.SERVICE_ICON_HDTV) SERVICE_ICON,                                                                                          
+		               MAX(NVL(A.BALACE, 0)) BALACE,
+		               MAX(NVL(A.DATAFREE_BALACE, 0)) DATAFREE_BALACE,
+		               <if test="possessionYn.equals('Y'.toString())">
+		               MAX(A.DATAFREE_YN) DATAFREE_YN ,
+		               MAX(A.DATAFREE_CP_USE_YN) DATAFREE_CP_USE_YN,
+		               MAX(A.DATAFREE_PRICE) DATAFREE_PRICE,
+		               </if>
+		               <if test="!possessionYn.equals('Y'.toString())">
+		               DATAFREE_YN ,
+		               DATAFREE_CP_USE_YN,
+		               DATAFREE_PRICE,
+		               </if>		               
+		               MAX(A.REAL_BUYING_PRICE) REAL_BUYING_PRICE,
+		               MAX(A.REAL_DATAFREE_BUYING_PRICE) REAL_DATAFREE_BUYING_PRICE,  
+		               MCUSTUSER.NUF_GET_NSCREEN_INFO(B.ADI_ALBUM_ID, #{testSbc}) AS NSCREEN_YN, 
+		               MAX(NVL(G.genre_small, ' ')) GENRE_SMALL
+		          FROM (
+		          	SELECT
+		          	   SA_ID,
+		          	   MAC_ADDR,
+		          	   PRODUCT_NAME,
+		          	   BUY_DATE,
+		          	   PRODUCT_ID,
+		          	   GENRE_NAME,
+		          	   MAX(REFUND_YN) REFUND_YN,
+		          	   MAX(BALACE) BALACE,
+		          	   MAX(DATAFREE_BALACE) DATAFREE_BALACE,
+		          	   EXPIRED_DATE,
+		          	   MAX(BUY_AMT) BUY_AMT,
+		          	   MAX(DATAFREE_YN) DATAFREE_YN,
+		          	   MAX(CP_USE_YN) CP_USE_YN,
+		          	   MAX(DATAFREE_CP_USE_YN) DATAFREE_CP_USE_YN,
+		          	   MAX(DATAFREE_PRICE) DATAFREE_PRICE,
+		          	   MAX(REAL_BUYING_PRICE) REAL_BUYING_PRICE,
+		          	   MAX(REAL_DATAFREE_BUYING_PRICE) REAL_DATAFREE_BUYING_PRICE
+		          	FROM (
+			          		SELECT SA_ID, MAC_ADDR,
+			          			BUY_DATE,
+			          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN SUBSTR(PRODUCT_ID, 1, LENGTH(PRODUCT_ID) - 2) ELSE PRODUCT_ID END PRODUCT_ID,
+			          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN 'Y' ELSE 'N' END DATAFREE_YN,
+			          			PRODUCT_NAME,
+			          			GENRE_NAME,
+			          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN ' ' ELSE REFUND_YN END REFUND_YN,
+			          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN ' ' ELSE BALACE END BALACE,
+			          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN BALACE ELSE ' ' END DATAFREE_BALACE,
+			          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN ' ' ELSE CP_USE_YN END CP_USE_YN,
+			          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN CP_USE_YN ELSE ' ' END DATAFREE_CP_USE_YN,
+			          			EXPIRED_DATE,
+			          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN '0' ELSE BUY_AMT END BUY_AMT,
+			          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN BUY_AMT ELSE '0' END DATAFREE_PRICE,
+			          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN '' ELSE ERROR_MSG END REAL_BUYING_PRICE,
+			          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN ERROR_MSG ELSE '' END REAL_DATAFREE_BUYING_PRICE
+			          		FROM PT_VO_BUY_NSC WHERE SA_ID = #{saId} AND MAC_ADDR = #{stbMac} AND NVL(regexp_substr(replace(replace(ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X')
+			          		GROUP BY SA_ID, MAC_ADDR, BUY_DATE, PRODUCT_ID, GENRE_NAME, PRODUCT_NAME, EXPIRED_DATE
+		        		) A ,                                                                                                                   
+		               IMCSUSER.PT_LA_ALBUM_MST B,                                                                                                     
+		               PT_VO_CATEGORY_MAP C,                                                                                                           
+		               PT_VO_CATEGORY D ,                                                                                                              
+		               IMCSUSER.PT_PD_PACKAGE_DETAIL E,                                                                                                
+		               IMCSUSER.PT_PD_PACKAGE F  ,                                                                                                     
+		               IMCSUSER.PT_LA_PACKAGE_ASSET I  ,                                                                                               
+		               IMCSUSER.PT_LA_TITLE_ASSET G,                                                                                                   
+		               IMCSUSER.PT_LA_CONTENT_ASSET H,                                                                                                 
+		               IMCSUSER.PT_LA_POSTER_ASSET J,
+		               IMCSUSER.PT_LA_RESERVE_ASSET K, <!-- 2018.07.24 권형도 -->
+		               IMCSUSER.PT_CD_CP_MST L <!-- 2018.07.24 권형도 -->                                                                                             
+		         WHERE B.ADI_ALBUM_ID = A.PRODUCT_ID                                                                                                   
+		           AND A.PRODUCT_ID = C.CONTENTS_ID                                                                                                    
+		           AND C.CATEGORY_ID = D.CATEGORY_ID
+		           AND NVL(C.viewing_flag, 'V') != 'N'                                                                                                   
+		           AND B.ADI_ALBUM_ID = I.NSC_ALBUM_ID                                                                                                 
+		           AND I.ASSET_ID = E.CONTENTS_ID                                                                                                      
+		           AND E.PRODUCT_ID = F.PRODUCT_ID                                                                                                     
+		           AND B.ADI_ALBUM_ID = I.NSC_ALBUM_ID                                                                                                 
+		           AND I.ADI_PRODUCT_ID = H.ADI_PRODUCT_ID                                                                                             
+		           AND I.ADI_PRODUCT_ID = G.ADI_PRODUCT_ID                                                                                             
+		           AND I.ADI_PRODUCT_ID = J.ADI_PRODUCT_ID
+		           AND J.POSTER_TYPE = 'P'
+		           AND J.ADI_PRODUCT_ID = K.ADI_PRODUCT_ID(+) <!-- 2018.07.24 권형도 --> 
+		           AND K.CP_ID = L.CP_ID(+) <!-- 2018.07.24 권형도 -->
+		           <if test="possessionYn.equals('Y'.toString())">
+		           AND TRUNC(TO_DATE((CASE WHEN NVL(A.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE A.EXPIRED_DATE END), 'YYYYMMDDHH24MISS')
+		                - TO_DATE(A.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) <![CDATA[>=]]> 2000 
+		           </if>
+		           <if test="possessionYn.equals('N'.toString())">
+		           AND TRUNC(TO_DATE((CASE WHEN NVL(A.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE A.EXPIRED_DATE END), 'YYYYMMDDHH24MISS')
+		           		- TO_DATE(A.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) <![CDATA[<]]> 2000 
+		           </if>
+		           <if test="!possessionYn.equals('Y'.toString())">
+		           AND A.BUY_DATE <![CDATA[>]]> TO_CHAR(ADD_MONTHS(SYSDATE,  - 12), 'YYYYMMDDHH24MISS') 
+		           </if>
+		           AND F.PRODUCT_TYPE IN ('0', '1')                                                                        
+		           AND D.CATEGORY_GB = 'NSC'
+		         <if test="possessionYn.equals('Y'.toString())">                                                                                                           
+		         GROUP BY B.ADI_ALBUM_ID ,  A.BUY_DATE , A.REFUND_YN, A.PRODUCT_NAME,                                                                  
+		                   B.POINT_SUM, B.POINT_CNT, D.CATEGORY_GB, A.REAL_BUYING_PRICE, A.REAL_DATAFREE_BUYING_PRICE 
+		         </if>
+		         <if test="!possessionYn.equals('Y'.toString())">
+		         AND (A.BUY_AMT + A.DATAFREE_PRICE) != 0                                                                                                           
+		         GROUP BY B.ADI_ALBUM_ID ,  A.BUY_DATE , A.REFUND_YN, A.PRODUCT_NAME,                                                                  
+		                   B.POINT_SUM, B.POINT_CNT, D.CATEGORY_GB, A.DATAFREE_YN, A.DATAFREE_CP_USE_YN, A.DATAFREE_PRICE, 
+		                   A.REAL_BUYING_PRICE, A.REAL_DATAFREE_BUYING_PRICE 
+		         </if>                                                                                    
+		        UNION ALL                                                                                                                              
+		        SELECT /*+ ORDERD USE_HASH(A) */
+		        	   MAX(F.PRODUCT_TYPE) CONTS_TYPE,                                                                                               
+		               MAX(A.GENRE_NAME)  CATEGORY_ID ,                                                                                              
+		               MIN(J.CONTENT_VALUE) CONTENT_VALUE,                                                                                           
+		               MAX(I.CONTENTS_ID) CONTS_ID ,                                                                                                 
+		               F.PRODUCT_ID  ALBUM_ID ,                                                                                                        
+		               F.PRODUCT_NAME CONTS_NAME,                                                                                                    
+		               MAX(D.CHA_NUM) CHA_NUM,                                                                                                       
+		               A.BUY_DATE BUYING_DATE ,                                                                                                      
+		               MAX(NVL(A.BUY_AMT, 0)) BUYING_PRICE ,                                                                                         
+		               CASE WHEN A.REFUND_YN = 'P' THEN 'Y' ELSE 'N' END PRESENT_YN,                                                                 
+		               CASE WHEN A.REFUND_YN = 'P' THEN '' ELSE MAX(A.EXPIRED_DATE) END EXPIRED_DATE,                                                
+		               MAX(NVL(A.CP_USE_YN, 'N')) CP_USE_YN,                                                                                         
+		               MAX(NVL(D.AUTH_YN, 'N')) AUTH_YN  ,                                                                                           
+		               CASE WHEN MAX(NVL(G.RATING, ''))= '06' THEN '05' ELSE MAX(NVL(G.RATING, '')) END  RATING,                                     
+		               MAX(H.HDCONTENT) IS_HD,                                                                                                       
+		               MAX(G.LICENSING_WINDOW_END) LICENSING_END,                                                                                    
+		               '' POINT,                                                                                                                     
+		               '' SERIES_NO,                                                                                                                   
+		               CASE WHEN MAX(NVL(G.GENRE_LARGE, ''))= '방송' THEN 'T' ELSE 'V' END GENRE_GB,                                                   
+		               '' IS_RH,                                                                                                                       
+		               '' SERVICE_ICON,                                                                                                                
+		               MAX(NVL(A.BALACE, 0)) BALACE,
+		               MAX(NVL(A.DATAFREE_BALACE, 0)) DATAFREE_BALACE,
+		              <if test="possessionYn.equals('Y'.toString())">
+		               MAX(A.DATAFREE_YN) DATAFREE_YN ,
+		               MAX(A.DATAFREE_CP_USE_YN) DATAFREE_CP_USE_YN,
+		               MAX(A.DATAFREE_PRICE) DATAFREE_PRICE,
+		               </if>
+		               <if test="!possessionYn.equals('Y'.toString())">
+		               DATAFREE_YN ,
+		               DATAFREE_CP_USE_YN,
+		               DATAFREE_PRICE,
+		               </if>	
+		               MAX(A.REAL_BUYING_PRICE) REAL_BUYING_PRICE,
+		               MAX(A.REAL_DATAFREE_BUYING_PRICE) REAL_DATAFREE_BUYING_PRICE,
+		               'N' AS NSCREEN_YN,
+		               MAX(NVL(G.genre_small, ' ')) GENRE_SMALL
+		          FROM (
+		          	SELECT
+		          	   SA_ID,
+		          	   MAC_ADDR,
+		          	   PRODUCT_NAME,
+		          	   BUY_DATE,
+		          	   PRODUCT_ID,
+		          	   GENRE_NAME,
+		          	   MAX(REFUND_YN) REFUND_YN,
+		          	   MAX(BALACE) BALACE,
+		          	   MAX(DATAFREE_BALACE) DATAFREE_BALACE,
+		          	   EXPIRED_DATE,
+		          	   MAX(BUY_AMT) BUY_AMT,
+		          	   MAX(DATAFREE_YN) DATAFREE_YN,
+		          	   MAX(CP_USE_YN) CP_USE_YN,
+		          	   MAX(DATAFREE_CP_USE_YN) DATAFREE_CP_USE_YN,
+		          	   MAX(DATAFREE_PRICE) DATAFREE_PRICE,
+		          	   MAX(REAL_BUYING_PRICE) REAL_BUYING_PRICE,
+		          	   MAX(REAL_DATAFREE_BUYING_PRICE) REAL_DATAFREE_BUYING_PRICE
+		          	FROM (
+		          		SELECT SA_ID, MAC_ADDR,
+		          			BUY_DATE,
+		          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN SUBSTR(PRODUCT_ID, 1, LENGTH(PRODUCT_ID) - 2) ELSE PRODUCT_ID END PRODUCT_ID,
+		          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN 'Y' ELSE 'N' END DATAFREE_YN,
+		          			PRODUCT_NAME,
+		          			GENRE_NAME,
+		          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN ' ' ELSE REFUND_YN END REFUND_YN,
+		          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN ' ' ELSE BALACE END BALACE,
+		          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN BALACE ELSE ' ' END DATAFREE_BALACE,
+		          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN ' ' ELSE CP_USE_YN END CP_USE_YN,
+		          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN CP_USE_YN ELSE ' ' END DATAFREE_CP_USE_YN,
+		          			EXPIRED_DATE,
+		          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN '0' ELSE BUY_AMT END BUY_AMT,
+		          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN BUY_AMT ELSE '0' END DATAFREE_PRICE,
+		          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN '' ELSE ERROR_MSG END REAL_BUYING_PRICE,
+		          			CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN ERROR_MSG ELSE '' END REAL_DATAFREE_BUYING_PRICE
+		          		FROM PT_VO_BUY_NSC WHERE SA_ID = #{saId} AND MAC_ADDR = #{stbMac} AND NVL(regexp_substr(replace(replace(ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X')
+		          		GROUP BY SA_ID, MAC_ADDR, BUY_DATE, PRODUCT_ID, GENRE_NAME, PRODUCT_NAME, EXPIRED_DATE
+		        	   ) A ,                                                                                                                   
+		               IMCSUSER.PT_LA_PACKAGE_ASSET B,                                                                                                 
+		               PT_VO_CATEGORY_MAP C,                                                                                                           
+		               PT_VO_CATEGORY D ,                                                                                                              
+		               IMCSUSER.PT_PD_PACKAGE_DETAIL E,                                                                                                
+		               IMCSUSER.PT_PD_PACKAGE F ,                                                                                                      
+		               IMCSUSER.PT_LA_TITLE_ASSET G,                                                                                                   
+		               IMCSUSER.PT_LA_CONTENT_ASSET H,                                                                                                 
+		               PT_VO_BUY_DETAIL_NSC I,                                                                                                             
+		               IMCSUSER.PT_LA_POSTER_ASSET J                                                                                                   
+		         WHERE B.ASSET_ID = E.CONTENTS_ID                                                                                                      
+		           AND B.NSC_ALBUM_ID = C.CONTENTS_ID                                                                                                  
+		           AND C.CATEGORY_ID = D.CATEGORY_ID
+		           AND NVL(C.viewing_flag, 'V') != 'N'                                                                                                   
+		           AND E.PRODUCT_ID = F.PRODUCT_ID                                                                                                     
+		           AND A.SA_ID = I.SA_ID                                                                                                               
+		           AND A.MAC_ADDR = I.MAC_ADDR                                                                                                         
+		           AND A.BUY_DATE = I.BUY_DATE                                                                                                         
+		           AND A.PRODUCT_ID = I.PRODUCT_ID                                                                                                     
+		           AND F.PRODUCT_ID = A.PRODUCT_ID                                                                                                     
+		           AND I.CONTENTS_ID =    B.NSC_ALBUM_ID                                                                                               
+		           AND B.ADI_PRODUCT_ID = H.ADI_PRODUCT_ID                                                                                             
+		           AND B.ADI_PRODUCT_ID = G.ADI_PRODUCT_ID                                                                                             
+		           AND B.ADI_PRODUCT_ID = J.ADI_PRODUCT_ID
+		           AND J.POSTER_TYPE = 'P'                                                                                                         
+		           AND F.PRODUCT_TYPE = '2'
+		           <if test="possessionYn.equals('Y'.toString())">
+		           AND TRUNC(TO_DATE((CASE WHEN NVL(A.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE A.EXPIRED_DATE END), 'YYYYMMDDHH24MISS')
+		           		- TO_DATE(A.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) <![CDATA[>=]]> 2000 
+		           </if>
+		           <if test="possessionYn.equals('N'.toString())">
+		           AND A.BUY_DATE <![CDATA[>]]> TO_CHAR(ADD_MONTHS(SYSDATE,  - 12), 'YYYYMMDDHH24MISS') 
+		           AND TRUNC(TO_DATE((CASE WHEN NVL(A.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE A.EXPIRED_DATE END), 'YYYYMMDDHH24MISS')
+		           		 - TO_DATE(A.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) <![CDATA[<]]> 2000  
+		           </if>
+		           <if test="!possessionYn.equals('Y'.toString())">
+		           AND A.BUY_DATE <![CDATA[>]]> TO_CHAR(ADD_MONTHS(SYSDATE,  - 12), 'YYYYMMDDHH24MISS') 
+		           </if>	                                                            
+		           AND D.CATEGORY_GB = 'NSC'
+		         <if test="possessionYn.equals('Y'.toString())">                                                                                                           
+		         GROUP BY F.PRODUCT_ID , A.BUY_DATE, A.REFUND_YN , F.PRODUCT_NAME, D.CATEGORY_GB, A.REAL_BUYING_PRICE, A.REAL_DATAFREE_BUYING_PRICE
+		         </if>
+		         <if test="!possessionYn.equals('Y'.toString())">                                                                                                           
+		         GROUP BY F.PRODUCT_ID , A.BUY_DATE, A.REFUND_YN , F.PRODUCT_NAME, D.CATEGORY_GB, A.DATAFREE_YN, A.DATAFREE_CP_USE_YN, A.DATAFREE_PRICE,
+		         		A.REAL_BUYING_PRICE, A.REAL_DATAFREE_BUYING_PRICE
+		         </if>                                                       
+		         ORDER BY BUYING_DATE DESC                                                                                                           
+		           ) X                                                                                                                                 
+		   GROUP BY X.CONTS_TYPE , X.CATEGORY_ID, X.CONTENT_VALUE , X.CONTS_ID , X.ALBUM_ID ,X.CONTS_NAME ,                                  
+		            X.CHA_NUM , X.BUYING_DATE , X.BUYING_PRICE , X.EXPIRED_DATE , X.CP_USE_YN ,                                              
+		            X.AUTH_YN , X.RATING , X.IS_HD , X.LICENSING_END , X.POINT, X.SERIES_NO, X.GENRE_GB, X.IS_RH, X.SERVICE_ICON,            
+		            X.BALACE, X.PRESENT_YN,  X.DATAFREE_YN , X.DATAFREE_CP_USE_YN, X.DATAFREE_PRICE , x.DATAFREE_BALACE,
+		            X.REAL_BUYING_PRICE, X.REAL_DATAFREE_BUYING_PRICE, X.NSCREEN_YN, X.genre_small
+		   ORDER BY BUYING_DATE DESC                                                                        
+	<if test="!pageNo.equals('A'.toString()) and !pageCnt.equals('A'.toString())">
+		) A
+		<!-- WHERE A.genre_small not in (
+             select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) >= '20190307' then 'SBS' else 'X' end
+               from dual
+             union
+             select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) >= '20190312' then 'KBS' else 'X' end
+               from dual
+             union
+             select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) >= '20190315' then 'MBC' else 'X' end
+               from dual
+            ) -->
+		) X
+		WHERE rownum <![CDATA[<=]]> 300 AND X.ORD_NUM <![CDATA[>=]]> ((TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt})) - (TO_NUMBER(#{pageCnt}) - 1))
+		    AND X.ORD_NUM <![CDATA[<=]]> (TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt}))
+	</if>
+	<if test="pageNo.equals('A'.toString()) or pageCnt.equals('A'.toString())">
+		) A 
+	 		<!-- WHERE A.genre_small not in (
+	                             select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) <![CDATA[>=]]> '20190307' then 'SBS' else 'X' end
+	                               from dual
+	                             union
+	                             select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) <![CDATA[>=]]> '20190312' then 'KBS' else 'X' end
+	                               from dual
+	                             union
+	                             select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) <![CDATA[>=]]> '20190315' then 'MBC' else 'X' end
+	                               from dual
+	                            ) -->
+	   ) X
+	   WHERE rownum <![CDATA[<=]]> 300
+	</if>
+	</select>
+	
+	<!-- 엔스크린 인 경우 구매내역 리스트 -->
+	<select id="getNSPurchasedListNsc2" parameterType="GetNSPurchasedRequestVO" resultType="GetNSPurchasedResponseVO" timeout="10">
+	<if test="!pageNo.equals('A'.toString()) and !pageCnt.equals('A'.toString())">
+	SELECT * FROM (
+	   SELECT A.*, ROW_NUMBER() OVER(ORDER BY BUYING_DATE desc) ORD_NUM, SUM(1) OVER(PARTITION BY 0) TOTALCNT FROM (
+	</if>
+	<if test="pageNo.equals('A'.toString()) or pageCnt.equals('A'.toString())">
+	SELECT * FROM (
+	   SELECT A.*, ROW_NUMBER() OVER(ORDER BY BUYING_DATE desc) ORD_NUM, SUM(1) OVER(PARTITION BY 0) TOTALCNT FROM (
+	</if>
+		SELECT X.CONTS_TYPE AS CONTS_TYPE,
+		  (SELECT FNC_GET_CATE_ID_LIST(X.ALBUM_ID, #{contsGb}, #{nscGb}, CASE WHEN X.CONTS_TYPE='2' THEN 'Y' ELSE 'N' END) FROM DUAL) AS CAT_ID,
+		  X.ALBUM_ID AS CONTS_ID, X.CONTS_NAME, X.CHA_NUM, X.BUYING_DATE, X.BUYING_PRICE,      
+		  X.EXPIRED_DATE, X.CP_USE_YN, X.AUTH_YN, X.RATING AS PR_INFO,   
+		  X.IS_HD, X.LICENSING_END AS LICENSING_WINDOW_END, X.POINT, X.CONTENT_VALUE AS IMG_FILE_NAME, X.CATEGORY_ID AS CATE_ID, X.SERIES_NO AS SERIES_DESC
+		  , X.GENRE_GB AS GENRE_GB, X.IS_RH AS REAL_HD,
+		  NVL((SELECT A.CATEGORY_ID||'|'||A.SERIES_NO
+		         FROM PT_VO_CATEGORY_MAP A, PT_VO_CATEGORY B
+		        WHERE A.CONTENTS_ID = X.ALBUM_ID AND NVL(A.viewing_flag, 'V') != 'N' AND A.CATEGORY_ID = B.CATEGORY_ID AND B.SERIES_YN = 'Y' AND B.CATEGORY_GB = #{contsGb}
+		          AND NVL(B.NSC_GB, 'LTE') = #{nscGb} AND (B.TEST_SBC = 'N' OR B.TEST_SBC IS NULL OR B.TEST_SBC = '') AND ROWNUM = 1), '|') SER_CAT_ID, 
+		  X.SERVICE_ICON SERVICE_GB, X.BALACE, X.PRESENT_YN, X.DATAFREE_YN DATAFREE_BUY_YN, X.DATAFREE_CP_USE_YN
+		  , X.DATAFREE_PRICE DATAFREE_BUYING_PRICE, X.DATAFREE_BALACE, X.REAL_BUYING_PRICE
+		  , X.REAL_DATAFREE_BUYING_PRICE
+		  ,  X.nscreen_yn as nscreen_yn, X.genre_small
+		   FROM     
+		    ( 
+			select /*+ USE_NL( A I G H J B C D E F ) */ 
+				MAX(F.PRODUCT_TYPE) CONTS_TYPE, 
+				MIN(C.CATEGORY_ID) CATEGORY_ID ,
+				MIN(J.CONTENT_VALUE) CONTENT_VALUE,
+				B.ADI_ALBUM_ID  CONTS_ID ,
+				B.ADI_ALBUM_ID  ALBUM_ID , 
+				A.PRODUCT_NAME CONTS_NAME,
+				MAX(D.CHA_NUM) CHA_NUM, 
+				A.BUY_DATE BUYING_DATE , 
+				MAX(NVL(A.BUY_AMT, 0)) BUYING_PRICE ,
+		        CASE WHEN A.REFUND_YN = 'P' THEN 'Y' ELSE 'N' END PRESENT_YN,                                                                 
+		        CASE WHEN A.REFUND_YN = 'P' THEN '' ELSE MAX(A.EXPIRED_DATE) END EXPIRED_DATE,                                                
+		        MAX(NVL(A.CP_USE_YN, 'N')) CP_USE_YN,                                                                                         
+		        MAX(NVL(D.AUTH_YN, 'N')) AUTH_YN  ,                                                                                           
+		        CASE WHEN MAX(NVL(G.RATING, ''))= '06' THEN '05' ELSE MAX(NVL(G.RATING, '')) END  RATING,                                     
+		        MAX(H.HDCONTENT) IS_HD,                                                                                                       
+		        MAX(G.LICENSING_WINDOW_END) LICENSING_END,                                                                                    
+		        TO_CHAR(ROUND(TO_NUMBER(NVL(B.POINT_SUM,'0'))                                                                                   
+		                      /(CASE WHEN NVL(B.POINT_CNT,'0')= '0' THEN 1 ELSE TO_NUMBER(NVL(B.POINT_CNT,'0')) END), 0)) POINT,              
+		        MAX(B.SERIES_NO) SERIES_NO,                                                                                                     
+		        CASE WHEN MAX(NVL(G.GENRE_LARGE, ''))= '방송' THEN 'T' ELSE 'V' END GENRE_GB,                                                   
+		        MAX(NVL(B.IS_RH, 'N')) IS_RH,                                                                                                   
+		        MAX(B.SERVICE_ICON_HDTV) SERVICE_ICON,                                                                                          
+		        MAX(NVL(A.BALACE, 0)) BALACE,
+		        MAX(NVL(A.DATAFREE_BALACE, 0)) DATAFREE_BALACE,
+		        MCUSTUSER.NUF_GET_NSCREEN_INFO(B.ADI_ALBUM_ID, #{testSbc}) AS nscreen_yn,
+		        <if test="possessionYn.equals('Y'.toString())">
+		        MAX(A.DATAFREE_YN) DATAFREE_YN ,
+		        MAX(A.DATAFREE_CP_USE_YN) DATAFREE_CP_USE_YN,
+		        MAX(A.DATAFREE_PRICE) DATAFREE_PRICE,
+		        </if>
+		        <if test="!possessionYn.equals('Y'.toString())">
+		        DATAFREE_YN ,
+		        DATAFREE_CP_USE_YN,
+		        DATAFREE_PRICE,
+		        </if>		               
+		        MAX(A.REAL_BUYING_PRICE) REAL_BUYING_PRICE,
+		        MAX(A.REAL_DATAFREE_BUYING_PRICE) REAL_DATAFREE_BUYING_PRICE,
+		        MAX(NVL(G.genre_small, ' ')) GENRE_SMALL                                                                                       
+		          FROM (
+		          	SELECT
+		          	   SA_ID,
+		          	   MAC_ADDR,
+		          	   X.PRODUCT_NAME,
+		          	   BUY_DATE,
+		          	   X.PRODUCT_ID,
+		          	   GENRE_NAME,
+		          	   MAX(REFUND_YN) REFUND_YN,
+		          	   MAX(BALACE) BALACE,
+		          	   MAX(DATAFREE_BALACE) DATAFREE_BALACE,
+		          	   X.EXPIRED_DATE,
+		          	   MAX(BUY_AMT) BUY_AMT,
+		          	   MAX(DATAFREE_YN) DATAFREE_YN,
+		          	   MAX(CP_USE_YN) CP_USE_YN,
+		          	   MAX(DATAFREE_CP_USE_YN) DATAFREE_CP_USE_YN,
+		          	   MAX(DATAFREE_PRICE) DATAFREE_PRICE,
+		          	   MAX(REAL_BUYING_PRICE) REAL_BUYING_PRICE,
+		          	   MAX(REAL_DATAFREE_BUYING_PRICE) REAL_DATAFREE_BUYING_PRICE,
+				   	   Y.ADI_ALBUM_ID
+		          	FROM (
+			          SELECT SA_ID, MAC_ADDR,
+						<choose>
+							<when test="!possessionYn.equals('Y'.toString()) and !possessionYn.equals('N'.toString())">
+								BUY_DATE
+								, CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN SUBSTR(PRODUCT_ID, 1, LENGTH(PRODUCT_ID) - 2) ELSE PRODUCT_ID END PRODUCT_ID
+								, CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN 'Y' ELSE 'N' END DATAFREE_YN
+								, PRODUCT_NAME
+								, GENRE_NAME
+								, CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN ' ' ELSE REFUND_YN END REFUND_YN
+								, CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN ' ' ELSE BALACE END BALACE
+								, CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN BALACE ELSE ' ' END DATAFREE_BALACE
+								, CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN ' ' ELSE CP_USE_YN END CP_USE_YN
+								, CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN CP_USE_YN ELSE ' ' END DATAFREE_CP_USE_YN
+								, EXPIRED_DATE
+								, CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN '0' ELSE BUY_AMT END BUY_AMT
+								, CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN BUY_AMT ELSE '0' END DATAFREE_PRICE
+								, CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN '' ELSE ERROR_MSG END REAL_BUYING_PRICE
+								, CASE WHEN SUBSTR(PRODUCT_ID, LENGTH(PRODUCT_ID) - 1) = '_D' THEN ERROR_MSG ELSE '' END REAL_DATAFREE_BUYING_PRICE
+							</when>
+							<otherwise>
+								BUY_DATE,
+						        PRODUCT_ID AS PRODUCT_ID,
+						        'N' AS DATAFREE_YN,
+						        PRODUCT_NAME,
+						        GENRE_NAME,
+						        REFUND_YN AS REFUND_YN,
+						        BALACE AS BALACE,
+						        ' ' AS DATAFREE_BALACE,
+						        CP_USE_YN AS CP_USE_YN, 
+						        ' ' AS DATAFREE_CP_USE_YN,
+						        EXPIRED_DATE,
+						        BUY_AMT AS BUY_AMT,
+						        '0' AS DATAFREE_PRICE,
+						        ERROR_MSG AS REAL_BUYING_PRICE,
+						        '' AS REAL_DATAFREE_BUYING_PRICE 
+							</otherwise>
+						</choose>
+				    FROM PT_VO_BUY WHERE SA_ID = #{nSaId} AND NVL(regexp_substr(replace(replace(ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+				    ) X, 
+				    IMCSUSER.PT_LA_PACKAGE_ASSET Y,
+				    IMCSUSER.PT_PD_PACKAGE_DETAIL V,
+				    IMCSUSER.PT_PD_PACKAGE W 
+				    WHERE X.PRODUCT_ID = Y.ASSET_ID 
+					  AND Y.ASSET_ID = V.CONTENTS_ID
+					  AND V.PRODUCT_ID = W.PRODUCT_ID 
+					  AND W.PRODUCT_TYPE = '1' 
+				    GROUP BY SA_ID, MAC_ADDR, BUY_DATE, X.PRODUCT_ID, GENRE_NAME, X.PRODUCT_NAME, X.EXPIRED_DATE, ADI_ALBUM_ID) A , 
+				               imcsuser.pt_la_Album_mst B, 
+				               PT_VO_CATEGORY_MAP C, 
+				               PT_VO_CATEGORY D , 
+				               IMCSUSER.PT_PD_PACKAGE_DETAIL E, 
+				               IMCSUSER.PT_PD_PACKAGE F  , 
+				               IMCSUSER.PT_LA_PACKAGE_ASSET I  , 
+				               IMCSUSER.PT_LA_TITLE_ASSET G, 
+					           IMCSUSER.PT_LA_CONTENT_ASSET H,
+					           IMCSUSER.PT_LA_POSTER_ASSET J,
+					           IMCSUSER.PT_LA_RESERVE_ASSET K,
+					           IMCSUSER.PT_CD_CP_MST L 
+					 WHERE I.NSC_ALBUM_ID = A.ADI_ALBUM_ID 
+					   AND I.NSC_ALBUM_ID = B.ADI_ALBUM_ID 
+					   AND B.ADI_ALBUM_ID = C.CONTENTS_ID 
+					   AND C.CATEGORY_ID = D.CATEGORY_ID
+					   AND NVL(C.viewing_flag, 'V') != 'N'
+					   AND I.ASSET_ID = E.CONTENTS_ID 
+					   AND E.PRODUCT_ID = F.PRODUCT_ID 
+					   AND B.ADI_ALBUM_ID = I.NSC_ALBUM_ID 
+					   AND I.ADI_PRODUCT_ID = H.ADI_PRODUCT_ID 
+					   AND I.ADI_PRODUCT_ID = G.ADI_PRODUCT_ID 
+					   AND I.ADI_PRODUCT_ID = J.ADI_PRODUCT_ID
+					   AND J.POSTER_TYPE = 'P' 
+					   AND J.ADI_PRODUCT_ID = K.ADI_PRODUCT_ID(+)
+					   <if test="possessionYn.equals('Y'.toString())">
+						   AND TRUNC(TO_DATE((CASE WHEN NVL(A.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE A.EXPIRED_DATE END), 'YYYYMMDDHH24MISS') 
+							- TO_DATE(A.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) <![CDATA[ >= ]]> 2000
+					   </if>
+					   <if test="possessionYn.equals('N'.toString())">
+						   AND TRUNC(TO_DATE((CASE WHEN NVL(A.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE A.EXPIRED_DATE END), 'YYYYMMDDHH24MISS')
+							- TO_DATE(A.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) <![CDATA[ < ]]> 2000
+					   </if>
+					   <if test="!possessionYn.equals('Y'.toString())">
+					   		AND A.buy_date <![CDATA[ > ]]> TO_CHAR(ADD_MONTHS(SYSDATE,  - 12), 'YYYYMMDDHH24MISS')
+					   		AND (A.BUY_AMT + A.DATAFREE_PRICE) != 0
+					   </if>
+					   AND F.PRODUCT_TYPE IN ('0', '1') 
+					   AND D.CATEGORY_GB = 'NSC' 
+					   AND K.CP_ID = L.CP_ID(+) 
+					   <!-- AND G.VERSION_MAJOR = 'Y' -->
+					   <if test="nscListYn.equals('Y') and testSbc.equals('N')">
+						AND NVL(D.TEST_SBC, 'N') = 'N'
+					   </if>
+					   <if test="possessionYn.equals('Y'.toString())">
+						 GROUP BY B.ADI_ALBUM_ID ,  A.BUY_DATE , A.REFUND_YN, A.PRODUCT_NAME, 
+							   B.POINT_SUM, B.POINT_CNT, D.CATEGORY_GB, REAL_BUYING_PRICE, REAL_DATAFREE_BUYING_PRICE 
+					   </if>
+					   <if test="!possessionYn.equals('Y'.toString())">
+					   	GROUP BY B.ADI_ALBUM_ID, A.buy_date, A.REFUND_YN, A.product_name,
+					   		B.point_sum, B.point_cnt, D.category_gb, DATAFREE_YN, DATAFREE_CP_USE_YN, DATAFREE_PRICE,
+					   		REAL_BUYING_PRICE, REAL_DATAFREE_BUYING_PRICE
+					   </if>
+					UNION ALL 
+					SELECT /*+ USE_NL( A B G H J C D ) */ '1' CONTS_TYPE, 
+					       MIN(C.CATEGORY_ID) CATEGORY_ID , 
+					       MIN(J.CONTENT_VALUE) CONTENT_VALUE, 
+					       MAX(B.NSC_ALBUM_ID) CONTS_ID , 
+					       B.NSC_ALBUM_ID ALBUM_ID ,  
+					       MAX(C.CONTENTS_NAME) CONTS_NAME, 
+					       MAX(D.CHA_NUM) CHA_NUM, 
+					       A.BUY_DATE BUYING_DATE , 
+					       MAX(NVL(A.BUY_AMT, 0)) BUYING_PRICE , 
+					       CASE WHEN A.REFUND_YN = 'P' THEN 'Y' ELSE 'N' END PRESENT_YN, 
+					       CASE WHEN A.REFUND_YN = 'P' THEN '' ELSE MAX(A.EXPIRED_DATE) END EXPIRED_DATE, 
+					       MAX(NVL(A.CP_USE_YN, 'N')) CP_USE_YN, 
+					       MAX(NVL(D.AUTH_YN, 'N')) AUTH_YN  , 
+					       CASE WHEN MAX(NVL(G.RATING, ''))= '06' THEN '05' ELSE MAX(NVL(G.RATING, '')) END  RATING, 
+					       MAX(H.HDCONTENT) IS_HD, 
+					       MAX(G.LICENSING_WINDOW_END) LICENSING_END, 
+					       '' POINT, 
+					       '' SERIES_NO, 
+					       CASE WHEN MAX(NVL(G.GENRE_LARGE, ''))= '방송' THEN 'T' ELSE 'V' END GENRE_GB, 
+					       '' IS_RH, 
+					       '' SERVICE_ICON, 
+					       MAX(NVL(A.BALACE, 0)) BALACE
+					       , MAX(NVL(DATAFREE_BALACE, 0)) DATAFREE_BALACE
+					       , MCUSTUSER.NUF_GET_NSCREEN_INFO(B.NSC_ALBUM_ID, #{testSbc}) AS nscreen_yn
+					       <if test="possessionYn.equals('Y'.toString())">
+						       , MAX(DATAFREE_YN) DATAFREE_YN 
+						       , MAX(DATAFREE_CP_USE_YN) DATAFREE_CP_USE_YN 
+						       , MAX(DATAFREE_PRICE) DATAFREE_PRICE 
+					       </if>
+					       <if test="!possessionYn.equals('Y'.toString())">
+					       		, DATAFREE_YN
+								, DATAFREE_CP_USE_YN
+								, DATAFREE_PRICE
+					       </if>
+						   , MAX(REAL_BUYING_PRICE) REAL_BUYING_PRICE
+						   , MAX(REAL_DATAFREE_BUYING_PRICE) REAL_DATAFREE_BUYING_PRICE,
+						   MAX(NVL(G.genre_small, ' ')) GENRE_SMALL			   
+					  FROM 
+				(SELECT 
+				    SA_ID 
+				    , MAC_ADDR 
+				    , X.PRODUCT_NAME 
+				    , BUY_DATE 
+				    , X.PRODUCT_ID 
+				    , GENRE_NAME 
+				    , MAX(REFUND_YN) REFUND_YN 
+				    , MAX(BALACE) BALACE 
+				    , MAX(DATAFREE_BALACE) DATAFREE_BALACE 
+				    , X.EXPIRED_DATE 
+				    , MAX(BUY_AMT) BUY_AMT 
+				    , MAX(DATAFREE_YN) DATAFREE_YN 
+				    , MAX(CP_USE_YN) CP_USE_YN 
+				    , MAX(DATAFREE_CP_USE_YN) DATAFREE_CP_USE_YN 
+				    , MAX(DATAFREE_PRICE) DATAFREE_PRICE 
+				    , MAX(REAL_BUYING_PRICE) REAL_BUYING_PRICE 
+				    , MAX(REAL_DATAFREE_BUYING_PRICE) REAL_DATAFREE_BUYING_PRICE 
+				    , C.ADI_ALBUM_ID 
+				    , A.PRODUCT_TYPE 
+				FROM( 
+				    SELECT SA_ID, MAC_ADDR 
+						, BUY_DATE 
+						, PRODUCT_ID AS PRODUCT_ID 
+						, 'N' AS DATAFREE_YN 
+						, PRODUCT_NAME 
+						, GENRE_NAME 
+						, REFUND_YN AS REFUND_YN 
+						, BALACE AS BALACE 
+						, ' ' AS DATAFREE_BALACE 
+						, CP_USE_YN AS CP_USE_YN 
+						, ' ' AS DATAFREE_CP_USE_YN 
+						, EXPIRED_DATE 
+						, BUY_AMT AS BUY_AMT 
+						, '0' AS DATAFREE_PRICE 
+						, ERROR_MSG AS REAL_BUYING_PRICE 
+						, '' AS REAL_DATAFREE_BUYING_PRICE 
+				    FROM PT_VO_BUY WHERE SA_ID = #{nSaId} AND NVL(regexp_substr(replace(replace(ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+				    ) X, 
+					 IMCSUSER.PT_PD_PACKAGE A, 
+					 IMCSUSER.PT_PD_PACKAGE_DETAIL B, 
+					 IMCSUSER.PT_LA_PACKAGE_ASSET C 
+				    WHERE X.PRODUCT_ID = A.PRODUCT_ID 
+				      AND LENGTH(X.PRODUCT_ID) = 5 
+				      AND A.PRODUCT_TYPE = '2' 
+				      AND A.PRODUCT_ID = B.PRODUCT_ID 
+				      AND B.CONTENTS_ID = C.ASSET_ID 
+				    GROUP BY SA_ID, MAC_ADDR, BUY_DATE, X.PRODUCT_ID, GENRE_NAME, X.PRODUCT_NAME, X.EXPIRED_DATE, ADI_ALBUM_ID, A.PRODUCT_TYPE) A , 
+					       IMCSUSER.PT_LA_PACKAGE_ASSET B, 
+					       PT_VO_CATEGORY_MAP C, 
+					       PT_VO_CATEGORY D , 
+					       IMCSUSER.PT_LA_TITLE_ASSET G, 
+					       IMCSUSER.PT_LA_CONTENT_ASSET H, 
+					       IMCSUSER.PT_LA_POSTER_ASSET J,
+					       IMCSUSER.PT_LA_RESERVE_ASSET K,
+					       IMCSUSER.PT_CD_CP_MST L 
+					 WHERE B.NSC_ALBUM_ID = A.ADI_ALBUM_ID 
+					   AND B.NSC_ALBUM_ID = C.CONTENTS_ID 
+					   AND C.CATEGORY_ID = D.CATEGORY_ID
+					   AND NVL(C.viewing_flag, 'V') != 'N' 
+					   AND B.ADI_PRODUCT_ID = H.ADI_PRODUCT_ID 
+					   AND B.ADI_PRODUCT_ID = G.ADI_PRODUCT_ID 
+					   AND B.ADI_PRODUCT_ID = J.ADI_PRODUCT_ID
+					   AND J.POSTER_TYPE = 'P'
+					   AND J.ADI_PRODUCT_ID = K.ADI_PRODUCT_ID(+)
+					   AND K.CP_ID = L.CP_ID(+) 
+					   <if test="possessionYn.equals('Y'.toString())">
+						   AND TRUNC(TO_DATE((CASE WHEN NVL(A.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE A.EXPIRED_DATE END), 'YYYYMMDDHH24MISS') 
+								- TO_DATE(A.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) <![CDATA[ >= ]]> 2000 
+					   </if>
+					   <if test="possessionYn.equals('N'.toString())">
+						   AND TRUNC(TO_DATE((CASE WHEN NVL(A.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE A.EXPIRED_DATE END), 'YYYYMMDDHH24MISS')
+								- TO_DATE(A.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) <![CDATA[ < ]]> 2000 
+					   </if>
+					   <if test="!possessionYn.equals('Y'.toString())">
+					   		AND A.buy_date <![CDATA[ > ]]> TO_CHAR(ADD_MONTHS(SYSDATE, - 12), 'YYYYMMDDHH24MISS') 
+					   </if>
+					   AND D.CATEGORY_GB = 'NSC' 
+					   <!-- AND G.VERSION_MAJOR = 'Y'  -->
+					   <if test="nscListYn.equals('Y') and testSbc.equals('N')">
+					        AND NVL(D.TEST_SBC, 'N') = 'N'
+					   </if>
+					   <if test="possessionYn.equals('Y'.toString())">
+					 	GROUP BY B.NSC_ALBUM_ID, A.BUY_DATE , A.REFUND_YN, D.CATEGORY_GB, REAL_BUYING_PRICE
+					 		, REAL_DATAFREE_BUYING_PRICE 
+					   </if>
+					   <if test="!possessionYn.equals('Y'.toString())">
+					 	GROUP BY B.nsc_album_id, A.buy_date, A.REFUND_YN, D.category_gb , DATAFREE_YN
+					 		, DATAFREE_CP_USE_YN , DATAFREE_PRICE, REAL_BUYING_PRICE, REAL_DATAFREE_BUYING_PRICE
+					   </if>
+					 ORDER BY BUYING_DATE DESC 
+					   ) X where X.NSCREEN_YN like 'Y%'
+				   GROUP BY X.CONTS_TYPE , X.CATEGORY_ID, X.CONTENT_VALUE , X.CONTS_ID , X.ALBUM_ID ,X.CONTS_NAME , 
+					    X.CHA_NUM , X.BUYING_DATE , X.BUYING_PRICE , X.EXPIRED_DATE , X.CP_USE_YN , 
+					    X.AUTH_YN , X.RATING , X.IS_HD , X.LICENSING_END , X.POINT, X.SERIES_NO, X.GENRE_GB, X.IS_RH, X.SERVICE_ICON, 
+					    X.BALACE, X.PRESENT_YN ,  X.DATAFREE_YN , X.DATAFREE_CP_USE_YN, X.DATAFREE_PRICE , X.DATAFREE_BALACE, 
+						REAL_BUYING_PRICE, REAL_DATAFREE_BUYING_PRICE, X.genre_small, X.nscreen_yn
+				   ORDER BY BUYING_DATE DESC
+	<if test="!pageNo.equals('A'.toString()) and !pageCnt.equals('A'.toString())">
+		) A
+		<!-- WHERE A.genre_small not in (
+             select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) >= '20190307' then 'SBS' else 'X' end
+               from dual
+             union
+             select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) >= '20190312' then 'KBS' else 'X' end
+               from dual
+             union
+             select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) >= '20190315' then 'MBC' else 'X' end
+               from dual
+            ) -->
+	) X
+	WHERE rownum <![CDATA[<=]]> 300 AND X.ORD_NUM <![CDATA[>=]]> ((TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt})) - (TO_NUMBER(#{pageCnt}) - 1))
+	    AND X.ORD_NUM <![CDATA[<=]]> (TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt}))
+	</if>
+	<if test="pageNo.equals('A'.toString()) or pageCnt.equals('A'.toString())">
+		) A 
+		<!-- WHERE A.genre_small not in (
+             select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) >= '20190307' then 'SBS' else 'X' end
+               from dual
+             union
+             select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) >= '20190312' then 'KBS' else 'X' end
+               from dual
+             union
+             select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) >= '20190315' then 'MBC' else 'X' end
+               from dual
+            ) -->
+	) X
+	WHERE rownum <![CDATA[<=]]> 300
+	</if>
+	</select>
+	
+	
+	
+	<!-- 카테고리 명 조회 -->
+	<select id="getCateName" parameterType="GetNSPurchasedRequestVO" resultType="String">
+		SELECT CATEGORY_NAME AS CAT_NAME
+		  FROM PT_VO_CATEGORY                              
+		 WHERE CATEGORY_LEVEL='1'                          
+		 START WITH CATEGORY_ID = TRIM(#{catId})          
+		 CONNECT BY PRIOR PARENT_CATEGORY_ID = CATEGORY_ID   
+	</select>
+	
+	
+	<!-- 카테고리 구분 조회 -->
+	<select id="getCateGbList" parameterType="GetNSPurchasedRequestVO" resultType="CateInfoVO">
+		SELECT MAX(DECODE(B.CATEGORY_GB, 'NSC' ,B.CATEGORY_GB)) AS CATE_GB1,
+		       MAX(DECODE(B.CATEGORY_GB, 'I20' ,B.CATEGORY_GB)) AS CATE_GB2, 
+		       MAX(DECODE(B.CATEGORY_GB, 'PCT' ,B.CATEGORY_GB)) AS CATE_GB3,
+		       MAX(DECODE(B.CATEGORY_GB, 'I30' ,B.CATEGORY_GB)) AS CATE_GB4
+		  FROM PT_VO_CATEGORY_MAP A,
+		       PT_VO_CATEGORY B
+		 WHERE A.CATEGORY_ID = B.CATEGORY_ID
+		   AND A.CONTENTS_ID = #{contsId}
+		   AND NVL(A.viewing_flag, 'V') != 'N'
+	</select>
+
+	<!-- 카테고리 구분 조회 -->	
+	<!-- if((rd1.c_nsc_list_yn[0] == 'N' && lst_Purchased.n_nscreen_yn[0] == 'Y') || rd1.c_nsc_list_yn[0] == 'Y') -->
+	<select id="getCateGbList2" parameterType="GetNSPurchasedRequestVO" resultType="CateInfoVO">
+		SELECT MAX(CATE_GB1) CATE_GB1, MAX(CATE_GB2) CATE_GB2, MAX(CATE_GB3) CATE_GB3, MAX(CATE_GB4) CATE_GB4, 
+		MIN(IPTV_PRODUCT_TYPE) IPTV_PRODUCT_TYPE, MIN(NSC_PRODUCT_TYPE) NSC_PRODUCT_TYPE, MIN(NVL(IPTV_TEST_SBC,'N')) IPTV_TEST_SBC, MIN(NVL(NSC_TEST_SBC,'N')) NSC_TEST_SBC
+		FROM 
+		( 
+		SELECT MAX(DECODE(B.CATEGORY_GB, 'NSC' ,B.CATEGORY_GB)) CATE_GB1, 
+		       MAX(DECODE(B.CATEGORY_GB, 'I20' ,B.CATEGORY_GB)) CATE_GB2, 
+		       MAX(DECODE(B.CATEGORY_GB, 'PCT' ,B.CATEGORY_GB)) CATE_GB3, 
+		       MAX(DECODE(B.CATEGORY_GB, 'I30' ,B.CATEGORY_GB)) CATE_GB4, 
+		       B.CATEGORY_GB, 
+		       MIN(case when ADI_ALBUM_ID = #{contsId} and B.CATEGORY_GB = 'I30' then E.PRODUCT_TYPE else '99' end) as IPTV_PRODUCT_TYPE, 
+		       MIN(case when NSC_ALBUM_ID = #{contsId} and B.CATEGORY_GB = 'NSC' then E.PRODUCT_TYPE else '99' end) as NSC_PRODUCT_TYPE, 
+		       MIN(case when ADI_ALBUM_ID = #{contsId} and B.CATEGORY_GB = 'I30' then B.TEST_SBC else 'Y' end) as IPTV_TEST_SBC, 
+		       MIN(case when NSC_ALBUM_ID = #{contsId} and B.CATEGORY_GB = 'NSC' then B.TEST_SBC else 'Y' end) as NSC_TEST_SBC 
+		  FROM PT_VO_CATEGORY_MAP A , 
+		       PT_VO_CATEGORY B, 
+		       IMCSUSER.PT_LA_PACKAGE_ASSET C, 
+		       IMCSUSER.PT_PD_PACKAGE_DETAIL D, 
+		       IMCSUSER.PT_PD_PACKAGE E 
+		 WHERE A.CATEGORY_ID = B.CATEGORY_ID 
+		   AND A.CONTENTS_ID = #{contsId}
+		   AND NVL(A.viewing_flag, 'V') != 'N'
+		   AND ( (A.CONTENTS_ID = C.NSC_ALBUM_ID) or (A.CONTENTS_ID = C.ADI_ALBUM_ID AND C.ALBUM_TYPE IN ('HD','SH')) ) 
+		   AND C.ASSET_ID = D.CONTENTS_ID 
+		   AND D.PRODUCT_ID = E.PRODUCT_ID 
+		   GROUP BY B.CATEGORY_GB
+		   )
+	</select>
+	
+	<!-- 부가세 요율 조회 -->
+	<select id="getSurtaxRateInfo" resultType="String">
+		SELECT NVL(TO_NUMBER(MIN_VALUE),0) MIN_VALUE
+		  FROM IMCSUSER.PT_CD_COM_CD                          
+		 WHERE GRP_ID = 'SURTAXRATE'                       
+		   AND ROWNUM = 1		    
+	</select>
+	
+	<!--  검수 STB여부 조회 -->
+	<select id="getTestSbc" parameterType="GetNSPurchasedRequestVO" resultType="String">
+		SELECT NVL(A.TEST_SBC, 'N') TEST_SBC
+		  FROM PT_VO_CUSTOM_ID A
+		 WHERE A.SA_ID = #{saId}
+		   AND A.MAC_ADDR = #{stbMac}
+	</select>
+	
+</mapper> 

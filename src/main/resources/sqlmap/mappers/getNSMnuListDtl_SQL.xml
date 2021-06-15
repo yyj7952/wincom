@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSMnuListDtl.GetNSMnuListDtlDao">
+	
+	 	<resultMap type="HashMap" id="mCatLevel">
+		<result property="CATEGORY_LEVEL" column="CATEGORY_LEVEL" javaType="String"/>
+		<result property="NSC_GB" column="NSC_GB" javaType="String"/>
+		<result property="CATEGORY_NAME" column="CATEGORY_NAME" javaType="String"/>
+	</resultMap>
+	 
+	<resultMap type="HashMap" id="mParentVersion">
+		<result property="PARENT_VERSION" column="VOD_VERSION" javaType="String"/>
+		<result property="PARENT_P_VERSION" column="P_VOD_VERSION" javaType="String"/>
+		<result property="PARENT_PP_VERSION" column="PP_VOD_VERSION" javaType="String"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mVersion">
+		<result property="VERSION" column="VOD_VERSION" javaType="String"/>
+		<result property="P_VERSION" column="P_VOD_VERSION" javaType="String"/>
+		<result property="PP_VERSION" column="PP_VOD_VERSION" javaType="String"/>
+	</resultMap>
+
+
+
+	<!-- 테스트 계정 유무조회 -->
+	<select id="testSbc" resultType="String" >
+		SELECT CASE WHEN TEST_SBC = 'Y' THEN TEST_SBC ELSE 'N' END AS TEST_SBC
+		  FROM PT_VO_CUSTOM_ID
+		 WHERE SA_ID = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	<!-- 카테고리ID의 카테고리 level 확인 --> 
+	<select id="confirmCatLevelByCatId" resultMap="mCatLevel" >
+		SELECT TO_CHAR(TO_NUMBER(category_level)+1) CATEGORY_LEVEL 
+		       , NVL(NSC_GB, 'LTE') NSC_GB
+		       , category_name CATEGORY_NAME
+		 FROM PT_VO_CATEGORY
+		WHERE CATEGORY_ID = #{catId}
+	</select> 
+	
+	
+	<!-- 하위카테고리부터 순차적으로 연결된 상위 카테고리중에서 2레벨의 카테고리 정보 SELECT -->
+	<select id="getParentCategory" resultType="String" >
+		 SELECT X.CATEGORY_ID
+		  FROM PT_VO_CATEGORY X,
+		      (select category_id from pt_vo_category WHERE CATEGORY_GB = 'NSC'
+		              START WITH category_id = #{catId}
+		              CONNECT BY category_id = PRIOR parent_category_id
+		      ) Y
+		 WHERE X.category_id = Y.category_id
+		   AND X.CATEGORY_LEVEL = '2'
+	</select>
+	
+	<select id="getParentVersion" resultMap="mParentVersion" >
+		SELECT vod_version, p_vod_version, pp_vod_version  
+		  FROM PT_VO_I20_VERSION
+		 WHERE CATEGORY_ID = #{parentCategory}
+	</select>
+	
+	<select id="getVersion" resultMap="mVersion" >
+		SELECT vod_version, p_vod_version, pp_vod_version  
+		  FROM PT_VO_I20_VERSION
+		 WHERE CATEGORY_ID = #{catId}
+	</select>
+	
+</mapper>
+	
+	
+	

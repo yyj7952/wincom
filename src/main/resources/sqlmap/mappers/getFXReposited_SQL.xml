@@ -1,0 +1,444 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getFXReposited.GetFXRepositedDao">
+	
+	<select id="getRepositedList" resultType="GetFXRepositedResponseVO" timeout="10">
+	
+	<if test="!pageNo.equals('A'.toString()) and !pageCnt.equals('A'.toString())">
+	SELECT * FROM (
+	</if>
+		SELECT K.SRC_GB, K.CONTS_TYPE, K.ALBUM_ID, K.CHA_NUM, K.BUYING_DATE, K.AUTH_YN, K.VIEW_TYPE,
+		       K.CAT_ID, K.EXPIRED_YN, K.LINK_TIME,
+		       'Y' AS SET_POINT_YN,
+		       ROWNUM ORD_NUM,
+		       SUM(1) OVER(PARTITION BY 0) AS TOTAL_CNT 
+		  FROM (
+		        SELECT /*+ LEADING(P C D G) USE_NL(P C D G) */
+		        	   MAX(SRC1) || MAX(SRC2) SRC_GB, P.ALBUM_ID, MAX(P.CONTS_NAME) AS CONTS_NAME,
+		               MAX(P.view_type) AS VIEW_TYPE, MAX(P.buying_date) AS BUYING_DATE,
+		               CASE WHEN MAX(NVL(P.buying_date, '0')) = '0' THEN '0' ELSE TO_CHAR(TO_DATE(MAX(P.buying_date), 'YYYYMMDDHH24MISS')+1, 'YYYYMMDDHH24MISS') END EXPIRED_YN,
+		               '3' AS CONTS_TYPE, MAX(D.CATEGORY_ID) AS CAT_ID, MAX(D.CHA_NUM) AS CHA_NUM, MAX(D.AUTH_YN) AS AUTH_YN,
+		               MAX(SUBSTR(G.RUN_TIME, 1, 2)*60*60 + SUBSTR(G.RUN_TIME, 3, 2)*60 + SUBSTR(G.RUN_TIME, 5, 2)) AS RUNTIME,
+		               NVL((
+		                SELECT /*+ index(A IDX_PT_VO_SET_TIME_02_PTT_N) */ TO_CHAR(MAX(TO_NUMBER(trim(link_time)))) 
+		                  FROM PT_VO_SET_TIME_PTT_NSC 
+		                 WHERE SA_ID = TRIM(#{saId})
+		                   AND NSCN_CUST_NO = 'M'
+		                   AND ADI_ALBUM_ID = P.ALBUM_ID
+		                   AND P_IDX_SA = MOD(#{pIdxSa}, 33)), '0') AS LINK_TIME,
+		               MAX(WACTH_EDATE) WACTH_EDATE 
+		          FROM (
+		                SELECT '1' SRC1, '0' SRC2, B.ADI_ALBUM_ID AS ALBUM_ID, B.ADI_ALBUM_NAME AS CONTS_NAME,
+		                       MAX(A.CONTENTS_ID) AS CONTENTS_ID, MAX(A.BUY_DATE) AS BUYING_DATE, MAX(A.VIEW_TYPE) AS VIEW_TYPE,
+		                       MAX(A.WATCH_FDATE) AS WACTH_DATE, MAX(A.WATCH_EDATE) AS WACTH_EDATE, I.ASSET_ID, I.ADI_PRODUCT_ID 
+		                  FROM (
+		                        SELECT SA_ID, CONTENTS_ID, MAX(DECODE(BUY_DATE, 'N', '0', BUY_DATE)) AS BUY_DATE,
+		                               MAX(VIEW_TYPE) AS VIEW_TYPE, MAX(WATCH_FDATE) AS WATCH_FDATE, MAX(WATCH_EDATE) AS WATCH_EDATE 
+                                FROM pt_vo_watch_history_nsc
+                               WHERE sa_id              = #{saId}
+                                 AND NVL (del_yn, 'N') = 'N'
+                                 AND p_idx_sa = MOD (#{pIdxSa}, 33)
+                               GROUP BY sa_id, contents_id
+                               UNION
+                            	SELECT SA_ID, CONTENTS_ID, MAX (DECODE (BUY_DATE, 'N', '0', BUY_DATE)) BUY_DATE,
+                                       MAX (VIEW_TYPE) VIEW_TYPE, MAX (WATCH_FDATE) WATCH_FDATE, MAX (WATCH_EDATE) WATCH_EDATE		                               
+		                          FROM PT_VO_WATCH_HISTORY 
+		                         WHERE SA_ID			= #{saId}
+		                           AND NVL(DEL_YN, 'N')	= 'N'
+		                           AND P_IDX_SA = MOD(#{pIdxSa}, 33)
+		                         GROUP BY SA_ID, CONTENTS_ID
+		                       ) A,
+		                       IMCSUSER.PT_LA_ALBUM_MST B,
+		                       IMCSUSER.PT_LA_PACKAGE_ASSET I 
+		                 WHERE A.CONTENTS_ID = B.ADI_ALBUM_ID
+						<if test="fxType.equals('NSC'.toString())">  
+		                   AND B.ADI_ALBUM_ID = I.NSC_ALBUM_ID
+						</if>
+						<if test="!fxType.equals('NSC'.toString())">		                   
+		                   AND B.ADI_ALBUM_ID = I.ADI_ALBUM_ID
+						</if>
+		                 GROUP BY B.ADI_ALBUM_ID, B.ADI_ALBUM_NAME, I.ASSET_ID, I.ADI_PRODUCT_ID
+		                UNION ALL
+		                 SELECT '0' SRC1, '1' SRC2, B.ADI_ALBUM_ID AS ALBUM_ID, B.ADI_ALBUM_NAME AS CONTS_NAME,
+		                       MAX(A.CONTENTS_ID) AS C_CONTS_ID, MAX(A.BUY_DATE) AS BUYING_DATE, 'S' AS VIEW_TYPE,
+		                       MAX(A.WATCH_FDATE) AS WACTH_DATE, MAX(A.WATCH_EDATE) AS WACTH_EDATE, I.ASSET_ID, I.ADI_PRODUCT_ID 
+		                  FROM (
+		                        SELECT SA_ID, CONTENTS_ID, MAX(DECODE(BUY_DATE, 'N', '0', BUY_DATE)) BUY_DATE,
+		                               MAX(VIEW_TYPE) VIEW_TYPE, MAX(WATCH_FDATE) WATCH_FDATE, MAX(WATCH_EDATE) WATCH_EDATE 
+		                          FROM PT_VO_WATCH_HISTORY_NSC
+		                         WHERE SA_ID			= #{saId}
+		                           AND NVL(DEL_YN, 'N') = 'N'
+		                           AND P_IDX_SA = MOD(#{pIdxSa}, 33)
+		                         GROUP BY SA_ID, CONTENTS_ID
+		                        UNION
+		                        SELECT SA_ID, CONTENTS_ID, MAX(DECODE(BUY_DATE, 'N', '0', BUY_DATE)) BUY_DATE,
+		                               MAX(VIEW_TYPE) VIEW_TYPE, MAX(WATCH_FDATE) WATCH_FDATE, MAX(WATCH_EDATE) WATCH_EDATE 
+		                          FROM PT_VO_WATCH_HISTORY 
+		                         WHERE SA_ID			= #{saId}
+		                           AND NVL(DEL_YN, 'N') = 'N'
+		                           AND P_IDX_SA = MOD(#{pIdxSa}, 33)
+		                         GROUP BY SA_ID, CONTENTS_ID
+		                       ) A,
+		                       IMCSUSER.PT_LA_ALBUM_MST B,
+		                       IMCSUSER.PT_LA_PACKAGE_ASSET I 
+		                 WHERE A.CONTENTS_ID = I.ASSET_ID
+		                   AND B.ADI_ALBUM_ID = I.ADI_ALBUM_ID
+		                 GROUP BY B.ADI_ALBUM_ID, B.ADI_ALBUM_NAME, I.ASSET_ID, I.ADI_PRODUCT_ID
+		               ) P,
+		               PT_VO_CATEGORY_MAP C,
+		               PT_VO_CATEGORY D,
+		               IMCSUSER.PT_LA_TITLE_ASSET G 
+		         WHERE P.ALBUM_ID = C.CONTENTS_ID
+<!-- 				<if test="rGrade.equals('Y'.toString())">
+				   AND G.RATING = '06'
+				</if>
+				<if test="rGrade.equals('N'.toString())">
+				   AND G.RATING <![CDATA[<>]]> '06'
+				</if> -->
+				   AND (G.RATING <![CDATA[<]]> #{ratingN01} OR G.RATING <![CDATA[=]]> #{ratingN02} OR G.RATING <![CDATA[>=]]> #{ratingN03} )
+		           AND C.CATEGORY_ID = D.CATEGORY_ID
+		           AND D.CATEGORY_GB = #{fxType}
+		           AND NVL(D.NSC_GB, 'LTE') = #{nscGb}
+		           AND P.ADI_PRODUCT_ID = G.ADI_PRODUCT_ID
+		         GROUP BY P.ALBUM_ID
+		         ORDER BY CASE WHEN 'N' = #{orderGb} THEN WACTH_EDATE ELSE '0' END DESC,
+		               		CASE WHEN 'N' = #{orderGb} THEN '0' ELSE CONTS_NAME END,
+		               		CASE WHEN LINK_TIME / RUNTIME * 100 <![CDATA[>]]> 90 THEN 1 ELSE 0 END,
+		               BUYING_DATE DESC
+		       ) K
+		       WHERE rownum <![CDATA[<=]]> 150
+	<if test="!pageNo.equals('A'.toString()) and !pageCnt.equals('A'.toString())">
+		 ) M 
+	WHERE ORD_NUM <![CDATA[>=]]> ((TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt})) - (TO_NUMBER(#{pageCnt}) - 1))
+	  AND ORD_NUM <![CDATA[<=]]> (TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt}))
+	</if>
+	       
+	</select>
+	
+	<select id="getRepositedList1" resultType="GetFXRepositedResponseVO" timeout="10">
+		<if test="!pageNo.equals('A'.toString()) and !pageCnt.equals('A'.toString())">
+		SELECT * FROM (
+		</if>
+			SELECT K.src_gb, K.c_conts_type CONTS_TYPE, K.album_id, K.c_cha_num CHA_NUM, K.c_buying_date BUYING_DATE,                                                                                                                                                                     
+			       K.c_auth_yn AUTH_YN, K.c_view_type VIEW_TYPE, K.c_category_id CAT_ID, K.c_buy_end_date EXPIRED_YN, K.link_time,                                                                                                                                                             
+			       'Y' as SET_POINT_YN,                                                          
+			       rownum ord_num, SUM(1) OVER(PARTITION BY 0) TOTAL_CNT                                                                                                                                                                                       
+			  FROM                                                                                                                                                                                                                                         
+			  (                                                                                                                                                                                                                                            
+			    SELECT /*+ LEADING(P C D G) USE_NL(P C D G) */ max(src1) || max(src2) src_gb,                                                                                                                                                                                                      
+			           P.album_id, max(P.c_conts_name) c_conts_name, max(P.c_view_type) c_view_type, max(P.c_buying_date) c_buying_date,                                                                                                                   
+			           case when max(nvl(P.c_buying_date,'0')) = '0' then '0' else to_char(to_date(max(P.c_buying_date), 'yyyymmddhh24miss')+1, 'yyyymmddhh24miss') end c_buy_end_date,                                                                    
+			           '3' c_conts_type, max(D.category_id) c_category_id, max(D.cha_num) c_cha_num, max(D.auth_yn) c_auth_yn,                                                                                                                             
+			           max(substr(G.run_time, 1, 2)*60*60 + substr(G.run_time, 3, 2)*60 + substr(G.run_time, 5, 2)) runtime,                                                                                                                               
+			           NVL((SELECT /*+ index(A IDX_PT_VO_SET_TIME_02_PTT_N) */ TO_CHAR(MAX(TO_NUMBER(trim(link_time))))  FROM PT_VO_SET_TIME_PTT_NSC WHERE sa_id = trim(#{saId}) and nscn_cust_no = 'M' and adi_album_id = p.album_id and P_IDX_SA = mod(#{pIdxSa}, 33)), '0') as link_time,  
+			           max(c_wacth_edate) c_wacth_edate                                            
+			      FROM                                                                             
+			          (                                                                            
+			           SELECT '1' src1, '0' src2,                                                  
+			                  B.adi_album_id album_id,                                             
+			                  B.adi_album_name  c_conts_name,                                      
+			                  max(a.contents_id) c_contents_id,                                    
+			                  max(A.buy_date) c_buying_date,                                       
+			                  max(A.view_type) c_view_type,                                        
+			                  max(A.watch_fdate) c_wacth_date,                                     
+			                  max(A.watch_edate) c_wacth_edate,                                    
+			                  i.asset_id, i.adi_product_id                                         
+			             FROM (                                                                    
+			                    SELECT sa_id, contents_id,                                         
+			                           max(decode(buy_date,'N','0',buy_date)) buy_date,            
+			                           max(view_type) view_type,                                   
+			                           max(watch_fdate) watch_fdate,                               
+			                           max(watch_edate) watch_edate                                
+			                      FROM PT_VO_WATCH_HISTORY_NSC                                     
+			                     WHERE sa_id = #{saId}                                            
+			                       AND NVL(del_yn, 'N') = 'N'                                      
+			                       AND p_idx_sa = mod(#{pIdxSa}, 33)                               
+			                     GROUP BY sa_id, contents_id                                       
+			                    UNION                                       						
+			                    SELECT sa_id, contents_id,                                         
+			                           max(decode(buy_date,'N','0',buy_date)) buy_date,            
+			                           max(view_type) view_type,                                   
+			                           max(watch_fdate) watch_fdate,                               
+			                           max(watch_edate) watch_edate                                
+			                      FROM PT_VO_WATCH_HISTORY	                                        
+			                     WHERE sa_id = #{saId}                                            
+			                       AND NVL(del_yn, 'N') = 'N'                                      
+			                       AND p_idx_sa = mod(#{pIdxSa}, 33)                               
+			                     GROUP BY sa_id, contents_id                                       
+			                   ) A,                                                                
+			                  IMCSUSER.PT_LA_ALBUM_MST B,                                          
+			                  IMCSUSER.PT_LA_PACKAGE_ASSET I                                       
+			            WHERE A.contents_id = B.ADI_ALBUM_ID                                       
+			              AND B.ADI_ALBUM_ID = I.NSC_ALBUM_ID                                      
+			            GROUP BY B.adi_album_id, B.adi_album_name, i.asset_id, i.adi_product_id    
+			           UNION ALL                                                                   
+			           SELECT '0' src1, '1' src2,                                                  
+			                  B.adi_album_id album_id,                                             
+			                  B.adi_album_name c_conts_name,                                       
+			                  max(A.contents_id) c_conts_id,                                       
+			                  max(A.buy_date) c_buying_date,                                       
+			                  'S' c_view_type,                                                     
+			                  max(A.watch_fdate) c_wacth_date,                                     
+			                  max(A.watch_edate) c_wacth_edate,                                    
+			                  i.asset_id, i.adi_product_id                                         
+			             FROM (                                                                    
+			                    SELECT sa_id, contents_id,                                         
+			                           max(decode(buy_date,'N','0',buy_date)) buy_date,            
+			                           max(view_type) view_type,                                   
+			                           max(watch_fdate) watch_fdate,                               
+			                           max(watch_edate) watch_edate                                
+			                      FROM PT_VO_WATCH_HISTORY_NSC                                     
+			                     WHERE sa_id = #{saId}                                            
+			                       AND NVL(del_yn, 'N') = 'N'                                      
+			                       AND p_idx_sa = mod(#{pIdxSa}, 33)                               
+			                     GROUP BY sa_id, contents_id                                       
+			                    UNION						                                        
+			                    SELECT sa_id, contents_id,                                         
+			                           max(decode(buy_date,'N','0',buy_date)) buy_date,            
+			                           max(view_type) view_type,                                   
+			                           max(watch_fdate) watch_fdate,                               
+			                           max(watch_edate) watch_edate                                
+			                      FROM PT_VO_WATCH_HISTORY	                                        
+			                     WHERE sa_id = #{saId}                                            
+			                       AND NVL(del_yn, 'N') = 'N'                                      
+			                       AND p_idx_sa = mod(#{pIdxSa}, 33)                               
+			                     GROUP BY sa_id, contents_id                                       
+			                   ) A,                                                                
+			                  IMCSUSER.PT_LA_ALBUM_MST B,                                          
+			                  IMCSUSER.PT_LA_PACKAGE_ASSET I                                       
+			            WHERE A.contents_id = I.asset_id                                           
+			              AND B.ADI_ALBUM_ID = I.ADI_ALBUM_ID                                      
+			            GROUP BY B.adi_album_id, B.adi_album_name, i.asset_id, i.adi_product_id    
+			          ) P,                                                                         
+			          PT_VO_CATEGORY_MAP C,                                                        
+			          PT_VO_CATEGORY D,                                                            
+			          IMCSUSER.PT_LA_TITLE_ASSET G                                                 
+			    WHERE (G.rating <![CDATA[<]]> #{ratingN01} or G.rating = #{ratingN02} or G.rating <![CDATA[>=]]> #{ratingN03})		
+			      AND P.album_id = C.contents_id                                                   
+			      AND C.category_id = D.category_id                                                
+			      AND D.CATEGORY_GB = #{fxType}                                                  
+			      AND NVL(D.NSC_GB, 'LTE') = #{nscGb}
+			      AND P.ADI_PRODUCT_ID = G.ADI_PRODUCT_ID                                          
+			    GROUP BY P.album_id                                                                
+			    ORDER BY case when 'N' = #{orderGb} then c_wacth_edate else '0' end DESC,         
+			             case when 'N' = #{orderGb} then '0' else c_conts_name end,               
+			             case when link_time / runtime * 100 <![CDATA[>]]> 90 then 1 else 0 end,               
+			             c_buying_date DESC                                                        
+			  ) K
+			  WHERE rownum <![CDATA[<=]]> 150                                                                                    
+		<if test="!pageNo.equals('A'.toString()) and !pageCnt.equals('A'.toString())">
+			 ) M 
+		WHERE ORD_NUM <![CDATA[>=]]> ((TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt})) - (TO_NUMBER(#{pageCnt}) - 1))
+		  AND ORD_NUM <![CDATA[<=]]> (TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt}))
+		</if>	
+	</select>
+
+	<select id="getRepositedList2" resultType="GetFXRepositedResponseVO" timeout="10">
+		<if test="!pageNo.equals('A'.toString()) and !pageCnt.equals('A'.toString())">
+		SELECT * FROM (
+		</if>	
+			SELECT K.src_gb, K.c_conts_type CONTS_TYPE, K.album_id, K.c_cha_num CHA_NUM, K.c_buying_date BUYING_DATE,                                                                                                             
+			       K.c_auth_yn AUTH_YN, K.c_view_type VIEW_TYPE, K.c_category_id CAT_ID, K.c_buy_end_date EXPIRED_YN, K.link_time,                                                                                                     
+			       'Y' as SET_POINT_YN,  
+			       rownum ord_num, SUM(1) OVER(PARTITION BY 0) TOTAL_CNT
+			  FROM 
+			  (
+			    SELECT max(src1) || max(src2) src_gb,                                                                                                                                              
+			           P.album_id, max(P.c_conts_name) c_conts_name, max(P.c_view_type) c_view_type, max(P.c_buying_date) c_buying_date,                                                           
+			           case when max(nvl(P.c_buying_date,'0')) = '0' then '0' else to_char(to_date(max(P.c_buying_date), 'yyyymmddhh24miss')+1, 'yyyymmddhh24miss') end c_buy_end_date,            
+			           '3' c_conts_type, max(D.category_id) c_category_id, max(D.cha_num) c_cha_num, max(D.auth_yn) c_auth_yn,                                                                     
+			           max(substr(G.run_time, 1, 2)*60*60 + substr(G.run_time, 3, 2)*60 + substr(G.run_time, 5, 2)) runtime,                                                                       
+			           NVL((SELECT /*+ index(A IDX_PT_VO_SET_TIME_02_PTT) */ TO_CHAR(MAX(TO_NUMBER(trim(link_time))))  FROM PT_VO_SET_TIME_PTT WHERE sa_id = trim(#{saId}) and nscn_cust_no = 'M' and adi_album_id = p.album_id and P_IDX_SA = mod(#{pIdxSa}, 33)), '0') as link_time,  
+			           max(c_wacth_edate) c_wacth_edate                                            
+			      FROM  
+			          ( 
+			           SELECT '1' src1, '0' src2,                                                  
+			                  B.adi_album_id album_id,                                             
+			                  B.adi_album_name  c_conts_name,                                      
+			                  max(a.contents_id) c_contents_id,                                    
+			                  max(A.buy_date) c_buying_date,                                       
+			                  max(A.view_type) c_view_type,                                        
+			                  max(A.watch_fdate) c_wacth_date,                                     
+			                  max(A.watch_edate) c_wacth_edate,                                    
+			                  i.asset_id, i.adi_product_id                                         
+			             FROM (                                                                    
+			                    SELECT sa_id, contents_id,                                         
+			                           max(decode(buy_date,'N','0',buy_date)) buy_date,            
+			                           max(view_type) view_type,                                   
+			                           max(watch_fdate) watch_fdate,                               
+			                           max(watch_edate) watch_edate                                
+			                      FROM PT_VO_WATCH_HISTORY   	                                    
+			                     WHERE sa_id = #{saId}                                            
+			                       AND NVL(del_yn, 'N') = 'N'                                      
+			                       AND p_idx_sa = mod(#{pIdxSa}, 33)                               
+			                     GROUP BY sa_id, contents_id                                       
+			                    UNION 						                                        
+			                    SELECT sa_id, contents_id,                                         
+			                           max(decode(buy_date,'N','0',buy_date)) buy_date,            
+			                           max(view_type) view_type,                                   
+			                           max(watch_fdate) watch_fdate,                               
+			                           max(watch_edate) watch_edate                                
+			                      FROM PT_VO_WATCH_HISTORY_NSC                                     
+			                     WHERE sa_id = #{saId}                                            
+			                       AND NVL(del_yn, 'N') = 'N'                                      
+			                       AND p_idx_sa = mod(#{pIdxSa}, 33)                               
+			                     GROUP BY sa_id, contents_id                                       
+			                   ) A,                                                                
+			                  IMCSUSER.PT_LA_ALBUM_MST B,                                          
+			                  IMCSUSER.PT_LA_PACKAGE_ASSET I                                       
+			            WHERE A.contents_id = B.ADI_ALBUM_ID                                       
+			              AND B.ADI_ALBUM_ID = I.ADI_ALBUM_ID                                      
+			            GROUP BY B.adi_album_id, B.adi_album_name, i.asset_id, i.adi_product_id    
+			           UNION ALL                                                                   
+			           SELECT '0' src1, '1' src2,                                                  
+			                  B.adi_album_id album_id,                                             
+			                  B.adi_album_name c_conts_name,                                       
+			                  max(A.contents_id) c_conts_id,                                       
+			                  max(A.buy_date) c_buying_date,                                       
+			                  'S' c_view_type,                                                     
+			                  max(A.watch_fdate) c_wacth_date,                                     
+			                  max(A.watch_edate) c_wacth_edate,                                    
+			                  i.asset_id, i.adi_product_id                                         
+			             FROM (                                                                    
+			                    SELECT sa_id, contents_id,                                         
+			                           max(decode(buy_date,'N','0',buy_date)) buy_date,            
+			                           max(view_type) view_type,                                   
+			                           max(watch_fdate) watch_fdate,                               
+			                           max(watch_edate) watch_edate                                
+			                      FROM PT_VO_WATCH_HISTORY    	                                    
+			                     WHERE sa_id = #{saId}                                            
+			                       AND NVL(del_yn, 'N') = 'N'                                      
+			                       AND p_idx_sa = mod(#{pIdxSa}, 33)                               
+			                     GROUP BY sa_id, contents_id                                       
+			                    UNION						                                        
+			                    SELECT sa_id, contents_id,                                         
+			                           max(decode(buy_date,'N','0',buy_date)) buy_date,            
+			                           max(view_type) view_type,                                   
+			                           max(watch_fdate) watch_fdate,                               
+			                           max(watch_edate) watch_edate                                
+			                      FROM PT_VO_WATCH_HISTORY_NSC                                     
+			                     WHERE sa_id = #{saId}                                            
+			                       AND NVL(del_yn, 'N') = 'N'                                      
+			                       AND p_idx_sa = mod(#{pIdxSa}, 33)                               
+			                     GROUP BY sa_id, contents_id                                       
+			                   ) A,                                                                
+			                  IMCSUSER.PT_LA_ALBUM_MST B,                                          
+			                  IMCSUSER.PT_LA_PACKAGE_ASSET I                                       
+			            WHERE A.contents_id = I.asset_id                                           
+			              AND B.ADI_ALBUM_ID = I.ADI_ALBUM_ID                                      
+			            GROUP BY B.adi_album_id, B.adi_album_name, i.asset_id, i.adi_product_id    
+			          ) P,                                                                         
+			          PT_VO_CATEGORY_MAP C,                                                        
+			          PT_VO_CATEGORY D,                                                            
+			          IMCSUSER.PT_LA_TITLE_ASSET G                                                 
+			    WHERE (G.rating <![CDATA[<]]> #{ratingN01} or G.rating = #{ratingN02} or G.rating <![CDATA[>=]]> #{ratingN03})		
+			      AND P.album_id = C.contents_id                                                   
+			      AND C.category_id = D.category_id                                                
+			      AND D.CATEGORY_GB = #{fxType}                                                   
+			      AND NVL(D.NSC_GB, 'LTE') = #{nscGb}                                             
+			      AND P.ADI_PRODUCT_ID = G.ADI_PRODUCT_ID                                          
+			    GROUP BY P.album_id                                                                
+			    ORDER BY case when 'N' = #{orderGb} then c_wacth_edate else '0' end DESC,         
+			             case when 'N' = #{orderGb} then '0' else c_conts_name end,               
+			             case when link_time / runtime * 100 <![CDATA[>]]> 90 then 1 else 0 end,               
+			             c_buying_date DESC                                                        
+			  ) K
+			  WHERE rownum <![CDATA[<=]]> 150                                                                                  
+		<if test="!pageNo.equals('A'.toString()) and !pageCnt.equals('A'.toString())">
+			 ) M 
+		WHERE ORD_NUM <![CDATA[>=]]> ((TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt})) - (TO_NUMBER(#{pageCnt}) - 1))
+		  AND ORD_NUM <![CDATA[<=]]> (TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt}))
+		</if>
+	</select>
+	
+	<!-- 카테고리 정보 조회 -->
+	<select id="getCateInfo" resultType="CateInfoVO" >
+		SELECT R.COUNT, NVL(FNC_GET_CATE_ID_LIST(#{contsId}, #{fxType}, #{nscGb}, 'N'), '') CATEGORY_ID,
+		       R.CATEGORY_ID AS PARENT_CAT_ID, R.IS_NEW, R.CHA_NUM, R.AUTH_YN, R.CATE_INFO, R.SERIES_YN,
+		       (SELECT MAX(CATEGORY_NAME) 
+		          FROM PT_VO_CATEGORY 
+		         WHERE CATEGORY_LEVEL = '1' START WITH CATEGORY_ID = R.CATEGORY_ID CONNECT BY PRIOR PARENT_CATEGORY_ID = CATEGORY_ID
+		       ) AS BELONGING_NAME 
+		  FROM (
+		        SELECT COUNT(*) COUNT, MAX(P.CATEGORY_ID) CATEGORY_ID, RPAD(MAX(P.CREATE_DATE), 10, '0') IS_NEW,
+		               MAX(Q.CHA_NUM) CHA_NUM, MAX(Q.AUTH_YN) AUTH_YN, NVL(MAX(K.CATE_INFO), '|') CATE_INFO, NVL(MAX(K.SERIES_YN), 'N') SERIES_YN 
+		          FROM PT_VO_CATEGORY_MAP P,
+		               PT_VO_CATEGORY Q,
+		               (SELECT C.CONTENTS_ID,
+		                       NVL(C.CATEGORY_ID||'|'||C.SERIES_NO, '|') CATE_INFO,
+		                       'Y' SERIES_YN 
+		                  FROM PT_VO_CATEGORY_MAP C,
+		                       PT_VO_CATEGORY D 
+		                 WHERE C.CATEGORY_ID = D.CATEGORY_ID
+		                   AND C.CONTENTS_ID = #{contsId}
+		                   AND D.SERIES_YN = 'Y'
+		                   AND D.CATEGORY_GB = #{fxType}
+		                   AND NVL(D.NSC_GB, 'LTE') = #{nscGb}
+		                   AND (D.TEST_SBC = 'N' OR D.TEST_SBC IS NULL OR D.TEST_SBC = '')
+		                   AND ROWNUM = 1
+		               ) K 
+		         WHERE P.CATEGORY_ID = Q.CATEGORY_ID
+		           AND P.CONTENTS_ID = #{contsId}
+		           AND Q.CATEGORY_GB = #{fxType}
+		           AND NVL(Q.NSC_GB, 'LTE') = #{nscGb}
+		           AND P.CONTENTS_ID = K.CONTENTS_ID (+)
+		       ) R
+	</select>
+	
+	
+	<!-- 앨범정보 조회 -->
+	<select id="getAlbumInfo" resultType="AlbumInfoVO" >
+		SELECT A.ADI_ALBUM_NAME AS CONTS_NAME, A.ONAIR_DATE, A.SERIES_NO AS SERIES_DESC, NVL(A.IS_RH, 'N') REAL_HD,
+		       TO_CHAR(ROUND(TO_NUMBER(NVL(A.POINT_SUM, '0')) / (CASE WHEN NVL(A.POINT_CNT, '0')= '0' THEN 1 ELSE TO_NUMBER(NVL(A.POINT_CNT, '0')) END), 0)) POINT,
+		       MAX(NVL(C.RATING, '')) AS PR_INFO, DECODE(MAX(D.HDCONTENT), 'S', 'Y', MAX(D.HDCONTENT)) IS_HD,
+		       MAX(SUBSTR(C.RUN_TIME, 1, 6)) RUN_TIME, MAX(C.LICENSING_WINDOW_END) LICENSING_END,
+		       CASE WHEN MAX(NVL(C.GENRE_LARGE, '')) = '방송' THEN 'T' ELSE 'V' END GENRE_GB,
+		       MAX(P.MIN_VALUE) AS TEMP_MIN_VALUE, MAX(P.MAX_VALUE) AS TEMP_MAX_VALUE 
+		  FROM IMCSUSER.PT_LA_ALBUM_MST A, IMCSUSER.PT_LA_PACKAGE_ASSET B, IMCSUSER.PT_LA_TITLE_ASSET C, IMCSUSER.PT_LA_CONTENT_ASSET D,
+		       (SELECT #{contsId} AS ALBUM_ID, MIN(CONTENT_VALUE) MIN_VALUE, MAX(CONTENT_VALUE) MAX_VALUE 
+		          FROM IMCSUSER.PT_LA_POSTER_ASSET 
+		         WHERE ADI_PRODUCT_ID IN (
+		                SELECT ADI_PRODUCT_ID 
+		                  FROM IMCSUSER.PT_LA_PACKAGE_ASSET
+					<if test="fxType.equals('NSC'.toString())">
+		                 WHERE NSC_ALBUM_ID = #{contsId}
+					</if>
+					<if test="!fxType.equals('NSC'.toString())">
+		                 WHERE ADI_ALBUM_ID = #{contsId}
+					</if>
+		               )
+		           AND NVL(POSTER_TYPE, 'P') = #{posterType}
+		       ) P 
+		 WHERE A.ADI_ALBUM_ID = #{contsId}
+
+		<if test="fxType.equals('NSC'.toString()) and srcGb.equals('10'.toString())">
+		   AND A.ADI_ALBUM_ID = B.NSC_ALBUM_ID
+		</if>
+		<if test="fxType.equals('NSC'.toString()) and !srcGb.equals('10'.toString())">		   
+		   AND (A.ADI_ALBUM_ID = B.NSC_ALBUM_ID OR A.ADI_ALBUM_ID = B.ADI_ALBUM_ID)
+		</if>
+		<if test="!fxType.equals('NSC'.toString())">
+		   AND A.ADI_ALBUM_ID = B.ADI_ALBUM_ID
+		</if>
+		   AND B.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID
+		   AND B.ADI_PRODUCT_ID = D.ADI_PRODUCT_ID
+		   AND A.ADI_ALBUM_ID = P.ALBUM_ID (+)
+		 GROUP BY A.ADI_ALBUM_NAME, A.ONAIR_DATE, A.SERIES_NO, A.IS_RH, A.POINT_SUM, A.POINT_CNT
+	</select>
+	
+	
+	<!-- 이미지 파일명 조회 -->
+	<select id="getImgFileName" resultType="StillImageVO" >
+		SELECT 'http:'||REPLACE(NVL(A.MAIN_IMG_URL, ''), '\', '/') IMG_URL,
+		       A.MAIN_IMG_FILE_NAME AS IMG_FILE_NAME,
+		       A.IMG_FLAG 
+		  FROM IMCSUSER.PT_LA_ALBUM_IMG A 
+		 WHERE A.ADI_ALBUM_ID = #{contsId}
+		   AND A.IMG_FLAG = 'N'
+		 ORDER BY TO_NUMBER(ADI_ALBUM_SEQ) ASC
+	</select>
+	
+</mapper>
+	
+	
+	

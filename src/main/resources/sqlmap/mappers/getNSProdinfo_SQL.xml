@@ -1,0 +1,326 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSProdinfo.GetNSProdinfoDao">
+	
+	<resultMap type="HashMap" id="customerProdMap">
+		<result property="PROD_CD" column="PROD_CD" javaType="String"/>
+		<result property="UCUBE_PROD_CD" column="UCUBE_PROD_CD" javaType="String"/>
+		<result property="ENTRY_DATE" column="ENTRY_DATE" javaType="String"/>
+		<result property="EVENT_YN" column="EVENT_YN" javaType="String"/>
+		<result property="UFLIXYN" column="UFLIXYN" javaType="String"/>
+		<result property="CONCURRENT_COUNT" column="CONCURRENT_COUNT" javaType="String"/>
+		<result property="PROD_DEL_FLAG" column="PROD_DEL_FLAG" javaType="String"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="TestSbcMap">
+		<result property="TEST_SBC" column="TEST_SBC" javaType="String"/>
+		<result property="PAIRING_SAID" column="PAIRING_SAID" javaType="String"/>
+		<result property="PAIRING_MAC" column="PAIRING_MAC" javaType="String"/>
+		<result property="JOIN_MENU" column="JOIN_MENU" javaType="String"/>
+	</resultMap>
+	
+	
+	<!-- 가상채널 장치 코드 조회 -->
+	<select id="getAtrctChnlDvCd" resultType="ComSbcVO" >
+		SELECT PVS_ATRT_CHNL_DV_CD AS CHNL_DV_CD,
+		       PVS_NSCN_CUST_NO AS CUST_NO 
+		  FROM NSCN_SBC_TBL 
+		 WHERE PVS_SBC_CONT_NO = #{saId}
+		   AND PVS_MAC_ADDR = #{stbMac}
+		   AND ROWNUM = 1
+	</select>
+	
+	
+	<!-- HDTV 공통코드 조회 -->
+	<select id="getProdSbc" resultType="ComCdVO" >
+		SELECT COM_NAME, COM_CD 
+		  FROM IMCSUSER.PT_CD_COM_CD 
+		 WHERE GRP_ID = 'HDTVSBC'
+		   AND MAX_VALUE = 'Y'
+	</select>
+	
+	
+	<!-- 검수 사용자 여부 조회 -->
+	<select id="getTestSbc" resultMap="TestSbcMap" >
+		SELECT CASE WHEN A.TEST_SBC = 'Y' THEN A.TEST_SBC ELSE 'N' END TEST_SBC,
+		  	   NVL(B.STB_SA_ID, 'X') AS PAIRING_SAID,
+		  	   NVL(B.STB_MAC, 'X') AS PAIRING_MAC,
+		  	   NVL((select menu_id || ',' || menu_name from imcsuser.PT_PD_PACKAGE_PPM_MENU where special_flag = 'M' and use_yn = 'Y' and rownum = 1), '77777,가입상품') JOIN_MENU 
+		  FROM PT_VO_CUSTOM_ID A, PT_VO_SBC_PAIRING_TBL B
+		 WHERE A.SA_ID = #{saId}
+		   AND A.MAC_ADDR = #{stbMac}
+		   AND A.SA_ID = B.M_SA_ID(+)
+		   AND A.MAC_ADDR = B.M_MAC(+)
+		   AND B.FLAG(+) = 'Y'
+	</select>
+	
+	
+	<!-- 가입자의 구매 상품정보 조회 -->
+	<select id="getCutsomProdList" resultMap="customerProdMap" >
+		SELECT A.PROD_CD PROD_CD, SUBSTR(A.BUY_DATE, 1, 8) AS ENTRYDATE
+		  FROM PT_VO_NSC_PRODUCT A
+		 WHERE A.NSCN_CUST_NO =  #{pvsNscnCustNo}
+		   AND A.SBC_CONT_NO  =  #{saId}
+		   AND A.MAC_ADDR     =  #{stbMac}
+		   AND TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS') BETWEEN A.BUY_DATE AND A.EXPIRED_DATE		
+	</select>
+	
+	<!-- 가입자의 가입 상품정보 조회 -->
+	<select id="getCutsomProdList2" resultMap="customerProdMap" >
+		SELECT T.PRODUCTCD AS PROD_CD, T.XCION_PROD_CD AS UCUBE_PROD_CD, SUBSTR(T.ENTRYDATE, 1, 8) AS ENTRYDATE, NVL(P.uflix_prod_yn, 'N') AS UFLIXYN, NVL(A.CONCURRENT_COUNT, 0) AS CONCURRENT_COUNT,	
+				       NVL((SELECT MAX(max_value) FROM IMCSUSER.PT_CD_COM_CD WHERE GRP_ID = 'HDTVPROD' AND T.XCION_PROD_CD = MIN_VALUE), 'N') AS PROD_DEL_FLAG
+	      FROM PT_VO_CUSTOM_PRODUCT T, IMCSUSER.PT_PD_PACKAGE P, IMCSUSER.PT_PD_PACKAGE_SUB A
+	     WHERE T.SA_ID      =  #{saId}
+	       AND T.MAC_ADDR   =  #{stbMac}
+	       AND T.XCION_BILLING_TYP = 'P'
+	       AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN T.ENTRYDATE AND NVL(TRIM(T.EXPIREDDATE), '29991231')
+	       AND T.PRODUCTCD = P.PRODUCT_ID
+    	   AND P.PRODUCT_ID = A.PRODUCT_ID		
+    	<if test= "productFlag.equals('K'.toString()) and appVersion.equals('002'.toString()) and !paringSaId.equals('X'.toString())">
+    	UNION
+    	SELECT T.PRODUCTCD AS PROD_CD, T.XCION_PROD_CD AS UCUBE_PROD_CD, SUBSTR(T.ENTRYDATE, 1, 8) AS ENTRYDATE, 'N' AS UFLIXYN, 0 AS CONCURRENT_COUNT,	
+				       'N' AS PROD_DEL_FLAG
+	      FROM PT_VO_CUSTOM_PRODUCT T, IMCSUSER.PT_PD_PACKAGE P
+	     WHERE T.SA_ID      =  #{paringSaId}
+	       AND T.MAC_ADDR   =  #{paringStbMac}
+	       AND T.XCION_BILLING_TYP = 'P'
+	       AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN T.ENTRYDATE AND NVL(TRIM(T.EXPIREDDATE), '29991231')
+	       AND T.PRODUCTCD = P.PRODUCT_ID
+    	</if>
+	</select>
+	
+	<!-- 가입자의 가입가능 상품정보 조회 -->
+	<select id="getCutsomProdList3" resultMap="customerProdMap" >
+		SELECT NVL(MAX_VALUE, 'N') EVENT_YN, COM_NAME PROD_CD, MIN_VALUE UCUBE_PROD_CD 
+		  FROM IMCSUSER.PT_CD_COM_CD 
+		 WHERE GRP_ID = 'HDTVPROD'
+		   AND COM_NAME IN (
+		        SELECT A.IMCS_PRODUCT_ID 
+		          FROM IMCSUSER.PT_PD_PACKAGE_UNITED A ,
+		               PT_VO_CUSTOM_PRODUCT B 
+		         WHERE A.IMCS_PRODUCT_ID = B.PRODUCTCD
+		           AND A.IMCS_PRODUCT_KIND = '1'
+		           AND B.SA_ID = #{saId}
+		           and B.MAC_ADDR = #{stbMac}
+		       )
+		   AND NVL(MAX_VALUE, 'N') = 'N'
+		 UNION ALL
+		 SELECT NVL(MAX_VALUE, 'Y') EVENT_YN, COM_NAME PROD_CD, MIN_VALUE UCUBE_PROD_CD
+		   FROM IMCSUSER.PT_CD_COM_CD
+		  WHERE GRP_ID = 'HDTVPRODEV'
+		  AND NVL(MAX_VALUE, 'Y') = 'Y'	
+	</select>
+	
+	
+	<!-- 상품정보 조회 -->
+	<select id="getNSProdinfoList" resultType="GetNSProdinfoResponseVO" >
+		SELECT SUB_PROD_ID, SUB_PROD_NAME,  SUB_PROD_PRICE, SUB_PROD_SUB, SUB_PROD_ISU,
+			   SUB_PROD_TYPE, SUB_PROD_PRIORITY, PROD_TYPE, UCUBE_PROD_CD, SUB_PROD_DESC, UFLIX_YN,
+			   USE_SCREEN_MOBILE, EXPIRED_YN, VIEW_CTRL, PROD_SUB_YN, ATRCT_CHNL_DV_CD, NSC_PROD_KIND, GROUP_CD, PROD_DETAIL_DESC, DEDUCTION_PRICE_LIMIT MEM_DEDUCTION_PRICE_LIMIT, MIMS_PANEL_ID, CONCURRENT_COUNT, GROUP_NM,
+			   SCREEN_INFO
+	      FROM (
+			SELECT B.IMCS_PRODUCT_ID SUB_PROD_ID, B.IMCS_PRODUCT_NAME SUB_PROD_NAME, B.IMCS_PRICE SUB_PROD_PRICE, B.IMCS_PRODUCT_DESC SUB_PROD_SUB, B.IMCS_ISU_YN SUB_PROD_ISU,
+		           B.IMCS_ISU_TYPE SUB_PROD_TYPE, B.IMCS_EXPIRED_DATE SUB_PROD_PRIORITY, '1' AS PROD_TYPE, '' UCUBE_PROD_CD,
+		           B.IMCS_PPS_PROD_DESC_DTL SUB_PROD_DESC, NVL(B.IMCS_UFLIX_PROD_YN, 'N') UFLIX_YN,
+		           DECODE(NVL(B.IMCS_USE_SCREEN_MOBILE, '4'), 'A', '10', 'B', '11', 'C', '12', 'D', '13', 'E', '14', 'F', '15', NVL(B.IMCS_USE_SCREEN_MOBILE, '4')) USE_SCREEN_MOBILE,
+		           CASE WHEN TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.IMCS_PRODUCT_START_DATETIME AND B.IMCS_PRODUCT_EXPIRY_DATETIME THEN 'Y' ELSE 'N' END EXPIRED_YN,
+		           NVL(B.IMCS_VIEW_CTRL, '0') VIEW_CTRL, '' PROD_SUB_YN, 'N' ATRCT_CHNL_DV_CD, B.IMCS_NSC_PROD_KIND NSC_PROD_KIND, NVL(C.MENU_ID, '99999') GROUP_CD,  NVL(G.MENU_NAME, '기타 월정액') GROUP_NM, G.SORT_NO as MENU_SORT_NO,
+		           '' PROD_DETAIL_DESC, NVL(C.SORT_NO, 99999) SORT_NO, NVL(B.IMCS_SI_PACKAGE_ID, '0') DEDUCTION_PRICE_LIMIT, D.MIMS_PANEL_ID MIMS_PANEL_ID, 0 AS CONCURRENT_COUNT,
+		           'N' AS SCREEN_INFO
+		      FROM IMCSUSER.PT_PD_PACKAGE_UNITED B, IMCSUSER.PT_PD_PACKAGE_PPM_RELATION C, IMCSUSER.PT_PD_PACKAGE_TERMS D, IMCSUSER.PT_PD_PACKAGE_SUB F, IMCSUSER.PT_PD_PACKAGE_PPM_MENU G
+		     WHERE B.IMCS_PRODUCT_TYPE = '7'		/* ippv = 7 */
+			<if test= 'productFlag == "P"'>
+		       AND B.IMCS_CA_SERVICE_ID IN ('B', 'G')
+		    </if>
+		    <if test= 'productFlag == "K"'>
+		       <!-- 2020.04.02 모바일 아이들나라 특정 상품만 전달이 아니라, 모바일TV 전달 상품 중 특정 상품만 빼달라고하여 임시로 공통코드 사용하여 제외처리 -->
+		       <!-- AND B.IMCS_CA_SERVICE_ID = 'K' -->
+		       <!-- AND B.IMCS_PRODUCT_ID NOT IN (SELECT COM_NAME FROM IMCSUSER.PT_CD_COM_CD WHERE GRP_ID = 'HDTVPRODKD') -->
+		       AND SUBSTR(F.APP_CTRL, 2, 1) = '1'
+		    </if>
+			<!--if test= 'productFlag == "G"'>
+		       AND B.IMCS_CA_SERVICE_ID = 'G'
+		    </if-->
+		       AND NVL(B.IMCS_NSC_PROD_GB, 'N') = #{youthYn}
+		       AND NVL(B.IMCS_VIEW_CTRL, '0') IN ('0', '2', '3')
+		       AND B.IMCS_PRODUCT_ID = C.PRODUCT_ID
+			   AND C.USE_YN = 'Y'
+			   AND C.MENU_ID = G.MENU_ID
+			   AND G.USE_YN = 'Y'
+		       AND B.IMCS_PRODUCT_ID = D.PRODUCT_ID(+)
+			   AND D.TERMS_TYPE(+) = 'A'
+			   AND B.IMCS_PRODUCT_ID = F.PRODUCT_ID
+			   AND G.special_flag != 'M'
+		     UNION
+		    SELECT B.IMCS_PRODUCT_ID SUB_PROD_ID, B.IMCS_PRODUCT_NAME SUB_PROD_NAME, B.IMCS_PRICE SUB_PROD_PRICE, B.IMCS_PRODUCT_DESC SUB_PROD_SUB, B.IMCS_ISU_YN SUB_PROD_ISU,
+		           B.IMCS_ISU_TYPE SUB_PROD_TYPE, DECODE(NVL(F.PPV_BLOCK_YN, 'N'), 'B', '0', '4') SUB_PROD_PRIORITY, '2' AS PROD_TYPE, C.PROD_CD UCUBE_PROD_CD,
+		           B.IMCS_PPS_PROD_DESC_DTL SUB_PROD_DESC, NVL(B.IMCS_UFLIX_PROD_YN, 'N') UFLIX_YN,
+		           DECODE(NVL(B.IMCS_USE_SCREEN_MOBILE, '4'), 'A', '10', 'B', '11', 'C', '12', 'D', '13', 'E', '14', 'F', '15', NVL(B.IMCS_USE_SCREEN_MOBILE, '4')) USE_SCREEN_MOBILE,
+		           CASE WHEN TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.IMCS_PRODUCT_START_DATETIME AND B.IMCS_PRODUCT_EXPIRY_DATETIME THEN 'Y' ELSE 'N' END EXPIRED_YN,
+		           NVL(B.IMCS_VIEW_CTRL, '0') VIEW_CTRL, NVL(C.PROD_SUB_YN, 'N') PROD_SUB_YN, NVL(C.ATRCT_CHNL_DV_CD, 'N') ATRCT_CHNL_DV_CD, B.IMCS_NSC_PROD_KIND NSC_PROD_KIND, NVL(D.MENU_ID, '999') GROUP_CD, NVL(G.MENU_NAME, '기타 월정액') GROUP_NM, G.SORT_NO as MENU_SORT_NO, 
+		           '' AS PROD_DETAIL_DESC, NVL(D.SORT_NO, 99999) SORT_NO, NVL(B.IMCS_SI_PACKAGE_ID, '0') DEDUCTION_PRICE_LIMIT, E.MIMS_PANEL_ID MIMS_PANEL_ID, NVL(F.CONCURRENT_COUNT, 0) AS CONCURRENT_COUNT,
+		           'N' AS SCREEN_INFO
+		      FROM IMCSUSER.PT_PD_PACKAGE_UNITED B, PVSUSER.PV_PROD_PRODUCT_TBL C, IMCSUSER.PT_PD_PACKAGE_PPM_RELATION D, IMCSUSER.PT_PD_PACKAGE_TERMS E, IMCSUSER.PT_PD_PACKAGE_SUB F, IMCSUSER.PT_PD_PACKAGE_PPM_MENU G
+		     WHERE B.IMCS_PRODUCT_KIND = '2'		/*부가*/
+		       AND B.IMCS_AMOUNT_GB    = 'F'		/*정액*/
+		       AND B.IMCS_PRODUCT_TYPE  = '4'		/*번들*/
+		       AND ( B.IMCS_PRICE <![CDATA[>]]> 0 OR (B.IMCS_PRICE = 0 AND F.PPV_BLOCK_YN = 'E') )	/*유료(buyNSProdcut에서는 31300, 31400 으로 대상 상품을 Fix 함)*/
+			<if test= 'productFlag == "P"'>
+		       AND B.IMCS_CA_SERVICE_ID IN ('B', 'G')
+		    </if>
+		    <if test= 'productFlag == "K"'>
+		       <!-- 2020.04.02 모바일 아이들나라 특정 상품만 전달이 아니라, 모바일TV 전달 상품 중 특정 상품만 빼달라고하여 임시로 공통코드 사용하여 제외처리 -->
+		       <!-- AND B.IMCS_CA_SERVICE_ID = 'K' -->
+		       <!-- AND B.IMCS_PRODUCT_ID NOT IN (SELECT COM_NAME FROM IMCSUSER.PT_CD_COM_CD WHERE GRP_ID = 'HDTVPRODKD') -->
+		       AND SUBSTR(F.APP_CTRL, 2, 1) = '1'
+		    </if>
+			<!--if test= 'productFlag == "G"'>
+		       AND B.IMCS_CA_SERVICE_ID = 'G'
+		    </if-->
+			<if test= "!(appVersion.equals('001'.toString()) or appVersion.equals('002'.toString()))">
+		       AND NVL(F.PPV_BLOCK_YN, 'N') != 'B'
+		    </if>
+		       AND NVL(B.IMCS_NSC_PROD_GB, 'N') = #{youthYn}
+		       AND C.PRODUCT_CD = B.IMCS_PRODUCT_ID
+		       AND NVL(B.IMCS_VIEW_CTRL, '0') in ('0', '2', '3')
+		       AND B.IMCS_PRODUCT_ID = D.PRODUCT_ID
+			   AND D.USE_YN = 'Y'
+			   AND D.MENU_ID = G.MENU_ID
+			   AND G.USE_YN = 'Y'
+		       AND B.IMCS_PRODUCT_ID = E.PRODUCT_ID(+)
+		       AND E.TERMS_TYPE(+) = 'A'
+		       AND B.IMCS_PRODUCT_ID = F.PRODUCT_ID
+		       AND G.special_flag != 'M'
+			   ) A       
+	     ORDER BY SCREEN_INFO DESC, MENU_SORT_NO, SORT_NO, SUB_PROD_PRICE DESC
+	</select>
+	
+	<!-- 상품정보 조회(하위호환성) -->
+	<select id="getNSProdinfoList2" resultType="GetNSProdinfoResponseVO" >
+		SELECT SUB_PROD_ID, SUB_PROD_NAME,  SUB_PROD_PRICE, SUB_PROD_SUB, SUB_PROD_ISU,
+			   SUB_PROD_TYPE, SUB_PROD_PRIORITY, PROD_TYPE, UCUBE_PROD_CD, SUB_PROD_DESC, UFLIX_YN,
+			   USE_SCREEN_MOBILE, EXPIRED_YN, VIEW_CTRL, PROD_SUB_YN, ATRCT_CHNL_DV_CD, NSC_PROD_KIND, GROUP_CD, NVL(B.GROUP_NM, '기타 월정액') GROUP_NM, PROD_DETAIL_DESC, DEDUCTION_PRICE_LIMIT MEM_DEDUCTION_PRICE_LIMIT, MIMS_PANEL_ID, CONCURRENT_COUNT, GRP_ORDER,
+			   SCREEN_INFO
+		  FROM (
+			SELECT B.IMCS_PRODUCT_ID SUB_PROD_ID, B.IMCS_PRODUCT_NAME SUB_PROD_NAME, B.IMCS_PRICE SUB_PROD_PRICE, B.IMCS_PRODUCT_DESC SUB_PROD_SUB, B.IMCS_ISU_YN SUB_PROD_ISU,
+		           B.IMCS_ISU_TYPE SUB_PROD_TYPE, B.IMCS_EXPIRED_DATE SUB_PROD_PRIORITY, '1' AS PROD_TYPE, '' UCUBE_PROD_CD,
+		           B.IMCS_PPS_PROD_DESC_DTL SUB_PROD_DESC, NVL(B.IMCS_UFLIX_PROD_YN, 'N') UFLIX_YN,
+		           DECODE(NVL(B.IMCS_USE_SCREEN_MOBILE, '4'), 'A', '10', 'B', '11', 'C', '12', 'D', '13', 'E', '14', 'F', '15', NVL(B.IMCS_USE_SCREEN_MOBILE, '4')) USE_SCREEN_MOBILE,
+		           CASE WHEN TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.IMCS_PRODUCT_START_DATETIME AND B.IMCS_PRODUCT_EXPIRY_DATETIME THEN 'Y' ELSE 'N' END EXPIRED_YN,
+		           NVL(B.IMCS_VIEW_CTRL, '0') VIEW_CTRL, '' PROD_SUB_YN, 'N' ATRCT_CHNL_DV_CD, B.IMCS_NSC_PROD_KIND NSC_PROD_KIND, NVL(C.GRP_CD, '999') GROUP_CD,
+		           NVL(PROD_DESC, '') PROD_DETAIL_DESC, NVL(C.SORT_NO, 99999) SORT_NO, NVL(B.IMCS_SI_PACKAGE_ID, '0') DEDUCTION_PRICE_LIMIT, D.MIMS_PANEL_ID MIMS_PANEL_ID, 0 AS CONCURRENT_COUNT,
+		           'N' AS SCREEN_INFO
+		      FROM IMCSUSER.PT_PD_PACKAGE_UNITED B, IMCSUSER.PT_PD_PACKAGE_ORDER C, IMCSUSER.PT_PD_PACKAGE_TERMS D, IMCSUSER.PT_PD_PACKAGE_SUB F
+		     WHERE B.IMCS_PRODUCT_TYPE = '7'		/* ippv = 7 */
+			<if test= 'productFlag == "P"'>
+		       AND B.IMCS_CA_SERVICE_ID IN ('B', 'G')
+		    </if>
+		    <if test= 'productFlag == "K"'>
+		        <!-- 2020.04.02 모바일 아이들나라 특정 상품만 전달이 아니라, 모바일TV 전달 상품 중 특정 상품만 빼달라고하여 임시로 공통코드 사용하여 제외처리 -->
+		        <!-- AND B.IMCS_CA_SERVICE_ID = 'K' -->
+		        <!-- AND B.IMCS_PRODUCT_ID NOT IN (SELECT COM_NAME FROM IMCSUSER.PT_CD_COM_CD WHERE GRP_ID = 'HDTVPRODKD') -->
+		       AND SUBSTR(F.APP_CTRL, 2, 1) = '1'
+		    </if>
+			<!--if test= 'productFlag == "G"'>
+		       AND B.IMCS_CA_SERVICE_ID = 'G'
+		    </if-->
+		       AND NVL(B.IMCS_NSC_PROD_GB, 'N') = #{youthYn}
+		       AND NVL(B.IMCS_VIEW_CTRL, '0') IN ('0', '2', '3')
+		       AND NVL(C.SORT_GB(+),'H') = #{sortGb}
+		       AND B.IMCS_PRODUCT_ID = C.PRODUCT_ID(+)
+		       AND B.IMCS_PRODUCT_ID = D.PRODUCT_ID(+)
+			   AND D.TERMS_TYPE(+) = 'A'
+			   AND B.IMCS_PRODUCT_ID = F.PRODUCT_ID
+		     UNION
+		    SELECT B.IMCS_PRODUCT_ID SUB_PROD_ID, B.IMCS_PRODUCT_NAME SUB_PROD_NAME, B.IMCS_PRICE SUB_PROD_PRICE, B.IMCS_PRODUCT_DESC SUB_PROD_SUB, B.IMCS_ISU_YN SUB_PROD_ISU,
+		           B.IMCS_ISU_TYPE SUB_PROD_TYPE, DECODE(NVL(F.PPV_BLOCK_YN, 'N'), 'B', '0', '4') SUB_PROD_PRIORITY, '2' AS PROD_TYPE, C.PROD_CD UCUBE_PROD_CD,
+		           B.IMCS_PPS_PROD_DESC_DTL SUB_PROD_DESC, NVL(B.IMCS_UFLIX_PROD_YN, 'N') UFLIX_YN,
+		           DECODE(NVL(B.IMCS_USE_SCREEN_MOBILE, '4'), 'A', '10', 'B', '11', 'C', '12', 'D', '13', 'E', '14', 'F', '15', NVL(B.IMCS_USE_SCREEN_MOBILE, '4')) USE_SCREEN_MOBILE,
+		           CASE WHEN TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN B.IMCS_PRODUCT_START_DATETIME AND B.IMCS_PRODUCT_EXPIRY_DATETIME THEN 'Y' ELSE 'N' END EXPIRED_YN,
+		           NVL(B.IMCS_VIEW_CTRL, '0') VIEW_CTRL, NVL(C.PROD_SUB_YN, 'N') PROD_SUB_YN, NVL(C.ATRCT_CHNL_DV_CD, 'N') ATRCT_CHNL_DV_CD, B.IMCS_NSC_PROD_KIND NSC_PROD_KIND, NVL(D.GRP_CD, '999') GROUP_CD, 
+		           '' AS PROD_DETAIL_DESC, NVL(D.SORT_NO, 99999) SORT_NO, NVL(B.IMCS_SI_PACKAGE_ID, '0') DEDUCTION_PRICE_LIMIT, E.MIMS_PANEL_ID MIMS_PANEL_ID, NVL(F.CONCURRENT_COUNT, 0) AS CONCURRENT_COUNT,
+		           'N' AS SCREEN_INFO
+		      FROM IMCSUSER.PT_PD_PACKAGE_UNITED B, PVSUSER.PV_PROD_PRODUCT_TBL C, IMCSUSER.PT_PD_PACKAGE_ORDER D, IMCSUSER.PT_PD_PACKAGE_TERMS E, IMCSUSER.PT_PD_PACKAGE_SUB F
+		     WHERE B.IMCS_PRODUCT_KIND = '2'		/*부가*/
+		       AND B.IMCS_AMOUNT_GB    = 'F'		/*정액*/
+		       AND B.IMCS_PRODUCT_TYPE  = '4'		/*번들*/
+		       AND ( B.IMCS_PRICE <![CDATA[>]]> 0 OR (B.IMCS_PRICE = 0 AND F.PPV_BLOCK_YN = 'E') )	/*유료(buyNSProdcut에서는 31300, 31400 으로 대상 상품을 Fix 함)*/
+			<if test= 'productFlag == "P"'>
+		       AND B.IMCS_CA_SERVICE_ID IN ('B', 'G')
+		    </if>
+		    <if test= 'productFlag == "K"'>
+		        <!-- 2020.04.02 모바일 아이들나라 특정 상품만 전달이 아니라, 모바일TV 전달 상품 중 특정 상품만 빼달라고하여 임시로 공통코드 사용하여 제외처리 -->
+		        <!-- AND B.IMCS_CA_SERVICE_ID = 'K' -->
+		        <!-- AND B.IMCS_PRODUCT_ID NOT IN (SELECT COM_NAME FROM IMCSUSER.PT_CD_COM_CD WHERE GRP_ID = 'HDTVPRODKD') -->
+		       AND SUBSTR(F.APP_CTRL, 2, 1) = '1'
+		    </if>
+			<!--if test= 'productFlag == "G"'>
+		       AND B.IMCS_CA_SERVICE_ID = 'G'
+		    </if-->
+		    <if test= "!(appVersion.equals('001'.toString()) or appVersion.equals('002'.toString()))">
+		       AND NVL(F.PPV_BLOCK_YN, 'N') != 'B'
+		    </if>
+		       AND NVL(B.IMCS_NSC_PROD_GB, 'N') = #{youthYn}
+		       AND C.PRODUCT_CD = B.IMCS_PRODUCT_ID
+		       AND NVL(B.IMCS_VIEW_CTRL, '0') IN ('0', '2', '3')
+		       AND NVL(D.SORT_GB(+),'H') = #{sortGb}
+		       AND B.IMCS_PRODUCT_ID = D.PRODUCT_ID(+)
+		       AND B.IMCS_PRODUCT_ID = E.PRODUCT_ID(+)
+		       AND E.TERMS_TYPE(+) = 'A'
+		       AND B.IMCS_PRODUCT_ID = F.PRODUCT_ID
+			<if test= "productFlag.equals('K'.toString()) and appVersion.equals('002'.toString()) and !paringSaId.equals('X'.toString())">
+		     UNION
+		    SELECT B.IMCS_PRODUCT_ID SUB_PROD_ID, B.IMCS_PRODUCT_NAME SUB_PROD_NAME, B.IMCS_PRICE SUB_PROD_PRICE, B.IMCS_PRODUCT_DESC SUB_PROD_SUB, 'N' AS SUB_PROD_ISU,
+		           B.IMCS_ISU_TYPE SUB_PROD_TYPE, '4' AS SUB_PROD_PRIORITY, '2' AS PROD_TYPE, C.PROD_CD UCUBE_PROD_CD,
+		           B.IMCS_PPS_PROD_DESC_DTL SUB_PROD_DESC, NVL(B.IMCS_UFLIX_PROD_YN, 'N') UFLIX_YN,
+		           DECODE(NVL(B.IMCS_USE_SCREEN_MOBILE, '4'), 'A', '10', 'B', '11', 'C', '12', 'D', '13', 'E', '14', 'F', '15', NVL(B.IMCS_USE_SCREEN_MOBILE, '4')) USE_SCREEN_MOBILE,
+		           'N' AS EXPIRED_YN,
+		           NVL(B.IMCS_VIEW_CTRL, '0') VIEW_CTRL, NVL(C.PROD_SUB_YN, 'N') PROD_SUB_YN, NVL(C.ATRCT_CHNL_DV_CD, 'N') ATRCT_CHNL_DV_CD, B.IMCS_NSC_PROD_KIND NSC_PROD_KIND, '999' AS GROUP_CD, 
+		           '' AS PROD_DETAIL_DESC, 99999 SORT_NO, NVL(B.IMCS_SI_PACKAGE_ID, '0') DEDUCTION_PRICE_LIMIT, '' AS MIMS_PANEL_ID, NVL(F.CONCURRENT_COUNT, 0) AS CONCURRENT_COUNT,
+		           'I' AS SCREEN_INFO
+		      FROM PT_VO_CUSTOM_PRODUCT A, IMCSUSER.PT_PD_PACKAGE_UNITED B, PVSUSER.PV_PROD_PRODUCT_TBL C, IMCSUSER.PT_PD_PACKAGE_SUB F
+		      	     WHERE A.SA_ID = #{paringSaId}
+		       AND A.MAC_ADDR = #{paringStbMac}
+		       AND A.PRODUCTCD = B.IMCS_PRODUCT_ID
+		       AND B.IMCS_PRODUCT_ID = C.PRODUCT_CD
+		       AND B.IMCS_PRODUCT_ID = F.PRODUCT_ID
+		       AND A.XCION_BILLING_TYP = 'P'
+		       AND B.IMCS_PRODUCT_TYPE = '3'
+		       AND B.IMCS_CA_SERVICE_ID = 'K'
+			</if>
+			   ) A,
+			   (SELECT COM_CD, COM_NAME GROUP_NM, TO_NUMBER(NVL(MIN_VALUE, '9999')) GRP_ORDER FROM IMCSUSER.PT_CD_COM_CD WHERE GRP_ID = 'HDTVPRODGP') B    
+	     WHERE A.GROUP_CD = B.COM_CD(+)            
+	     ORDER BY SCREEN_INFO DESC, GRP_ORDER, SORT_NO, SUB_PROD_PRICE DESC
+	</select>
+	
+	<!-- 이미지 정보 조회 -->
+	<select id="getImage" resultType="StillImageVO" >
+		SELECT 'http:' || REPLACE(NVL(A.IMAGE_URL, ''), '\', '/') AS IMG_URL,
+		       A.IMAGE_FILE_NAME AS IMG_FILE_NAME 
+		  FROM IMCSUSER.PT_PD_PACKAGE_PPM_INFO A 
+		 WHERE A.PRODUCT_ID = #{subProdId}
+		   AND A.PPM_TYPE = #{ppmType}
+		   AND A.CATEGORY_GB = #{applGb}	
+	</select>
+	
+	<!-- 부가세 요율 조회 -->
+	<select id="getSurtaxRateInfo" resultType="String">
+		SELECT NVL(TO_NUMBER(MIN_VALUE),0) MIN_VALUE
+		  FROM IMCSUSER.PT_CD_COM_CD                          
+		 WHERE GRP_ID = 'SURTAXRATE'                       
+		  AND ROWNUM = 1		    
+	</select>
+	
+	<!-- 멤버십 정기차감 정보 조회 -->
+	<select id="getMemberDeductionInfo" resultType="GetNSProdinfoResponseVO">
+		SELECT UCUBE_PROD_CD MEM_PROD_CD, DEDUCTION_PRICE MEM_DEDUCTION_PRICE
+		FROM
+			PVSUSER.PV_MEMBER_INFO_TBL A
+		WHERE A.SA_ID = #{saId}
+		AND A.MAC_ADDR = #{stbMac}
+		AND NVL(A.DEL_YN,'N') = 'N'
+		AND ROWNUM = 1
+	</select>
+	
+</mapper>

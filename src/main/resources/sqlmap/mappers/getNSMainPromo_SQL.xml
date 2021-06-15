@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSMainPromo.GetNSMainPromoDao">
+	
+	<!-- 공지 정보 조회 -->
+	<select id="getMainPromo" resultType="GetNSMainPromoResponseVO">
+	SELECT TO_CHAR(ROWNUM) ROW_NUM, X.PMO_IDX PMO_IDX, X.TYPE TYPE, X.MAIN_IMG_URL MAIN_IMG_URL,
+		   X.THUMBNAIL_IMG_URL THUMBNAIL_IMG_URL, X.CAT_ID CAT_ID, X.CONTS_ID CONTS_ID, X.CONTS_NAME CONTS_NAME,
+		   X.CONTS_DESC CONTS_DESC, X.CHA_NUM CHA_NUM, X.PR_INFO PR_INFO, X.BILL_FLAG BILL_FLAG, X.IMG_TYPE, X.EXPIRED_DATE
+       FROM (
+             SELECT
+                    NVL(A.PMO_IDX, ' ')	PMO_IDX,
+                    NVL(A.PMO_TYPE, ' ') TYPE,
+                    'http:' || REPLACE(NVL(A.MAIN_IMG_URL, ' '), '\', '/')||NVL(A.MAIN_IMG_FILE_NAME, ' ')  MAIN_IMG_URL,
+                    'http:' || REPLACE(NVL(A.THUMBNAIL_IMG_URL, ' '), '\', '/')||NVL(A.THUMBNAIL_IMG_FILE_NAME, ' ')  THUMBNAIL_IMG_URL,
+                    NVL(B.DISPLAY_CATEGORY_ID, ' ')   CAT_ID,
+                    NVL(A.CONTENTS_ID, ' ')   CONTS_ID,
+                    NVL(A.CONTENTS_NAME, ' ') CONTS_NAME,
+                    NVL(A.CONTENTS_DESC, ' ') CONTS_DESC,
+                    NVL(A.CHA_NUM, ' ')       CHA_NUM,
+                    NVL(A.PR_INFO, ' ')       PR_INFO,
+                    NVL(A.BILL_FLAG, ' ')     BILL_FLAG,
+                    A.IMG_TYPE IMG_TYPE,
+                    TO_CHAR(TO_DATE(SUBSTR(TO_CHAR(SYSDATE, 'YYYYMMDDHH24MI'), 1, 12), 'YYYYMMDDHH24MI') + 1/12, 'YYYYMMDDHH24MI') EXPIRED_DATE
+               FROM PT_VO_PROMOTION A,
+                    PT_VO_PROMOTION_DISPLAY B
+              WHERE A.PORTAL_TYPE = 'N'
+                AND SUBSTR(A.SCREEN_TYPE, TO_NUMBER(#{screenType}), 1) = '1'
+                AND A.CATEGORY_GB = 'NSC'
+                AND A.PMO_IDX = B.PMO_IDX
+		            AND A.PMO_TYPE = B.PMO_TYPE
+		            AND A.SCREEN_TYPE = B.SCREEN_TYPE
+		          ORDER BY A.IMG_TYPE, A.PMO_IDX
+             ) X
+	</select>
+	
+	<!-- 공지 메세지 조회 -->
+	<select id="getMessage" resultType="String">
+	SELECT NOTI_MESSAGE
+	  FROM (
+	        SELECT DISTINCT NVL(B.NOTI_MESSAGE, ' ') NOTI_MESSAGE, B.NOTI_IDX
+	          FROM PT_VO_PROMOTION_NOTI B,
+	               PT_VO_PROMOTION C
+	 	 WHERE B.PMO_TYPE = C.PMO_TYPE
+	 	   AND B.PMO_TYPE = 'N'
+	 	   AND SUBSTR(C.SCREEN_TYPE, TO_NUMBER(#{screenType}), 1) = '1'
+		 ORDER BY B.NOTI_IDX
+	       ) X
+	 ORDER BY X.NOTI_IDX
+	</select>
+	
+	
+</mapper> 

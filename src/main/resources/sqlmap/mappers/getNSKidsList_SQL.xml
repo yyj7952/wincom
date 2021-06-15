@@ -1,0 +1,775 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSKidsList.GetNSKidsListDao">
+
+	<resultMap type="HashMap" id="myUserInfo">
+		<result property="TEST_SBC" column="TEST_SBC" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="VIEW_FLAG2" column="VIEW_FLAG2" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="STB_SA_ID" column="STB_SA_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="STB_MAC" column="STB_MAC" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="myCategoryType">
+		<result property="CATEGORY_TYPE" column="CATEGORY_TYPE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="CATEGORY_LEVEL" column="CATEGORY_LEVEL" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="PARENT_CATEGORY_ID" column="PARENT_CATEGORY_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="CATEGORY_MONTH" column="CATEGORY_MONTH" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="myCategoryInfo">
+		<result property="c_result_type" column="C_RESULT_TYPE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_contents_id" column="C_CONTENTS_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_contents_name" column="C_CONTENTS_NAME" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_type" column="C_TYPE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_runtime" column="C_RUNTIME" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_is_51_ch" column="C_IS_51_CH" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_is_caption" column="C_IS_CAPTION" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_is_hd" column="C_IS_HD" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_point" column="C_POINT" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_pps_yn" column="C_PPS_YN" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_service_gb" column="C_SERVICE_GB" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_focus_file_name" column="C_FOCUS_FILE_NAME" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_normal_file_name" column="C_NORMAL_FILE_NAME" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_select_file_name" column="C_SELECT_FILE_NAME" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_ppm_yn" column="C_PPM_YN" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_ppm_prod_id" column="C_PPM_PROD_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_cat_img_type" column="C_CAT_IMG_TYPE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_img_file_name_h" column="C_IMG_FILE_NAME_H" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_img_file_name_v" column="C_IMG_FILE_NAME_V" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_is_cat_fh" column="C_IS_CAT_FH" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_is_cat_uhd" column="C_IS_CAT_UHD" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_animation_file" column="C_ANIMATION_FILE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_cat_level_month" column="C_CAT_LEVEL_MONTH" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_cat_sub_name" column="C_CAT_SUB_NAME" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_cat_img_file_name" column="C_CAT_IMG_FILE_NAME" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_recommend_id" column="C_RECOMMEND_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_category_flag" column="C_CATEGORY_FLAG" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_cat_level" column="C_CAT_LEVEL" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="sort_no" column="SORT_NO" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_cat_id" column="C_CAT_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="last_album_id" column="LAST_ALBUM_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="myWatchInfo">
+		<result property="tmp_cont_type" column="TMP_CONT_TYPE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="tmp_cont_id" column="TMP_CONT_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="tmp_cont_watch_date" column="TMP_CONT_WATCH_DATE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="screen_type" column="SCREEN_TYPE" javaType="String" typeHandler="EmptyStringIfNull"/>		
+	</resultMap>
+	
+	<resultMap type="HashMap" id="myHotCatInfo">
+		<result property="cont_type" column="CONT_TYPE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_book_cont_id" column="C_BOOK_CONT_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_character_cont_id" column="C_CHARACTER_CONT_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="myMsg_G">
+		<result property="msg_type" column="MSG_TYPE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="message" column="MESSAGE" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="myLastAlbumInfo">
+		<result property="c_cat_id" column="C_CAT_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_album_id" column="C_ALBUM_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="myCatSubVersion">
+		<result property="c_sub_version" column="C_SUB_VERSION" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_sub_P_version" column="C_SUB_P_VERSION" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_sub_PP_version" column="C_SUB_PP_VERSION" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="myKidsContentsCache">
+		<result property="c_result_type" column="C_RESULT_TYPE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_contents_id" column="C_CONTENTS_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_contents_name" column="C_CONTENTS_NAME" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_cat_id" column="C_CAT_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_kids_grade" column="C_KIDS_GRADE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_runtime" column="C_RUNTIME" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_51ch" column="C_51CH" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_is_caption" column="C_IS_CAPTION" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_is_hd" column="C_IS_HD" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_point" column="C_POINT" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_product_type" column="C_PRODUCT_TYPE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_3d_yn" column="C_3D_YN" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_price" column="C_PRICE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_service_gb" column="C_SERVICE_GB" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_album_type" column="C_ALBUM_TYPE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_is_fh" column="C_IS_FH" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_is_cat_fh" column="C_IS_CAT_FH" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_is_uhd" column="C_IS_UHD" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_is_cat_uhd" column="C_IS_CAT_UHD" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="adi_product_id" column="ADI_PRODUCT_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="cine_id" column="CINE_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="rank_no" column="RANK_NO" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="album_type_ord" column="ALBUM_TYPE_ORD" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="sort_no" column="SORT_NO" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="myContsPoster">
+		<result property="c_img_file_name_v" column="C_IMG_FILE_NAME_V" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_img_file_name_h" column="C_IMG_FILE_NAME_H" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="myWatchHotInfoCont">
+		<result property="c_result_type" column="C_RESULT_TYPE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_contents_id" column="C_CONTENTS_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_contents_name" column="C_CONTENTS_NAME" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_cat_id" column="C_CAT_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_kids_grade" column="C_KIDS_GRADE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_runtime" column="C_RUNTIME" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_51ch" column="C_51CH" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_is_caption" column="C_IS_CAPTION" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_is_hd" column="C_IS_HD" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_point" column="C_POINT" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_product_type" column="C_PRODUCT_TYPE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_3d_yn" column="C_3D_YN" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_price" column="C_PRICE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_service_gb" column="C_SERVICE_GB" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_album_type" column="C_ALBUM_TYPE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_is_fh" column="C_IS_FH" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_is_cat_fh" column="C_IS_CAT_FH" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_is_uhd" column="C_IS_UHD" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="c_is_cat_uhd" column="C_IS_CAT_UHD" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="adi_product_id" column="ADI_PRODUCT_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="cine_id" column="CINE_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="album_type2" column="ALBUM_TYPE2" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<!-- 가입자 정보 가져오기 검수 여부 -->
+	<select id="getUserInfo" resultMap="myUserInfo" parameterType="GetNSKidsListRequestVO">
+		SELECT
+			CASE WHEN A.test_sbc = 'Y' THEN A.test_sbc else 'N' END AS test_sbc
+			, CASE WHEN A.test_sbc = 'Y' THEN 'T' else 'V' END AS view_flag2
+			, B.stb_sa_id, B.stb_mac
+		FROM PT_VO_CUSTOM_ID A, PT_VO_SBC_PAIRING_TBL B
+		WHERE A.sa_id = #{saId}
+		AND A.mac_addr = #{stbMac}
+		AND A.sa_id = B.m_sa_id(+)
+		AND A.mac_addr = B.m_mac(+)
+	</select>
+	
+	<!-- 카테고리 속성 정보 조회 -->
+	<select id="getCatType" resultMap="myCategoryType" parameterType="GetNSKidsListRequestVO">
+		SELECT
+			NVL(A.ACTORS_DISPLAY,'N') AS category_type
+			, A.category_level
+			, A.parent_category_id
+			, CASE WHEN A.category_level = '3'
+				THEN TO_NUMBER(TO_CHAR(SYSDATE, 'MM'))
+				ELSE TO_NUMBER(NVL(A.point,1))
+				END AS category_month
+		FROM PT_VO_CATEGORY A
+		WHERE A.CATEGORY_ID = #{catId}
+	</select>
+	
+	<!-- 시청 이력 정보 조회 -->
+	<select id="listWatchInfo" resultMap="myWatchInfo" parameterType="GetNSKidsListRequestVO">
+		SELECT
+			    max(tmp_cont_type) KEEP(DENSE_RANK FIRST ORDER BY tmp_cont_watch_date DESC) tmp_cont_type,
+			    max(tmp_cont_id) KEEP(DENSE_RANK FIRST ORDER BY tmp_cont_watch_date DESC) tmp_cont_id,
+			    max(tmp_cont_watch_date) KEEP(DENSE_RANK FIRST ORDER BY tmp_cont_watch_date DESC) tmp_cont_watch_date,    
+			    max(screen_type) KEEP(DENSE_RANK FIRST ORDER BY tmp_cont_watch_date DESC) screen_type
+		FROM
+		(
+		    SELECT
+		    	'W' AS tmp_cont_type
+		    	, A.ADI_ALBUM_ID AS tmp_cont_id
+		    	, A.WATCH_DATE AS tmp_cont_watch_date
+		    	, 'N' as screen_type
+		    	, 'Y' AS N_SCREEN_YN
+		    FROM PT_VO_SET_TIME_PTT_NSC A
+		    WHERE A.P_IDX_SA = mod(#{c_idx_sa},33)
+		    AND A.SA_ID = #{saId}
+		    AND A.NSCN_CUST_NO = #{kids_category_type}
+		    <if test='ncnSaId != "" and ncnSaId != null'> 
+		    UNION
+		    SELECT
+		    	'W' AS tmp_cont_type
+		    	, A.ADI_ALBUM_ID AS tmp_cont_id
+		    	, A.WATCH_DATE AS tmp_cont_watch_date
+		    	, 'I' as screen_type
+		    	, MCUSTUSER.NUF_GET_NSCREEN_INFO(A.ADI_ALBUM_ID, #{testSbc}) AS N_SCREEN_YN
+		    FROM PT_VO_SET_TIME_PTT A
+		    WHERE A.P_IDX_SA = mod(substr(#{ncnSaId},-2),33)
+		    AND A.SA_ID = #{ncnSaId}
+		    AND A.NSCN_CUST_NO = #{kids_category_type}
+		    </if>
+		)
+		WHERE SUBSTR(N_SCREEN_YN,1,1) = 'Y'
+		GROUP BY tmp_cont_id
+		ORDER BY tmp_cont_watch_date DESC
+	</select>
+	
+	<!-- 인기순 컬럼 공통 -->
+	<sql id="myHotCatInfoCommonColumn">
+		SELECT /*+ USE_NL( A B C ) */
+			'H' AS cont_type
+			, MIN(A.CONTENT_ID) AS c_book_cont_id
+			, MIN(A.CATEGORY_ID) AS c_character_cont_id
+	</sql>
+	
+	<!-- 캐릭터관 인기순 정보 조회 -->
+	<select id="listHotCatInfo_C" resultMap="myHotCatInfo">
+		<include refid="myHotCatInfoCommonColumn" />
+		FROM AVBM_QBIC_TNSVOD_TB A
+		WHERE A.RANKING BETWEEN 1001 AND 1100
+		GROUP BY RANKING
+		ORDER BY RANKING
+	</select>
+	
+	<!-- 책읽어주는TV 인기순 정보 조회 -->
+	<select id="listHotCatInfo_B" resultMap="myHotCatInfo">
+		<include refid="myHotCatInfoCommonColumn" />
+		FROM AVBM_QBIC_TNSVOD_TB A
+			, PT_VO_CATEGORY B, PT_VO_CATEGORY_MAP C
+		WHERE A.RANKING BETWEEN 1101 AND 2000
+		AND B.CATEGORY_GB = 'NSC'
+		AND NVL(B.NSC_GB, 'N') = 'KID'
+		AND NVL(B.ACTORS_DISPLAY, 'N') = 'B'
+		AND B.CATEGORY_ID = C.CATEGORY_ID
+		AND A.CONTENT_ID = C.CONTENTS_ID
+		GROUP BY RANKING
+		ORDER BY RANKING
+	</select>
+	
+	<!-- 아마존 서비스 가능여부 확인
+		Y : AWS(아마존) 정상 서비스 가능
+		N : AWS(아마존) 정상 서비스 불가능 -->
+	<select id="getAwsSvcFlag" resultType="java.lang.String">
+		SELECT MIN_VALUE
+		FROM IMCSUSER.PT_CD_COM_CD
+		WHERE GRP_ID = 'CLOUDFLAG'
+		AND COM_CD = 'AWS'
+	</select>
+	
+	<!-- 앨범 포스터 이미지 -->
+	<select id="getPosterImgFileName" resultType="String" parameterType="GetNSKidsListRequestVO">
+		SELECT content_value
+		  FROM IMCSUSER.PT_LA_ALBUM_POSTER
+		 WHERE ALBUM_ID = #{last_album_id}
+		   AND screen_type = 'N'
+		   AND poster_type = 'P'
+		   AND service_yn = 'Y'
+	</select>
+	
+	<!-- 영어유치원인 경우 Message 조회 -->
+	<select id="listMessage_G" resultMap="myMsg_G">
+		SELECT
+			msg_type
+			, message
+		FROM IMCSUSER.PT_CD_MSG_INFO
+		WHERE CODE_ID = 'A0000'
+		ORDER BY MSG_TYPE
+	</select>
+	
+	<!-- last_album_info 조회 -->
+	<select id="listLastAlbumInfo" resultMap="myLastAlbumInfo" parameterType="GetNSKidsListRequestVO">
+		SELECT
+			X.root_cat_id AS c_cat_id
+			, X.contents_id AS c_album_id
+		FROM
+		(
+			SELECT
+				A.ROOT_CAT_ID
+				, B.CONTENTS_ID
+				, A.SORT_NO
+				, RANK() OVER (PARTITION BY A.ROOT_CAT_ID ORDER BY C.WATCH_DATE DESC) AS RANK_ORD
+				, C.WATCH_DATE
+			FROM (
+				SELECT
+					LPAD(' ', 2*(LEVEL-1)) || category_id
+					, category_level
+					, SYS_CONNECT_BY_PATH(CATEGORY_ID, '-')
+					, category_id
+					, CONNECT_BY_ROOT CATEGORY_ID as ROOT_CAT_ID
+					, CONNECT_BY_ROOT sort_no as SORT_NO
+				FROM PT_VO_CATEGORY
+				WHERE NVL(TEST_SBC,'N') IN ('N', #{testSbc})
+				START WITH parent_category_id = #{catId}
+				CONNECT BY PRIOR category_id = parent_category_id
+			) A, PT_VO_CATEGORY_MAP B, PT_VO_SET_TIME_PTT_NSC C
+			WHERE A.CATEGORY_ID = B.CATEGORY_ID AND B.CONTENTS_ID = C.ADI_ALBUM_ID
+			AND C.SA_ID = #{saId} AND C.P_IDX_SA = MOD(#{c_idx_sa}, 33)
+			AND C.NSCN_CUST_NO = 'M'
+		) X
+		WHERE RANK_ORD = 1
+		ORDER BY X.WATCH_DATE DESC, X.SORT_NO
+	</select>
+	
+	<!-- 카테고리 버전 조회(부모카테고리 ID) -->
+	<select id="getCatVersionLevel_pCatId" resultType="java.lang.String" parameterType="GetNSKidsListRequestVO">
+		SELECT X.CATEGORY_ID AS pCatId
+		FROM PT_VO_CATEGORY X,
+			(select category_id from pt_vo_category WHERE CATEGORY_GB = 'NSC'
+				 START WITH category_id = #{c_cat_id_cache}
+				CONNECT BY category_id = PRIOR parent_category_id
+			) Y
+		WHERE X.category_id = Y.category_id
+		AND X.CATEGORY_LEVEL = '2'
+	</select>
+	
+	<!-- 카테고리 버전 조회(서브버전) -->
+	<select id="getCatVersionLevel_subVer" resultMap="myCatSubVersion" parameterType="GetNSKidsListRequestVO">
+		SELECT
+			vod_version AS c_sub_version
+			, p_vod_version AS c_sub_P_version
+			, pp_vod_version AS c_sub_PP_version
+		FROM PT_VO_I20_VERSION
+		WHERE CATEGORY_ID = #{c_parent_category}
+	</select>
+	
+	<!-- 카테고리 정보 공통 컬럼 -->
+	<sql id="myCommonColumnCatInfo">
+		SELECT
+			'CAT' AS c_result_type
+			, A.category_id AS c_contents_id
+			, A.category_name AS c_contents_name
+			, CASE WHEN A.series_yn = 'Y' THEN 'SER' WHEN A.promotion_yn = 'Y' THEN 'PMO' ELSE NVL(A.category_type, '') END AS c_type
+			, '' AS c_runtime
+			, A.ch_51_yn AS c_is_51_ch
+			, '' AS c_is_caption
+			, A.is_hd AS c_is_hd
+			, '' AS c_point
+			, A.pkg_yn AS c_pps_yn
+			, CASE WHEN NVL(A.nsc_gb, 'LTE') = 'UFX' THEN A.service_icon_uflix ELSE A.service_icon END AS c_service_gb
+			, A.focus_file_name AS c_focus_file_name
+			, A.normal_file_name AS c_normal_file_name
+			, A.select_file_name AS c_select_file_name
+			, A.ppm_yn AS c_ppm_yn
+			, A.ppm_prod_id AS c_ppm_prod_id
+			, A.i30_image_hv_flag AS c_cat_img_type
+			, A.i30_h_file_name AS c_img_file_name_h
+			, A.i30_v_file_name AS c_img_file_name_v
+			, NVL(A.is_cat_fh,'N') AS c_is_cat_fh
+			, NVL(A.is_cat_uh, 'N') AS c_is_cat_uhd
+			, A.wide_file_name AS c_animation_file
+			, A.point AS c_cat_level_month
+			, A.thumbnail_file_name AS c_cat_sub_name
+			, A.img_file_name AS c_cat_img_file_name
+			, A.genre AS c_recommend_id
+			, A.caption_yn AS c_category_flag
+			, A.category_level AS c_cat_level
+			, A.sort_no AS sort_no
+			, '' AS c_cat_id
+			, (SELECT
+					min(contents_id) 
+				FROM pt_vo_category_map 
+				WHERE category_id = A.category_id 
+				AND rank_no = (SELECT decode(nvl(min(g.close_yn), 'N'), 'Y', max(m.rank_no), min(m.rank_no)) 
+								FROM pt_vo_category_map m, pt_vo_category g, IMCSUSER.PT_LA_ALBUM_INFO R, IMCSUSER.PT_LA_ASSET_INFO W 
+								WHERE m.category_id = A.category_id 
+								AND m.category_id = g.category_id 
+								AND R.album_id = m.contents_id 
+								AND R.ALBUM_ID = W.ALBUM_ID 
+								AND W.SCREEN_TYPE = 'N' 
+								AND (nvl(r.pre_mapping_yn, 'N') = 'N' or (nvl(r.pre_mapping_yn, 'N') = 'Y' AND nvl(m.viewing_flag, 'V') in ('V', 'P', #{viewFlag2})) or (nvl(w.RESERVED_FLAG,'N') in ('R', 'P', 'X'))) 
+			)) AS last_album_id 
+	</sql>
+	
+	<!-- 캐릭터관 2레벨 카테고리 정보 조회 -->
+	<select id="listCategoryInfo_C_2Lvl" resultMap="myCategoryInfo" parameterType="GetNSKidsListRequestVO">
+		<include refid="myCommonColumnCatInfo" />
+		FROM PT_VO_CATEGORY A
+		WHERE NVL(A.test_sbc,'N') IN ('N', #{testSbc})
+		AND A.category_gb = 'NSC'
+		AND NVL(A.nsc_gb, 'N') = 'KID'
+		AND A.PARENT_CATEGORY_ID = #{catId}
+		ORDER BY sort_no
+	</select>
+	
+	<!-- 선생님추천 2레벨 카테고리 정보 조회 -->
+	<!-- M3U8_FILE_1 : 캐스트이즈, M3U8_FILE_2 : 온누리넷 -->
+	<select id="listCategoryInfo_T_2Lvl" resultMap="myCategoryInfo" parameterType="GetNSKidsListRequestVO">
+	<include refid="myCommonColumnCatInfo" />
+	<![CDATA[
+		FROM PT_VO_CATEGORY A,
+			(
+				SELECT
+					B.CATEGORY_ID
+					, B.CATEGORY_LEVEL
+					, (SELECT NVL(X.POINT,'99')
+						FROM PT_VO_CATEGORY X
+						WHERE X.CATEGORY_ID = B.PARENT_CATEGORY_ID) AS POINT
+				FROM PT_VO_CATEGORY B START WITH PARENT_CATEGORY_ID = #{catId} CONNECT BY PRIOR CATEGORY_ID = PARENT_CATEGORY_ID
+			) Z
+		WHERE NVL(A.test_sbc,'N') IN ('N', #{testSbc})
+		AND A.category_gb = 'NSC'
+		AND NVL(A.nsc_gb, 'N') = 'KID'
+		AND A.CATEGORY_LEVEL <= 5
+		AND A.CATEGORY_ID = Z.CATEGORY_ID
+		AND (
+		       ( to_number(nvl(A.point,99)) IN (to_number(to_char(add_months(sysdate, -1), 'MM')), to_number(to_char(sysdate, 'MM')), to_number(to_char(add_months(sysdate, +1), 'MM'))) and A.CATEGORY_LEVEL = '4' )
+		      or 
+		       ( to_number(nvl(Z.point,99)) = to_number(to_char(sysdate, 'MM')) )
+		    )
+		START WITH PARENT_CATEGORY_ID = #{catId} CONNECT BY PRIOR A.CATEGORY_ID = PARENT_CATEGORY_ID
+		UNION
+		SELECT
+			'ALB' result_type
+			, X.CONTENT_VALUE AS CATEGORY_ID
+			, X.ALBUM_NAME AS category_name
+			, '' AS category_type
+			, '' run_time
+			, '' ch_51_yn
+			, '' caption_yn
+			, '' hd
+			, '' point
+			, '' pkg_yn
+			, '' service_icon
+			, '' focus_file_name
+			, '' normal_file_name
+			, '' select_file_name
+			, '' ppm_yn
+			, '' ppm_prod_id
+			, '' POSTER_TYPE
+			, '' CAT_H_FILE
+			, '' CAT_V_FILE
+			, '' is_cat_fh
+			, '' is_cat_uh
+			, '' animation_file
+			, '' month
+			, '' THUMBNAIL_FILE_NAME
+			, '' img_file_name
+			, '' recommend_id
+			, '' category_flag
+			, X.category_level AS c_cat_level
+			, TO_NUMBER(999||X.sort_num) AS sort_no
+			, '' AS c_cat_id
+			, X.ALBUM_ID AS last_album_id
+		FROM (				
+				SELECT
+					C.ALBUM_ID
+					, D.M3U8_FILE_1 || ',' || D.M3U8_FILE_2 AS CONTENT_VALUE
+					, C.ALBUM_NAME
+					, B.RANK_NO AS RANK_NO
+					, CATEGORY_LEVEL
+					, B.rank_no as sort_num
+				FROM PT_VO_CATEGORY A, PT_VO_CATEGORY_MAP B, IMCSUSER.PT_LA_ALBUM_INFO C, IMCSUSER.PT_LA_M3U8_INFO D,
+					(SELECT A.CATEGORY_ID FROM PT_VO_CATEGORY A
+						WHERE A.PARENT_CATEGORY_ID = #{catId}
+						AND to_number(nvl(A.point,99)) = to_number(to_char(sysdate, 'MM'))
+					) E
+				WHERE A.CATEGORY_ID = E.CATEGORY_ID
+				AND A.CATEGORY_ID = B.CATEGORY_ID
+				AND NVL(A.test_sbc, 'N') IN ('N', #{testSbc})
+				AND NVL(B.VIEWING_FLAG, 'V') IN ('V', 'P', #{viewFlag2})
+				AND B.CONTENTS_ID = C.ALBUM_ID
+				AND C.ALBUM_ID = D.M3U8_ID
+				AND D.M3U8_TYPE = 'H'
+				ORDER BY B.rank_no
+		) X
+		ORDER BY c_cat_level, sort_no
+	]]>
+	</select>
+	
+	<!-- 선생님추천 3레벨 이상 카테고리 정보 조회 -->
+	<!-- M3U8_FILE_1 : 캐스트이즈, M3U8_FILE_2 : 온누리넷 -->
+	<select id="listCategoryInfo_T_3OverLvl" resultMap="myCategoryInfo" parameterType="GetNSKidsListRequestVO">
+	<include refid="myCommonColumnCatInfo" />
+	<![CDATA[
+		FROM PT_VO_CATEGORY A,
+			(SELECT
+				B.CATEGORY_ID, B.CATEGORY_LEVEL,
+				(SELECT NVL(X.POINT,'99')
+				FROM PT_VO_CATEGORY X
+				WHERE X.CATEGORY_ID = B.PARENT_CATEGORY_ID) AS POINT
+			FROM PT_VO_CATEGORY B START WITH PARENT_CATEGORY_ID = #{kids_parent_category_id} CONNECT BY PRIOR CATEGORY_ID = PARENT_CATEGORY_ID) Z
+		WHERE NVL(A.test_sbc,'N') IN ('N', #{testSbc})
+		AND A.category_gb = 'NSC'
+		AND nvl(A.nsc_gb, 'N') = 'KID'
+		AND A.CATEGORY_LEVEL <= 5
+		AND A.CATEGORY_ID = Z.CATEGORY_ID
+		AND (
+		       ( to_number(nvl(A.point,99)) IN (to_number(to_char(add_months(to_date('2019' || #{kids_category_month} , 'YYYYMM'), -1), 'MM')), #{kids_category_month}, to_number(to_char(add_months(to_date('2019' || #{kids_category_month} , 'YYYYMM'), +1), 'MM'))) and A.CATEGORY_LEVEL = '4' )
+		      or
+		       ( to_number(nvl(Z.point,99)) = #{kids_category_month} )
+		    )
+			START WITH PARENT_CATEGORY_ID = #{kids_parent_category_id} CONNECT BY PRIOR A.CATEGORY_ID = PARENT_CATEGORY_ID
+		UNION
+		SELECT
+			'ALB' AS result_type
+			, X.CONTENT_VALUE AS CATEGORY_ID
+			, X.ALBUM_NAME AS category_name
+			, '' AS category_type
+			, '' run_time
+			, '' ch_51_yn
+			, '' caption_yn
+			, '' hd
+			, '' point
+			, '' pkg_yn
+			, '' service_icon
+			, '' focus_file_name
+			, '' normal_file_name
+			, '' select_file_name
+			, '' ppm_yn
+			, '' ppm_prod_id
+			, '' POSTER_TYPE
+			, '' CAT_H_FILE
+			, '' CAT_V_FILE
+			, '' is_cat_fh
+			, '' is_cat_uh
+			, '' animation_file
+			, '' month
+			, '' THUMBNAIL_FILE_NAME
+			, '' img_file_name
+			, '' recommend_id
+			, '' category_flag
+			, X.CATEGORY_LEVEL
+			, TO_NUMBER(999||X.sort_num) AS SORT_NO
+			, '' AS c_cat_id
+			, X.ALBUM_ID AS last_album_id
+		FROM (			
+			SELECT
+				C.ALBUM_ID
+            	, D.M3U8_FILE_1 || ',' || D.M3U8_FILE_2 AS CONTENT_VALUE
+				, C.ALBUM_NAME
+				, B.RANK_NO AS RANK_NO
+				, CATEGORY_LEVEL
+                , B.rank_no as sort_num
+			FROM PT_VO_CATEGORY A, PT_VO_CATEGORY_MAP B, IMCSUSER.PT_LA_ALBUM_INFO C, IMCSUSER.PT_LA_M3U8_INFO D 
+			WHERE A.CATEGORY_ID = #{catId}
+			AND A.CATEGORY_ID = B.CATEGORY_ID
+			AND NVL(A.test_sbc, 'N') IN ('N', #{testSbc})
+			AND NVL(B.VIEWING_FLAG, 'V') IN ('V', 'P', #{viewFlag2})
+            AND B.CONTENTS_ID = C.ALBUM_ID
+            AND C.ALBUM_ID = D.M3U8_ID
+            AND D.M3U8_TYPE = 'H'
+			ORDER BY B.rank_no
+		) X
+		ORDER BY c_cat_level, SORT_NO
+	]]>
+	</select>
+	
+	<!-- 영어유치원 2레벨, 3레벨 카테고리 정보 조회 -->
+	<!-- M3U8_FILE_1 : 캐스트이즈, M3U8_FILE_2 : 온누리넷 -->
+	<select id="listCategoryInfo_G_2_3Lvl" resultMap="myCategoryInfo" parameterType="GetNSKidsListRequestVO">
+	<include refid="myCommonColumnCatInfo" />
+	<![CDATA[
+		FROM PT_VO_CATEGORY A
+		WHERE NVL(A.test_sbc,'N') IN ('N', #{testSbc})
+		AND A.category_gb = 'NSC'
+		AND nvl(A.nsc_gb, 'N') = 'KID'
+		AND A.PARENT_CATEGORY_ID = #{catId}
+		UNION
+		SELECT
+			'ALB' result_type
+			, X.CONTENT_VALUE AS CATEGORY_ID
+			, X.ALBUM_NAME AS category_name
+			, '' AS category_type
+			, '' run_time
+			, '' ch_51_yn
+			, '' caption_yn
+			, '' hd
+			, '' point
+			, '' pkg_yn
+			, '' service_icon
+			, '' focus_file_name
+			, '' normal_file_name
+			, '' select_file_name
+			, '' ppm_yn
+			, '' ppm_prod_id
+			, '' POSTER_TYPE
+			, '' CAT_H_FILE
+			, '' CAT_V_FILE
+			, '' is_cat_fh
+			, '' is_cat_uh
+			, '' animation_file
+			, '' month
+			, '' THUMBNAIL_FILE_NAME
+			, '' img_file_name
+			, '' recommend_id
+			, '' category_flag
+			, X.CATEGORY_LEVEL
+			, TO_NUMBER(999||X.RANK_NO) AS SORT_NO
+			, '' AS c_cat_id
+			, X.ALBUM_ID AS last_album_id
+		  FROM (
+			SELECT
+				C.ALBUM_ID
+            	, D.M3U8_FILE_1 || ',' || D.M3U8_FILE_2 AS CONTENT_VALUE
+				, C.ALBUM_NAME
+				, B.RANK_NO AS RANK_NO
+				, CATEGORY_LEVEL
+			FROM PT_VO_CATEGORY A, PT_VO_CATEGORY_MAP B, IMCSUSER.PT_LA_ALBUM_INFO C, IMCSUSER.PT_LA_M3U8_INFO D 
+			WHERE A.CATEGORY_ID = #{catId}
+			AND A.CATEGORY_ID = B.CATEGORY_ID
+			AND NVL(A.test_sbc, 'N') IN ('N', #{testSbc})
+			AND NVL(B.VIEWING_FLAG, 'V') IN ('V', 'P', #{viewFlag2})
+            AND B.CONTENTS_ID = C.ALBUM_ID
+            AND C.ALBUM_ID = D.M3U8_ID
+            AND D.M3U8_TYPE = 'H'
+			ORDER BY B.rank_no
+		) X
+		ORDER BY SORT_NO
+	]]>
+	</select>
+	
+	<!-- 모바일 아이들나라 캐시용 쿼리
+		C소스는 album_type_ord DESC로 하고 소스에서 중복되는 데이터중 마지막 데이터를 출력함.
+		자바 소스는 album_type_ord ASC로 하고 소스에서 중복되는 데이터중 첫번째 데이터를 출력함.
+	-->
+	<select id="listKidsContentsCache" resultMap="myKidsContentsCache" parameterType="GetNSKidsListRequestVO">
+		SELECT DISTINCT
+			'ALB' AS c_result_type
+			, EE.adi_album_id AS c_contents_id
+			, EE.adi_album_name AS c_contents_name
+			, AA.category_id AS c_cat_id
+			, SUBSTRB(BB.APPROVAL_ID,1,2) AS c_kids_grade
+			, DECODE(TO_CHAR(TO_NUMBER(SUBSTR(BB.display_run_time,1,2))*60 + TO_NUMBER(SUBSTR(BB.display_run_time,3,2))) , '0', '1', 
+					TO_CHAR(TO_NUMBER(SUBSTR(BB.display_run_time,1,2))*60 + TO_NUMBER(SUBSTR(BB.display_run_time,3,2)))  ) AS c_runtime
+			, UPPER(NVL(CC.audio_type, '')) AS c_51ch
+			, CASE WHEN CC.smi_yn = 'Y' AND CC.smi_imp_yn = 'Y' THEN 'Y' ELSE 'N' END AS c_is_caption
+			, NVL(CC.hdcontent, 'N') AS c_is_hd
+			, '' AS c_point
+			, AA.product_type AS c_product_type
+			, NVL(CC.is_3d, 'N') AS c_3d_yn
+			, TO_CHAR(TRIM(NVL(BB.suggested_price, '0')),'FM999,999,999,999,999,999,999') AS c_price
+			, CASE WHEN NVL(AA.nsc_gb, 'LTE') = 'UFX' THEN EE.service_icon_uflix ELSE EE.service_icon END AS c_service_gb
+			, AA.album_type AS c_album_type
+			, NVL(EE.is_fh, 'N') AS c_is_fh
+			, NVL(AA.is_cat_fh, 'N') AS c_is_cat_fh
+			, NVL(EE.is_uh, 'N') AS c_is_uhd
+			, NVL(AA.is_cat_uh, 'N') AS c_is_cat_uhd
+			<!-- , AA.adi_product_id AS adi_product_id -->
+			, NVL(FF.CINE_ID,'X') AS cine_id
+			, AA.rank_no
+			, DECODE(AA.album_type, '3D', '1', 'F1', '2', 'F2', '3', 'HD', '4', 'SH', '5', 'SD', '6', 'PR', '7', '8') AS album_type_ord
+			, 999 AS sort_no
+		FROM (
+				SELECT
+					a.adi_product_id,a.nsc_album_id,E.category_id,E.cha_num,j.category_level,E.rank_no
+					,A.album_type,E.viewing_flag,J.is_cat_uh,J.is_cat_fh,E.create_date,j.sort_no,J.nsc_gb
+					,min(B.product_type) product_type
+				FROM PT_VO_CATEGORY J,
+					PT_VO_CATEGORY_MAP E,
+					imcsuser.PT_LA_PACKAGE_ASSET A,
+					imcsuser.PT_PD_PACKAGE B,
+					imcsuser.PT_PD_PACKAGE_DETAIL C
+				WHERE j.category_id = #{c_cat_id_cache}
+				AND E.category_id = J.category_id
+				AND A.nsc_album_id=e.contents_id
+				AND C.contents_id=A.asset_id
+				AND C.product_id=B.product_id
+				AND J.category_gb = 'NSC'
+				AND NVL(J.series_yn, 'N') = 'N'
+				AND nvl(J.nsc_gb, 'N') = 'KID'
+				AND NVL(J.test_sbc, 'N') IN ('N', #{testSbc})
+				GROUP BY a.adi_product_id,E.category_id,A.album_type,E.viewing_flag,J.is_cat_uh,J.is_cat_fh,a.nsc_album_id,E.cha_num
+						,E.rank_no,j.category_level,E.create_date,j.sort_no,J.nsc_gb
+			) AA,
+			imcsuser.PT_LA_TITLE_ASSET BB,
+			imcsuser.PT_LA_CONTENT_ASSET CC,
+			IMCSUSER.PT_LA_ALBUM_MST EE,
+			IMCSUSER.PT_LA_RESERVE_ASSET FF
+		WHERE AA.adi_product_id = BB.adi_product_id
+		AND AA.adi_product_id = CC.adi_product_id
+		AND AA.nsc_album_id = EE.adi_album_id
+		AND AA.adi_product_id = FF.adi_product_id(+)
+		AND (nvl(CC.pre_mapping_yn, 'N') = 'N' or (nvl(CC.pre_mapping_yn, 'N') = 'Y' and nvl(AA.viewing_flag, 'V') in ('V', 'P', #{viewFlag2})))
+		ORDER BY c_result_type DESC, sort_no, category_id, rank_no, album_type_ord ASC
+	</select>
+	
+	<!-- 컨텐츠 포스터 조회. 저 위에 쿼리와 같은 중복 쿼리임. -->
+	<select id="getContsPoster" resultMap="myContsPoster" parameterType="String">
+		SELECT
+			content_value AS c_img_file_name_v
+			, '' AS c_img_file_name_h
+		FROM IMCSUSER.PT_LA_ALBUM_POSTER
+		WHERE ALBUM_ID = #{contents_id}
+		AND screen_type = 'N'
+		AND poster_type = 'P'
+		AND service_yn = 'Y'
+	</select>
+	
+	<!-- 시청/인기순 데이터가 캐시에 없을 때 조회함(중복데이터 존재함)
+		중복이 존재하기 때문에 album_type2 ASC 으로 하고 자바소스에서 첫번째 데이터만 출력한다.
+	-->
+	<select id="listWatchHotInfoCont" resultMap="myWatchHotInfoCont" parameterType="GetNSKidsListRequestVO">
+		SELECT DISTINCT
+			'ALB' AS c_result_type
+			, EE.adi_album_id AS c_contents_id
+			, EE.adi_album_name AS c_contents_name
+			, AA.category_id AS c_cat_id
+			, SUBSTRB(BB.APPROVAL_ID,1,2) AS c_kids_grade
+			, DECODE(TO_CHAR(TO_NUMBER(SUBSTR(BB.display_run_time,1,2))*60 + TO_NUMBER(SUBSTR(BB.display_run_time,3,2))) , '0', '1' ,
+					TO_CHAR(TO_NUMBER(SUBSTR(BB.display_run_time,1,2))*60 + TO_NUMBER(SUBSTR(BB.display_run_time,3,2)))  ) AS c_runtime
+			, UPPER(NVL(CC.audio_type, '')) AS c_51ch
+			, CASE WHEN CC.smi_yn = 'Y' AND CC.smi_imp_yn = 'Y' THEN 'Y' ELSE 'N' END AS c_is_caption
+			, NVL(CC.hdcontent, 'N') AS c_is_hd
+			, '' AS c_point
+			, AA.product_type AS c_product_type
+			, NVL(CC.is_3d, 'N') AS c_3d_yn
+			, TO_CHAR(TRIM(NVL(BB.suggested_price, '0')),'FM999,999,999,999,999,999,999') AS c_price
+			, CASE WHEN NVL(AA.nsc_gb, 'LTE') = 'UFX' THEN EE.service_icon_uflix ELSE EE.service_icon END AS c_service_gb
+			, AA.album_type AS c_album_type
+			, NVL(EE.is_fh, 'N') AS c_is_fh
+			, NVL(AA.is_cat_fh, 'N') AS c_is_cat_fh
+			, NVL(EE.is_uh, 'N') AS c_is_uhd
+			, NVL(AA.is_cat_uh, 'N') AS c_is_cat_uhd
+			<!-- , AA.adi_product_id AS adi_product_id -->
+			, NVL(FF.CINE_ID,'X') AS cine_id
+			, decode(AA.album_type, '3D', '1', 'F1', '2', 'F2', '3', 'HD', '4', 'SH', '5', 'SD', '6', 'PR', '7', '8') AS album_type2
+		FROM (
+				select
+					a.adi_product_id,a.nsc_album_id,E.category_id,E.cha_num,j.category_level,E.rank_no
+					,A.album_type,E.viewing_flag,J.is_cat_uh,J.is_cat_fh,E.create_date,j.sort_no,J.nsc_gb
+					,min(B.product_type) product_type
+				from PT_VO_CATEGORY J,
+					PT_VO_CATEGORY_MAP E,
+					imcsuser.PT_LA_PACKAGE_ASSET A,
+					imcsuser.PT_PD_PACKAGE B,
+					imcsuser.PT_PD_PACKAGE_DETAIL C
+				where j.category_id in (select category_id
+										from pt_vo_category
+										START WITH category_id = #{catId}
+										CONNECT BY PRIOR category_id = parent_category_id
+				)
+				and E.category_id = J.category_id
+				and A.nsc_album_id=e.contents_id
+				and C.contents_id=A.asset_id
+				and C.product_id=B.product_id
+				and J.category_gb = 'NSC'
+				and E.contents_id = #{c_cont_id}
+				and (J.series_yn = 'N' or J.series_yn is null or J.series_yn = '')
+				and nvl(J.nsc_gb, 'N') = 'KID'
+				and (J.test_sbc = #{testSbc} or J.test_sbc = 'N' or J.test_sbc is null or J.test_sbc = '')
+				group by a.adi_product_id,E.category_id,A.album_type,E.viewing_flag,J.is_cat_uh,J.is_cat_fh,a.nsc_album_id,E.cha_num
+						,E.rank_no,j.category_level,E.create_date,j.sort_no,J.nsc_gb
+			) AA,
+			imcsuser.PT_LA_TITLE_ASSET BB,
+			imcsuser.PT_LA_CONTENT_ASSET CC,
+			IMCSUSER.PT_LA_ALBUM_MST EE,
+			IMCSUSER.PT_LA_RESERVE_ASSET FF
+		WHERE AA.adi_product_id = BB.adi_product_id	
+		AND AA.adi_product_id = CC.adi_product_id
+		AND AA.nsc_album_id = EE.adi_album_id
+		AND AA.adi_product_id = FF.adi_product_id(+)
+		AND (nvl(CC.pre_mapping_yn, 'N') = 'N' or (nvl(CC.pre_mapping_yn, 'N') = 'Y' and nvl(AA.viewing_flag, 'V') in ('V', 'P', #{viewFlag2})))
+		ORDER BY album_type2 ASC
+	</select>
+	
+	
+</mapper> 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

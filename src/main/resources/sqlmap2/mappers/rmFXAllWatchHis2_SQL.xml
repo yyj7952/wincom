@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom2.imcs.api.rmFXAllWatchHis.RmFXAllWatchHisDao2">
+
+	<!-- 시청목록 삭제 (DEL_YN 업데이트) -->
+	<update id="rmFXAllWatchHisUpdate" parameterType="kr.co.wincom.imcs.api.rmFXAllWatchHis.RmFXAllWatchHisRequestVO" >
+		UPDATE PT_VO_WATCH_HISTORY A 
+		   SET DEL_YN = 'Y'          
+		 WHERE A.SA_ID = #{saId}
+		   AND (DEL_YN = 'N' OR DEL_YN IS NULL OR DEL_YN = '') 
+		   AND (A.CONTENTS_ID IN (SELECT C.CONTENTS_ID 
+		  FROM PT_VO_CATEGORY B, PT_VO_CATEGORY_MAP C 
+		 WHERE B.CATEGORY_ID = C.CATEGORY_ID
+		   AND B.CATEGORY_GB = #{contsGb}
+		   AND NVL(B.NSC_GB, 'LTE') = 'UFX' )
+		    OR A.CONTENTS_ID IN (
+		        SELECT ASSET_ID 
+		          FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+		         WHERE ADI_ALBUM_ID IN (
+		                SELECT C.CONTENTS_ID 
+		                  FROM PT_VO_CATEGORY B, PT_VO_CATEGORY_MAP C 
+		                 WHERE B.CATEGORY_ID = C.CATEGORY_ID
+		                   AND B.CATEGORY_GB = #{contsGb}
+		                   AND NVL(B.NSC_GB, 'LTE') = 'UFX'
+		               )
+		       ) )
+		   AND A.P_IDX_SA = MOD(#{pIdxSa}, 33)
+	</update>
+</mapper> 

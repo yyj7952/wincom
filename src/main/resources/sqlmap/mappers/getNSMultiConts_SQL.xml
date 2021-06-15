@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSMultiConts.GetNSMultiContsDao">
+	
+	<!-- 시청 여부 조회 -->
+	<select id="isWatch" parameterType="GetNSMultiContsRequestVO" resultType="String">
+		SELECT DISTINCT 1
+		FROM PT_VO_WATCH_HISTORY_NSC A
+		WHERE A.SA_ID = #{saId}
+		AND MAC_ADDR = #{stbMac}
+		AND CONTENTS_ID = #{albumId}
+		AND A.P_IDX_SA = MOD(#{pIdxSa}, 33)
+	</select>
+	
+	<!-- 링크타입 정보 조회 -->
+	<select id="getLinkTime" parameterType="GetNSMultiContsRequestVO" resultType="GetNSMultiContsResponseVO">
+		SELECT DISTINCT ADI_ALBUM_ID
+				, A.LINK_TIME
+		FROM PT_VO_SET_TIME_PTT_NSC A
+		WHERE A.SA_ID = #{saId}
+		AND ADI_ALBUM_ID = #{albumId}
+		AND A.P_IDX_SA = MOD(#{pIdxSa}, 33)
+		AND A.NSCN_CUST_NO = 'M'
+	</select>
+	
+	<!-- 런타임 정보 조회 -->
+	<select id="getAlbumRuntime" parameterType="GetNSMultiContsRequestVO" resultType="String">
+		SELECT DISTINCT TO_CHAR(TO_NUMBER(SUBSTR(B.RUN_TIME, 1, 2))*3600
+				+ TO_NUMBER(SUBSTR(B.RUN_TIME, 3, 2))*60
+				+ TO_NUMBER(SUBSTR(B.RUN_TIME, 5, 2))) RUN_TIME
+		FROM IMCSUSER.PT_LA_PACKAGE_ASSET A
+			 , IMCSUSER.PT_LA_TITLE_ASSET B
+		WHERE A.NSC_ALBUM_ID = #{albumId}
+		AND A.ADI_PRODUCT_ID = B.ADI_PRODUCT_ID
+	</select>
+	
+</mapper> 

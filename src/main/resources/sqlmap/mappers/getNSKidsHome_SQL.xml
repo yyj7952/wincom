@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSKidsHome.GetNSKidsHomeDao">
+
+	<resultMap type="HashMap" id="myUserInfo">
+		<result property="test_sbc" column="TEST_SBC" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="view_flag" column="VIEW_FLAG" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="stb_sa_id" column="STB_SA_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="stb_mac_addr" column="STB_MAC_ADDR" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="stb_pairing" column="STB_PAIRING" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<!-- 가입자 정보 가져오기 검수 여부 -->
+	<select id="getUserInfo" resultMap="myUserInfo" parameterType="GetNSKidsHomeRequestVO">		
+		SELECT
+			case when A.test_sbc = 'Y' then A.test_sbc else 'N' end AS test_sbc
+			, case when A.test_sbc = 'Y' then 'T' else 'V' end AS view_flag
+			, NVL(T.stb_sa_id, '') AS stb_sa_id
+			, NVL(T.stb_mac, '') AS stb_mac_addr
+			, NVL(T.flag, 'N') AS stb_pairing
+		FROM PT_VO_CUSTOM_ID A,
+		(
+			SELECT m_sa_id, stb_sa_id, stb_mac, flag, ctn
+			FROM PT_VO_SBC_PAIRING_TBL
+			WHERE m_sa_id = #{saId}
+			AND m_mac = #{stbMac}
+			AND flag = 'Y'
+		) T
+		WHERE A.sa_id = #{saId}
+		AND A.mac_addr = #{stbMac}
+		AND A.sa_id = T.m_sa_id (+)
+	</select>
+	
+	<!-- 최근 시청 정보 가져오기 1 -->
+	<select id="getWatchInfo_1" resultType="KidsHomeWatchInfo_1_VO" parameterType="GetNSKidsHomeRequestVO">		
+		SELECT
+			contents_id AS album_id
+			, TO_NUMBER(link_time) AS link_time
+			, REGEXP_SUBSTR(cate_info, '[^|]+', 1, 3) category_id
+			, REGEXP_SUBSTR(cate_info, '[^|]+', 1, 2) series_yn
+			, REGEXP_SUBSTR(cate_info, '[^|]+', 1, 4) series_no
+		  FROM (SELECT M.contents_id, W.link_time, W.watch_date,
+					   MAX(DECODE(NVL(R.pkg_yn, 'N'), 'Y', 0, 1) || '|' ||
+								  NVL(R.series_yn, 'N') || '|' ||
+								  R.category_id || '|' || M.series_no) cate_info
+					   FROM PT_VO_CATEGORY R,
+					   PT_VO_CATEGORY_MAP M,
+					   (SELECT A.adi_album_id, NVL(A.link_time, '0') link_time, A.watch_date, substr(${@kr.co.wincom.imcs.common.util.GlobalCom@getDBMcustUser()}.nuf_get_nscreen_info(A.adi_album_id, #{testSbc}),1,1) nscreen_yn
+						   FROM PT_VO_SET_TIME_PTT A
+						  WHERE 1 = #{iCheckFlag}
+						    AND A.sa_id = #{temp_stb_sa_id}
+							AND A.p_idx_sa = #{p_stb_idx_sa}
+							AND A.nscn_cust_no = 'M' 
+						UNION ALL
+						SELECT A.adi_album_id, NVL(A.link_time, '0') link_time, A.watch_date, 'Y' nscreen_yn
+						   FROM PT_VO_SET_TIME_PTT_NSC A
+						  WHERE A.sa_id = #{saId}
+							AND A.p_idx_sa = #{p_idx_sa}
+							AND A.nscn_cust_no = 'M'
+							) W
+				 WHERE R.category_id = M.category_id
+					AND R.category_gb = 'NSC'
+					AND M.contents_id = W.adi_album_id
+					AND NVL(M.viewing_flag, 'V') IN ('V', #{viewFlag})
+					AND NVL(R.test_sbc, 'N') IN ('N', #{testSbc})
+					AND NVL(R.nsc_gb, 'N') = 'KID'
+					AND W.nscreen_yn = 'Y'
+				 GROUP BY contents_id, link_time, watch_date
+				 ORDER BY watch_date desc, cate_info
+			   ) X
+		 WHERE rownum = 1
+	</select>
+	
+	<!-- 최근 시청 정보 앨범 가져오기 -->
+	<select id="getWatchInfoAlbum" resultType="KidsHomeWatchInfo_album_VO" parameterType="GetNSKidsHomeRequestVO">		
+		SELECT /*+LEADING(A B) USE_NL(C G)*/
+			A.album_name AS album_nm
+			, A.series_no AS series_desc
+			, TO_CHAR(TO_NUMBER(SUBSTR(B.run_time, 1, 2)) * 60 + TO_NUMBER(SUBSTR(B.run_time, 3, 2))) AS runtime
+			, TO_NUMBER(SUBSTR(B.run_time, 1, 2)) * 3600 + TO_NUMBER(SUBSTR(B.run_time, 3, 2)) * 60 + TO_NUMBER(SUBSTR(B.run_time, 5, 2)) AS i_runtime
+			, MAX(case when C.poster_type = 'T' then C.content_value else '' end) AS poster_h
+			, MAX(case when C.poster_type = 'P' then C.content_value else '' end) AS poster_v
+			, G.still_file
+		FROM IMCSUSER.PT_LA_ALBUM_INFO A,
+			IMCSUSER.PT_LA_ALBUM_SUB B,
+			IMCSUSER.PT_LA_ALBUM_POSTER C,
+			(SELECT adi_album_id, main_img_file_name still_file
+				FROM IMCSUSER.PT_LA_ALBUM_IMG
+				WHERE adi_album_id = #{albumId}
+				AND img_flag = 'N'
+				AND rownum = 1
+			) G
+		WHERE 1 = 1
+		AND A.album_id = B.album_id
+		AND A.album_id = C.album_id
+		AND A.album_id = G.adi_album_id
+		AND C.poster_type IN ('P', 'T')
+		AND C.screen_type = 'N'
+		AND C.service_yn = 'Y'
+		AND A.album_id = #{albumId}
+		GROUP BY A.album_name, A.series_no, B.run_time, still_file
+	</select>
+	
+	<!-- 최근 사용한 메뉴 가져오기 -->
+	<select id="listKidsHomeMenu" resultType="KidsHomeMenu_VO" parameterType="GetNSKidsHomeRequestVO">		
+		SELECT
+			Trim(A.suggest_type) AS suggest_type
+			, A.menu_id
+			, A.menu_nm
+			, A.menu_desc
+			, case when NVL(series_yn, 'N') = 'Y' then 'SER'
+					else (case NVL(R.caption_yn, '')
+							when 'A' then 'APP'
+							when 'R' then 'RCM'
+							when 'U' then 'MNU'
+							when 'T' then 'TOP'
+							when 'D' then 'DIR'
+							when 'P' then 'FLO'
+							when 'Q' then 'PRV'
+							else '' end) end type
+			, case when R.actors_display IN ('B','C','P','G','T','E','R','H') then R.actors_display else '' end AS cat_type
+			, case when NVL(R.caption_yn, '') = 'L' then 'L' else DECODE(NVL(R.caption_yn, ''), 'U', Trim(R.point), DECODE(Trim(R.point), 'P', 'P', 'E', 'E', '')) end AS cat_flag
+			, case when NVL(R.caption_yn, '') IN ('A','R') then NVL(R.genre, '') else '' end AS recommend_id
+			, case when NVL(R.order_yn, '') IN ('T','L') then R.order_yn else '' end AS disp_option
+			, R.focus_file_name AS image_file
+			, A.order_no
+		FROM IMCSUSER.PT_KD_SUGGEST_MENU A, PT_VO_CATEGORY R
+		WHERE A.menu_id = R.category_id
+		AND A.menu_id NOT IN
+			(
+				SELECT NVL(REGEXP_SUBSTR(#{lastUseMenu}, '[^;]+', 1, 1), 'X') menu_id FROM dual
+				UNION ALL
+				SELECT NVL(REGEXP_SUBSTR(#{lastUseMenu}, '[^;]+', 1, 2), 'X') menu_id FROM dual
+			)
+		AND A.mng_type = 'S'
+		AND A.screen_type = 'N'
+		AND R.category_gb = 'NSC'
+		AND NVL(R.test_sbc, 'N') IN ('N', #{testSbc})
+		AND NVL(R.nsc_gb, 'N') = 'KID'
+		UNION ALL
+		SELECT
+			'0' AS suggest_type
+			, A.menu_id
+			, R.category_name AS menu_nm
+			, (SELECT B.menu_desc FROM IMCSUSER.PT_KD_SUGGEST_MENU B WHERE B.mng_type = 'S' AND B.screen_type = 'N' AND B.menu_id = A.menu_id) menu_desc
+			, case when NVL(series_yn, 'N') = 'Y' then 'SER'
+					else (case NVL(R.caption_yn, '')
+							when 'A' then 'APP'
+							when 'R' then 'RCM'
+							when 'U' then 'MNU'
+							when 'T' then 'TOP'
+							when 'D' then 'DIR'
+							when 'P' then 'FLO'
+							when 'Q' then 'PRV'
+							else '' end) end type
+			, case when R.actors_display IN ('B','C','P','G','T','E','R','H') then R.actors_display else '' end cat_type
+			, case when NVL(R.caption_yn, '') = 'L' then 'L' else DECODE(NVL(R.caption_yn, ''), 'U', Trim(R.point), DECODE(Trim(R.point), 'P', 'P', 'E', 'E', '')) end AS cat_flag
+			, case when NVL(R.caption_yn, '') IN ('A','R') then NVL(R.genre, '') else '' end AS recommend_id
+			, case when NVL(R.order_yn, '') IN ('T','L') then R.order_yn else '' end AS disp_option
+			, R.focus_file_name AS image_file
+			, A.order_no
+		FROM (SELECT REGEXP_SUBSTR(#{lastUseMenu}, '[^;]+', 1, 1) menu_id, 1 order_no FROM dual
+				UNION ALL
+				SELECT REGEXP_SUBSTR(#{lastUseMenu}, '[^;]+', 1, 2) menu_id, 2 order_no FROM dual
+			) A, PT_VO_CATEGORY R
+		WHERE A.menu_id = R.category_id
+		AND NVL(R.test_sbc, 'N') IN ('N', #{testSbc})
+		AND NVL(R.nsc_gb, 'N') = 'KID'
+		AND R.category_gb = 'NSC'
+		ORDER BY suggest_type, order_no
+	</select>
+	
+	<!-- 사업차 추천 컨텐츠 가져오기 -->
+	<select id="listKidsHomeRecom" resultType="KidsHomeRecom_VO" parameterType="GetNSKidsHomeRequestVO">		
+		SELECT /*+LEADING(R) USE_NL(M L T P C D G) */
+		       M.contents_id AS conts_id,
+		       L.album_name AS conts_nm,
+		       case when NVL(T.run_time, '') = '' OR Trim(T.run_time) = '' then '0'
+		            else TO_CHAR(TO_NUMBER(SUBSTR(T.run_time, 1, 2)) * 60 + TO_NUMBER(SUBSTR(T.run_time, 3, 2))) end runtime,
+		       MAX(case when S.poster_type = 'T' and S.service_yn = 'Y' then S.content_value else '' end) AS poster_h,
+		       MAX(case when S.poster_type = 'P' and S.service_yn = 'Y' then S.content_value else '' end) AS poster_v,
+		       (SELECT K.main_img_file_name FROM IMCSUSER.PT_LA_ALBUM_IMG K WHERE K.adi_album_id = M.contents_id AND K.img_flag = 'S' AND rownum = 1) AS still_file
+		  FROM PT_VO_CATEGORY R,
+		       PT_VO_CATEGORY_MAP M,
+		       IMCSUSER.PT_LA_ALBUM_INFO L,
+		       IMCSUSER.PT_LA_ALBUM_SUB T,
+		       IMCSUSER.PT_LA_ALBUM_PLATFORM P,
+		       IMCSUSER.PT_LA_ASSET_INFO C,
+		       IMCSUSER.PT_LA_ALBUM_POSTER S,
+		       IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+		       IMCSUSER.PT_PD_PACKAGE G
+		 WHERE 1 = 1
+		   AND R.category_id = M.category_id
+		   AND R.category_gb = 'NSC'
+		   AND M.contents_id = L.album_id
+		   AND L.album_id = T.album_id
+		   AND L.album_id = P.album_id
+		   AND L.album_id = C.album_id
+		   AND L.album_id = S.album_id
+		   AND P.screen_type = 'N'
+		   AND P.screen_type = C.screen_type
+		   AND P.screen_type = S.screen_type
+		   AND S.poster_type IN ('P', 'T')
+		   AND S.service_yn = 'Y'			
+		   AND C.asset_id = D.contents_id
+		   AND D.product_id = G.product_id
+		   AND NVL(L.high_quality_type, 'N') != 'H'
+		   AND R.category_id = #{sugg_cat_id}
+		   AND NVL(R.test_sbc, 'N') IN ('N', #{testSbc})
+		   AND NVL(M.viewing_flag, 'V') IN ('V', #{viewFlag})
+		 GROUP BY M.contents_id, L.album_name, T.run_time, M.rank_no
+		 ORDER BY M.rank_no
+	</select>
+	
+	<!-- 하위에 있는 시리즈 카테고리 하나 가져오기 -->
+	<select id="getSeriesTypeDirCategoryId" resultType="String" parameterType="GetNSKidsHomeRequestVO">		
+		SELECT
+			category_id
+		FROM
+		(
+			SELECT category_id, category_level, sort_no
+			FROM PT_VO_CATEGORY A
+			WHERE category_gb = 'NSC'
+			AND NVL(A.ch_51_yn, 'N') != 'X'
+			AND NVL(A.test_sbc, 'N') IN ('N', #{testSbc})
+			AND NVL(A.series_yn, 'N') = 'Y'
+			START WITH A.category_id = #{temp_category_id}
+			CONNECT BY PRIOR A.category_id = A.parent_category_id
+			ORDER BY category_level, sort_no
+		) X
+		WHERE rownum = 1
+	</select>
+	
+	
+</mapper> 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

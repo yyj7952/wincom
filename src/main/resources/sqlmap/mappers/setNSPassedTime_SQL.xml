@@ -1,0 +1,397 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.setNSPassedTime.SetNSPassedTimeDao">
+
+	<resultMap type="HashMap" id="chkCharBook">
+		<result property="char_cnt" column="CHAR_CNT" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="book_cnt" column="BOOK_CNT" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="char_cat_id" column="CHAR_CAT_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<!-- 컨텐츠 정보 조회 -->	
+	<select id="getContsType" resultType="ContTypeVO" >
+		SELECT MIN(B.PRODUCT_TYPE) AS CONTS_TYPE,
+		      C.ASSET_NAME AS CONTS_NAME,
+		      SUBSTR(D.run_time, 1, 6) META_RUN_TIME
+		      <if test="nWatchYn.equals('Y'.toString())"> 
+			  ,MCUSTUSER.NUF_GET_NSCREEN_INFO(#{albumId}, (SELECT NVL(TEST_SBC,'N') FROM PT_VO_CUSTOM_ID WHERE SA_ID = #{saId} and mac_addr = #{stbMac})) AS NSCREEN_YN
+			  </if>
+		 FROM IMCSUSER.PT_PD_PACKAGE_DETAIL A,
+		      IMCSUSER.PT_PD_PACKAGE B,
+		      IMCSUSER.PT_LA_PACKAGE_ASSET C,
+		      IMCSUSER.PT_LA_ALBUM_SUB D
+		WHERE C.NSC_ALBUM_ID = #{albumId}
+		  AND C.NSC_ALBUM_ID = D.ALBUM_ID
+		  AND B.PRODUCT_ID   = A.PRODUCT_ID
+		  AND A.CONTENTS_ID  = C.ASSET_ID
+        GROUP BY C.ASSET_NAME, D.RUN_TIME
+	</select>
+	
+	<select id="getSvodPkg" resultType="SvodPkgVO" >
+		SELECT DISTINCT CASE WHEN SVOD_YN = 'Y' THEN SVOD_PROD_ID WHEN PPM_YN = 'Y' THEN PPM_PROD_ID END PRODUCT_ID,
+		       CASE WHEN SVOD_YN = 'Y' THEN 'SVOD' WHEN PPM_YN = 'Y' THEN 'PPM' END SVOD_PKG,
+		       CATEGORY_LEVEL CATEGORY_LEVEL 
+		  FROM PT_VO_CATEGORY 
+		 WHERE (SVOD_YN = 'Y' OR PPM_YN = 'Y')
+		   AND CATEGORY_GB = 'NSC' 
+		   START WITH CATEGORY_ID IN (
+		        SELECT CATEGORY_ID 
+		          FROM PT_VO_CATEGORY_MAP 
+		         WHERE CONTENTS_ID = #{albumId}
+		       ) CONNECT BY PRIOR PARENT_CATEGORY_ID = CATEGORY_ID
+		UNION ALL
+		 SELECT PRODUCT_ID PRODUCT_ID,
+		       'SVOD' SVOD_PKG,
+		       '0' CATEGORY_LEVEL 
+		  FROM PT_VO_WATCH_HISTORY 
+		 WHERE SA_ID = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+		   AND (CONTENTS_ID = #{albumId} OR CONTENTS_ID IN (
+		        SELECT ASSET_ID 
+		          FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+		         WHERE ADI_ALBUM_ID = #{albumId}
+		       ))
+		   AND P_IDX_SA = MOD(#{pIdxSa}, 33)
+		 GROUP BY PRODUCT_ID
+		 ORDER BY SVOD_PKG, CATEGORY_LEVEL
+	</select>
+	
+	
+	<select id="dataChk1" resultType="ComDupCHk">
+		<![CDATA[
+		SELECT /*+ LEADING(E) */
+		     1 DATA_CHK, PRODUCTCD PRODUCT_ID
+		FROM (SELECT DISTINCT B.IMCS_PRODUCT_ID PRODUCTCD
+		        FROM PT_VO_CUSTOM_PRODUCT A,
+		             IMCSUSER.PT_PD_PACKAGE_UNITED B,
+		             IMCSUSER.PT_PD_PACKAGE_DETAIL C,
+		             IMCSUSER.PT_PD_PACKAGE_RELATION D,
+		             IMCSUSER.PT_LA_PACKAGE_ASSET E
+		       WHERE A.SA_ID             = #{saId}
+		         AND A.MAC_ADDR          = #{stbMac}
+		         AND A.PRODUCTCD         = D.P_PRODUCT_ID
+		         AND B.IMCS_PRODUCT_ID   = C.PRODUCT_ID
+		         AND D.PRODUCT_ID        = B.IMCS_PRODUCT_ID
+		         AND C.CONTENTS_ID       = E.ASSET_ID
+		         AND E.NSC_ALBUM_ID      = #{albumId}
+		         AND B.IMCS_PRODUCT_TYPE = '3'
+		     ) X   
+         ]]>
+	</select>
+	
+	<select id="dataChk2" resultType="ComDupCHk">
+		<![CDATA[
+		SELECT /*+ LEADING(D) */
+		     1 DATA_CHK, PRODUCTCD PRODUCT_ID
+		FROM (SELECT DISTINCT B.IMCS_PRODUCT_ID PRODUCTCD
+		        FROM PT_VO_CUSTOM_PRODUCT A,
+		             IMCSUSER.PT_PD_PACKAGE_UNITED B,
+		             IMCSUSER.PT_PD_PACKAGE_DETAIL C,
+		             IMCSUSER.PT_LA_PACKAGE_ASSET D
+		       WHERE A.SA_ID           = #{saId}
+		         AND A.MAC_ADDR        = #{stbMac}
+		         AND A.PRODUCTCD       = B.IMCS_PRODUCT_ID
+		         AND B.IMCS_PRODUCT_ID = C.PRODUCT_ID
+		         AND C.CONTENTS_ID     = D.ASSET_ID
+		         AND D.NSC_ALBUM_ID =    #{albumId}
+		         AND B.IMCS_PRODUCT_TYPE = '3'
+		     ) X   
+         ]]>
+	</select>
+	
+	<select id="dataChk3" resultType="ComDupCHk">
+		<![CDATA[
+		SELECT /*+ LEADING(E) */
+		     1 DATA_CHK, PRODUCTCD PRODUCT_ID
+		FROM (SELECT DISTINCT D.PRODUCT_ID PRODUCTCD
+		        FROM PT_VO_NSC_PRODUCT A,
+		             IMCSUSER.PT_PD_PACKAGE_UNITED B,
+		             IMCSUSER.PT_PD_PACKAGE_DETAIL C,
+		             IMCSUSER.PT_PD_PACKAGE_RELATION D,
+		             IMCSUSER.PT_LA_PACKAGE_ASSET E
+		       WHERE A.SBC_CONT_NO       = #{saId}
+		         AND A.MAC_ADDR          = #{stbMac}
+		         AND A.PROD_CD           = D.P_PRODUCT_ID
+		         AND B.IMCS_PRODUCT_ID   = C.PRODUCT_ID
+		         AND D.PRODUCT_ID        = B.IMCS_PRODUCT_ID
+		         and C.CONTENTS_ID       = E.ASSET_ID
+		         AND E.NSC_ALBUM_ID      = #{albumId}
+		         AND B.IMCS_PRODUCT_TYPE = '3'
+		     ) X   
+         ]]>
+	</select>
+	
+	<select id="dataChk4" resultType="ComDupCHk">
+		<![CDATA[
+		SELECT 1 DATA_CHK, PRODUCTCD PRODUCT_ID
+		FROM (SELECT B.IMCS_PRODUCT_ID PRODUCTCD
+		        FROM PT_VO_CUSTOM_PRODUCT A,
+		             IMCSUSER.PT_PD_PACKAGE_UNITED B
+		       WHERE A.SA_ID             = #{saId}
+		         AND A.MAC_ADDR          = #{stbMac}
+		         AND A.PRODUCTCD         = B.IMCS_PRODUCT_ID
+		         AND B.IMCS_PRODUCT_ID   = #{productId}
+		         AND B.IMCS_PRODUCT_TYPE = '3'
+		    ) X   
+         ]]>
+	</select>
+	
+	<select id="dataChk5" resultType="ComDupCHk">
+		<![CDATA[
+		SELECT 1 DATA_CHK, PRODUCTCD PRODUCT_ID                                
+		FROM (SELECT B.IMCS_PRODUCT_ID PRODUCTCD            
+		        FROM PT_VO_CUSTOM_PRODUCT A,                
+		             IMCSUSER.PT_PD_PACKAGE_UNITED B,       
+		             IMCSUSER.PT_PD_PACKAGE_RELATION D      
+		       WHERE A.SA_ID             = #{saId}      
+		         AND A.MAC_ADDR          = #{stbMac}  
+		         AND A.PRODUCTCD         = D.P_PRODUCT_ID   
+		         AND B.IMCS_PRODUCT_ID   = D.PRODUCT_ID     
+		         AND B.IMCS_PRODUCT_ID   = #{productId}   
+		         AND B.IMCS_PRODUCT_TYPE = '3'              
+		     ) X 
+         ]]>
+	</select>
+	
+	
+	
+	<!-- 링크 유무 조회 -->
+	<select id="getLinkChk" resultType="Integer">
+		SELECT /*+ index(A IDX_PT_VO_SET_TIME_02_PTT) */ 
+			1
+	      FROM PT_VO_SET_TIME_PTT A
+	     WHERE SA_ID = #{shareSaId}
+	       AND ADI_ALBUM_ID = #{albumId}
+	       AND P_IDX_SA = MOD(#{pIdxSa}, 33)
+	       AND A.NSCN_CUST_NO = #{nscnCustNo}
+	       AND ROWNUM = 1
+	</select>
+	
+	<!-- 링크 유무 조회 -->
+	<select id="getLinkChkNsc" resultType="Integer">
+		SELECT /*+ index(A IDX_PT_VO_SET_TIME_02_PTT_N) */ 
+			1
+	      FROM PT_VO_SET_TIME_PTT_NSC A
+	     WHERE SA_ID = #{shareSaId}
+	       AND ADI_ALBUM_ID = #{albumId}
+	       AND P_IDX_SA = MOD(#{pIdxSa}, 33)
+	       AND A.NSCN_CUST_NO = #{nscnCustNo}
+	       AND ROWNUM = 1
+	</select>
+
+	<!-- 링크 유무 조회 #2 -->
+	<select id="getLinkChkNsc2" resultType="Integer">
+		SELECT /*+ index(A IDX_PT_VO_SET_TIME_02_PTT) */
+			   COUNT(*)
+		  FROM PT_VO_SET_TIME_PTT_NSC A
+		 WHERE sa_id = #{shareSaId}
+		   AND adi_album_id = #{albumId}
+		   AND P_IDX_SA = mod(#{pIdxSa}, 33)
+		   AND nscn_cust_no IN (#{nscnCustNo}, #{nscnCustNoSub})	       
+	</select>
+	
+	
+	<!-- 링크 유무 조회 -->
+	<select id="getLinkChk2" resultType="Integer">
+		SELECT 1 
+		  FROM PT_VO_SET_TIME 
+		 WHERE NSCN_CUST_NO = (
+		        SELECT DISTINCT PVS_NSCN_CUST_NO 
+		          FROM NSCN_SBC_TBL 
+		         WHERE PVS_SBC_CONT_NO = #{saId}
+		       )
+		   AND ADI_ALBUM_ID = #{albumId}
+	</select>
+	
+	
+	
+	<!-- 이어보기 시간 갱신 -->
+	<update id="updateSetTime">
+		UPDATE /*+ index(A IDX_PT_VO_SET_TIME_02_PTT_N) */ PT_VO_SET_TIME_PTT_NSC A
+		  SET LINK_TIME = #{second},
+		      WATCH_DATE = #{sysdate}
+		WHERE SA_ID        = #{shareSaId}
+		  AND ADI_ALBUM_ID = #{albumId}
+		  <if test="iSubChk.equals(0)">
+		  AND NSCN_CUST_NO = #{nscnCustNo}		  
+		  </if>
+		  <if test="!iSubChk.equals(0)">
+		  AND NSCN_CUST_NO = #{nscnCustNoSub}		  
+		  </if>
+		  AND P_IDX_SA = MOD(#{pIdxSa}, 33)
+	</update>
+	
+	
+	<!-- 이어보기 시간 등록 -->
+	<insert id="insertSetTime">
+		INSERT INTO PT_VO_SET_TIME_PTT_NSC(P_IDX_SA, P_IDX_DAY, NSCN_CUST_NO, SA_ID, ADI_ALBUM_ID, LINK_TIME, WATCH_DATE)                     
+		VALUES (
+		       MOD(#{pIdxSa}, 33),
+			   SUBSTR(TO_CHAR(SYSDATE,'YYYYMMDD'), 7, 2),
+			   #{nscnCustNo},
+			   #{shareSaId},            
+		       #{albumId},                         
+		       #{second} ,                           
+		       #{sysdate} 
+		       )
+	</insert>
+	
+		
+	
+	<update id="updateWatchHis1">
+		UPDATE PT_VO_WATCH_HISTORY_NSC
+		  SET WATCH_EDATE = TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS'),
+		      RUN_TIME    = #{runTime},
+		      KEY_LOG     = #{keyLog},
+		      DOWNLOAD_BYTE = #{downloadByte}
+		WHERE SA_ID       = #{saId}   
+		  AND MAC_ADDR    = #{stbMac}
+		  AND BUY_DATE    = #{buyingDate}
+		  AND CONTENTS_ID = #{albumId}
+		  AND WATCH_FDATE = (SELECT MAX(WATCH_FDATE)
+		                      FROM PT_VO_WATCH_HISTORY_NSC
+		                   WHERE SA_ID     = #{saId} 
+		                   AND MAC_ADDR    = #{stbMac}
+		                   AND BUY_DATE    = #{buyingDate}
+		                   AND CONTENTS_ID = #{albumId}
+		                   AND P_IDX_SA = mod(#{pIdxSa}, 33))
+		  AND P_IDX_SA = MOD(#{pIdxSa}, 33)
+	</update>
+	
+	<update id="updateWatchHis2">
+		UPDATE PT_VO_WATCH_HISTORY_NSC
+		  SET WATCH_EDATE = TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS'),
+		      RUN_TIME    = #{runTime},
+		      KEY_LOG     = #{keyLog},
+		      DOWNLOAD_BYTE = #{downloadByte}
+		WHERE SA_ID    = #{saId}   
+		  AND MAC_ADDR = #{stbMac}
+		  AND BUY_DATE = (SELECT MAX(BUY_DATE)
+		                    FROM PT_VO_WATCH_HISTORY_NSC
+		                   WHERE SA_ID = #{saId}   
+		                     AND MAC_ADDR = #{stbMac}
+		                     AND CONTENTS_ID = #{albumId}
+		                     AND P_IDX_SA = MOD(#{pIdxSa}, 33))
+		  AND CONTENTS_ID = #{albumId}
+		  AND WATCH_FDATE = (SELECT MAX(BUY_DATE)
+		                       FROM PT_VO_WATCH_HISTORY_NSC
+		                      WHERE SA_ID       = #{saId}   
+		                        AND MAC_ADDR    = #{stbMac}
+		                        AND CONTENTS_ID = #{albumId}
+		                        AND P_IDX_SA = MOD(#{pIdxSa}, 33))
+		  AND P_IDX_SA = MOD(#{pIdxSa}, 33)
+	</update>
+			
+	<!-- 가입자 정보 가져오기 검수 여부 -->		
+	<select id="chkCharBook" resultMap="chkCharBook" parameterType="SetNSPassedTimeRequestVO">
+		SELECT SUM(CHAR_CNT) CHAR_CNT, SUM(BOOK_CNT) BOOK_CNT, MAX(CATEGORY_ID) AS CHAR_CAT_ID
+		FROM (
+		    SELECT COUNT(*) CHAR_CNT, 0 BOOK_CNT,CATEGORY_ID
+		    FROM PT_VO_CATEGORY
+		    WHERE category_gb = 'NSC'
+		    AND NSC_GB = 'KID'
+		    AND ACTORS_DISPLAY = 'C'
+		    AND CATEGORY_LEVEL = '4'
+		    AND ROWNUM = 1
+		    START WITH CATEGORY_ID IN (SELECT CATEGORY_ID FROM PT_VO_CATEGORY_MAP WHERE CONTENTS_ID = #{albumId})
+		    CONNECT BY PRIOR parent_category_id = category_id
+		    GROUP BY CATEGORY_ID
+		    UNION ALL
+		    SELECT 0 CHAR_CNT, COUNT(*) BOOK_CNT, '' CATEGORY_ID
+		    FROM PT_VO_CATEGORY
+		    WHERE category_gb = 'NSC'
+		    AND NSC_GB = 'KID'
+		    AND ACTORS_DISPLAY = 'B'
+		    AND CATEGORY_ID IN (SELECT CATEGORY_ID FROM PT_VO_CATEGORY_MAP WHERE CONTENTS_ID = #{albumId})
+		)
+	</select>
+	
+	<!-- 가입자 정보 가져오기 검수 여부 -->		
+	<select id="chkParentCnt" resultType="Integer">
+		SELECT COUNT(*) PARENT_CNT
+		  FROM PT_VO_CATEGORY
+		 WHERE NSC_GB = 'KID'
+		   AND category_gb = 'NSC'
+		   AND ACTORS_DISPLAY = 'P'
+		   AND CATEGORY_ID IN (SELECT CATEGORY_ID FROM PT_VO_CATEGORY_MAP WHERE CONTENTS_ID = #{albumId})
+	</select>
+	
+	<select id="getLinkChkNscKids" resultType="Integer">
+		SELECT /*+ index(A IDX_PT_VO_SET_TIME_02_PTT_N) */ 
+			1
+	      FROM PT_VO_SET_TIME_PTT_NSC A
+	     WHERE SA_ID = #{shareSaId}
+	       <choose>    
+			   		<when test='nscnCustNoKids.equals("C")'>
+		   AND ADI_ALBUM_ID = #{catId} 
+		       		</when> 
+		       		<otherwise>
+		   AND ADI_ALBUM_ID = #{albumId} 		
+		       		</otherwise>
+		  </choose>
+	       AND P_IDX_SA = MOD(#{pIdxSa}, 33)
+	       AND A.NSCN_CUST_NO = #{nscnCustNoKids}
+	       AND ROWNUM = 1
+	</select>
+	
+	<!-- 이어보기 시간 갱신 -->
+	<update id="updateSetTimeKids">
+		UPDATE /*+ index(A IDX_PT_VO_SET_TIME_02_PTT_N) */ PT_VO_SET_TIME_PTT_NSC A
+		  SET LINK_TIME = #{second},
+		      WATCH_DATE = #{sysdate}
+		WHERE SA_ID        = #{shareSaId}
+		  <choose>    
+			   		<when test='nscnCustNoKids.equals("C")'>
+		   AND ADI_ALBUM_ID = #{catId} 
+		       		</when> 
+		       		<otherwise>
+		   AND ADI_ALBUM_ID = #{albumId} 		
+		       		</otherwise>
+		  </choose>
+		  AND NSCN_CUST_NO = #{nscnCustNoKids}
+		  AND P_IDX_SA = MOD(#{pIdxSa}, 33)
+	</update>
+	
+	<!-- 이어보기 시간 등록 -->
+	<insert id="insertSetTimeKids">
+		INSERT INTO PT_VO_SET_TIME_PTT_NSC(P_IDX_SA, P_IDX_DAY, NSCN_CUST_NO, SA_ID, ADI_ALBUM_ID, LINK_TIME, WATCH_DATE)                     
+		VALUES (
+		       MOD(#{pIdxSa}, 33),
+			   SUBSTR(TO_CHAR(SYSDATE,'YYYYMMDD'), 7, 2),
+			   #{nscnCustNoKids},
+			   #{shareSaId}, 
+			   <choose>    
+			   		<when test='nscnCustNoKids.equals("C")'>
+		       #{catId},  
+		       		</when> 
+		       		<otherwise>
+		       #{albumId}, 		
+		       		</otherwise>
+		       </choose>                       
+		       #{second} ,                           
+		       #{sysdate} 
+		       )
+	</insert>
+	
+	
+	
+	<!-- 이어보기 시간 등록 -->
+	<insert id="insertSetWatchTime">
+		INSERT INTO MCUSTUSER.NPT_VO_WATCH_TIME(SA_ID, ALBUM_ID, WATCH_DATE, WATCH_TYPE, ALBUM_NAME, END_FLAG, WATCH_RUNTIME, P_IDX_SA, P_IDX_MM)
+		values(#{saId},
+			   DECODE(#{albumId}, 'CH', 'CH', #{albumId}),
+			   DECODE(#{albumId}, 'CH', TO_CHAR(sysdate, 'YYYYMMDDHH24MISS'), #{sysdate}),
+			   DECODE(#{albumId}, 'CH', 'H', #{svcType}),
+			   #{albumName},
+			   #{chkRunTime},
+			   #{runTime},
+			   mod(substr(#{saId}, -2),33),
+			   substr(TO_CHAR(sysdate,'yyyymmdd'), 5, 2)
+			  )
+	</insert>
+	
+</mapper>
+	
+	
+	

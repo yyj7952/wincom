@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.chkSubscribeProd.ChkSubscribeProdDao">
+
+	<!-- 상태, 개통여부 가져오기 -->
+	<select id="getSbcInfo" resultType="ComSbcVO">
+		SELECT DECODE(A.ST_TYP, '1', 'Y', 'N') STATUS_FLAG,
+		       A.VOD_USE_YN YN_VOD_OPEN,
+		       NVL(A.CP_CNT, 0) CP_CNT
+		  FROM PT_VO_CUSTOM_ID A,
+		       PT_VO_CUSTOM_PRODUCT B 
+		 WHERE A.SA_ID = B.SA_ID
+		   AND A.SA_ID = #{saId}
+		   AND A.MAC_ADDR = #{stbMac}
+	</select>
+
+	<!-- 동일 SVOD 가입여부 조회 -->
+	<select id="getBuyContsProdType" parameterType="ChkSubscribeProdRequestVO" resultType="ChkSubscribeProdResultVO">
+		 SELECT A.PRODUCTCD AS PROD_ID, C.PRODUCT_NAME AS PROD_NAME, ENTRYDATE AS BUYING_DATE
+		   FROM PT_VO_CUSTOM_PRODUCT A,
+				IMCSUSER.PT_PD_PACKAGE_RELATION B,
+				IMCSUSER.PT_PD_PACKAGE C,
+				(SELECT product_id FROM IMCSUSER.PT_PD_PACKAGE_RELATION WHERE p_product_id = #{prodId}) D,
+				PVSUSER.PV_PROD_PRODUCT_TBL E
+		  WHERE A.SA_ID = #{saId}
+			AND A.MAC_ADDR = #{stbMac}
+			AND A.productcd = B.p_product_id
+			AND A.xcion_billing_typ = 'P'
+			AND B.p_product_id = C.product_id
+			AND B.product_id = D.product_id
+			AND A.xcion_prod_cd = E.prod_cd
+			AND NVL(E.prod_sub_yn, 'N') = 'N'
+			ORDER BY C.product_type
+	</select>
+
+
+</mapper> 
+
+
+
+
+
+
+
+
+
+
+
+
+
+

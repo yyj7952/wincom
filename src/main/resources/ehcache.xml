@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ehcache xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:noNamespaceSchemaLocation="https://www.ehcache.org/ehcache.xsd"
+	updateCheck="false" monitoring="autodetect" dynamicConfig="false">
+
+	<diskStore path="java.io.tmpdir" />
+	
+	<defaultCache
+		maxElementsInMemory="1"
+		eternal="true"
+		timeToIdleSeconds="0"
+		timeToLiveSeconds="0"
+		overflowToDisk="false"
+		diskPersistent="false"
+		diskExpiryThreadIntervalSeconds="0"
+		memoryStoreEvictionPolicy="FIFO"
+		statistics="false">
+	</defaultCache>
+	
+	<!-- idolLiveBuyCache 캐시(200M) -->
+	<cache
+		name="idolLiveBuyCache"
+		maxBytesLocalHeap="200M"
+		eternal="true"
+		overflowToDisk="false"
+		timeToIdleSeconds="0"
+		timeToLiveSeconds="0"
+		diskPersistent="false"
+		diskExpiryThreadIntervalSeconds="0"
+		memoryStoreEvictionPolicy="FIFO"
+		statistics="false">
+	</cache>
+	
+	<!-- liveStatDataCache 캐시(15개) -->
+	<cache
+		name="liveStatDataCache"
+		maxEntriesLocalHeap="15"
+		eternal="true"
+		overflowToDisk="false"
+		timeToIdleSeconds="0"
+		timeToLiveSeconds="0"
+		diskPersistent="false"
+		diskExpiryThreadIntervalSeconds="0"
+		memoryStoreEvictionPolicy="FIFO"
+		statistics="false">
+	</cache>
+
+</ehcache>
+
+	<!--
+		캐시 설정시 defaultCache는 반드시 있어야 한다.
+		defaultCache는 캐시 사용시 다른 적절한 캐시를 찾을수 없을 때 사용된다.
+		
+		name : 캐시의 이름(필수) 
+		maxElementsInMemory : 메모리에 저장될 수 있는 객체의 최대 개수(필수)
+		maxBytesLocalHeap: 최대 로컬 힙메모리 사용량 설정. 1K, 1M, 1G
+					해당 옵션을 사용할 경우 maxEntriesLocalHeap 설정은 사용 할 수 없음.
+		eternal : 저장된 캐시를 제거할지 여부를 설정한다. true 인 경우 저장된 캐시는 제거되지 않으며
+		          timeToIdleSeconds, timeToLiveSeconds 설정은 무시된다.(필수)
+		overflowToDisk : 메모리에 저장된 객체 개수가 maxElementsInMemory에서 지정한 값에 다다를 경우 디스크에 오버플로우 되는 
+		                 객체는 저장할 지의 여부를 지정한다.(필수)
+		timeToIdleSeconds : 해당 시간 동안 캐쉬가 사용되지 않으면 삭제된다. 0은 삭제되지 않는 다.
+		                    단 eternal=false 인 경우에만 유효하다.(선택)
+		timeToLiveSeconds : 해당 시간이 지나면 캐쉬는 삭제된다. 0은 삭제되지 않는 다.
+		                    단 eternal=false 인 경우에만 유효하다.(선택)
+		diskPersistent : VM이 재 가동할 때 디스크 저장소에 캐싱된 객체를 저장할지의 여부를 지정한다. 기본값은 false이다.(선택)
+		diskExpiryThreadIntervalSeconds : Disk Expiry 쓰레드의 수행 시간 간격을 초 단위로 지정한다. 기본값은 120 이다.(선택)
+		memoryStoreEvictionPolicy : 객체의 개수가 maxElementsInMemory에 도달했을 때,
+		                            메모리에서 객체를 어떻게 제거할 지에 대한 정책을 지정한다.
+		                            기본값은 LRU이다. FIFO와 LFU도 지정할 수 있다.(선택)
+		LRU : 최근에 이용한 것을 남기는 알고리즘
+		LFU : 가장 적게 이용된 것을 제거하는 알고리즘
+		FIFO : 먼저 입력된것을 제거하는 알고리즘
+		statistics : JMX 통계정보 갱신 옵션
+		
+		분산 캐시를 사용할 때에는 다음과 같은 내용을 고려해야 한다.
+		
+		노드 증가에 따라 네트워크 트래픽 증가:
+		많은 양의 네트워크 트래픽이 발생할 수 있다. 
+		특히 동기 모드인 경우 성능에 영향을 받을 수 있다. 
+		비동기 모드인 경우 버퍼에 변경 내역을 저장하였다가 일정한 주기로 버퍼에 쌓인 내역을 다른 노드에 통지하기 때문에 
+		이 문제를 다소 완하시킬 수 있다.
+		
+		데이터 불일치 발생 가능성:
+		두 노드에서 동시에 동일한 캐시의 동일한 데이터에 대한 변경을 수행할 경우, 
+		두 노드 사이에 데이터 불일치가 발생할 수 있다. 
+		캐시 데이터의 불일치가 매우 심각한 문제가 될 경우, 
+		동기 모드(replicateAsynchronously=false)와
+		복사 메시지 대신 삭제 메시지를 전송(replicateUpdatesViaCopy=false)함으로써 
+		이 문제를 해결할 수 있다.
+	-->
+	
+	<!-- 아래 옵션은 캐시 동기화 옵션임.
+		replicatePuts : 캐시에 새로운 요소가 추가됐을 때 다른 노드에 복사할지의 여부
+		replicateUpdates : 캐시 요소의 값이 변경되었을 때 다른 노드에 값을 복사할지의 여부
+		replicateRemovals : 캐시 요소가 삭제되었을 때 다른 노드에 반영할지의 여부
+		replicateAsynchronously : 비동기로 값을 복사할지의 여부
+		replicateUpdatesViaCopy : 새로운 요소를 다른 노드에 복사할 지 아니면 삭제 메시지를 보낼지의 여부
+		asynchronousReplicationIntervalMillis : 비동기 방식을 사용할 때 변경 내역을 다른 노드에 통지하는 주기. 기본값은 1000.
+	-->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

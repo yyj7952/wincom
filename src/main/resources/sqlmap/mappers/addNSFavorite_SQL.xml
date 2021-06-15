@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.addNSFavorite.AddNSFavoriteDao">
+	
+	<!-- 1. 찜목록 중복 체크 - Oracle버전 -->
+	<select id="getFavoriteDupChk" parameterType="AddNSFavoriteRequestVO" resultType="Integer">
+	SELECT 1
+	  FROM DUAL
+	 WHERE EXISTS (SELECT 'x'
+					 FROM SMARTUX.PT_CM_FAVORITE A
+					WHERE A.p_idx_sa = mod(substr(#{saId}, -2), 33)
+					  AND A.P_IDX_YEAR IN ( mod(to_number(to_char(sysdate,'YY'))-1,10), mod(to_number(to_char(sysdate,'YY')),10) )
+					  AND A.sa_id    = #{saId}
+					  AND contents_id = #{contsId}
+					  AND service_type IN ('V','U')
+	  	  	  	   UNION
+				   SELECT 'x'
+					 FROM SMARTUX.PT_UX_FAVORITE A
+					WHERE A.p_idx_sa = mod(substr(#{saId}, -2), 33)
+					  AND A.P_IDX_YEAR IN ( mod(to_number(to_char(sysdate,'YY'))-1,10), mod(to_number(to_char(sysdate,'YY')),10) )
+					  AND A.sa_id    = #{saId}
+					  AND contents_id = #{contsId}
+					  AND service_type IN ('I','K','B','S')
+				   )
+	</select>
+	
+	
+	<!-- 2. 찜목록 인덱스 조회 - Oracle버전 -->
+	<select id="getFavoriteIndex" parameterType="String" resultType="Integer">
+	SELECT NVL(TO_CHAR(MAX(TO_NUMBER(TRIM(FAV_IDX))) + 1), '1')
+	  FROM PT_VO_FAVORITE A
+	 WHERE A.SA_ID = #{saId}
+	</select>
+	
+	
+	<!-- 3. 찜목록 갯수 조회 - Oracle버전 -->
+	<select id="getFavoriteCount" parameterType="String" resultType="Integer">
+	SELECT COUNT(X.contents_id) 
+			   FROM (SELECT A.contents_id 
+			           FROM SMARTUX.PT_CM_FAVORITE A 
+			          WHERE A.p_idx_sa = mod(substr(#{saId}, -2), 33) 
+					     AND A.P_IDX_YEAR IN ( mod(to_number(to_char(sysdate,'YY'))-1,10), mod(to_number(to_char(sysdate,'YY')),10) ) 
+			            AND A.sa_id    = #{saId}
+						 AND A.service_type IN ('V','U') 
+			          GROUP BY A.contents_id 
+					  UNION 
+					  SELECT A.contents_id 
+			           FROM SMARTUX.PT_UX_FAVORITE A 
+			          WHERE A.p_idx_sa = mod(substr(#{saId}, -2), 33) 
+					     AND A.P_IDX_YEAR IN ( mod(to_number(to_char(sysdate,'YY'))-1,10), mod(to_number(to_char(sysdate,'YY')),10) ) 
+			            AND A.sa_id    = #{saId}
+						 AND A.service_type IN ('I','K','B','S') 
+			          GROUP BY A.contents_id 
+			        ) X, 
+			        (SELECT DISTINCT A.adi_album_id 
+			           FROM PT_VO_CATEGORY_MAP E, 
+			                PT_VO_CATEGORY J, 
+			                IMCSUSER.PT_LA_PACKAGE_ASSET PA , 
+			                IMCSUSER.PT_LA_ALBUM_MST A 
+			          WHERE E.category_id = J.category_id 
+			            AND J.category_gb = 'NSC' 
+			            AND E.contents_id = PA.nsc_album_id 
+			            AND PA.nsc_album_id = A.adi_album_id 
+			        ) G 
+				WHERE X.contents_id = G.adi_album_id  
+	</select>
+	
+	
+	<!-- 4. 찜목록 등록 - Oracle버전 -->
+	<insert id="addNSFavoriteInfo" parameterType="AddNSFavoriteRequestVO">  	
+	INSERT INTO SMARTUX.PT_CM_FAVORITE 
+			       ( 
+			        P_IDX_SA, 
+			        P_IDX_YEAR, 
+			        SA_ID, 
+			        MAC_ADDR, 
+			        CONTENTS_ID, 
+			        SERVICE_TYPE, 
+			        FAV_IDX , 
+			        CONTENTS_NAME, 
+			        CHA_NUM, 
+			        PRICE, 
+			        PR_INFO, 
+			        CATEGORY_ID, 
+			        REG_UPDATE 
+			       ) 
+			   VALUES 
+			       ( 
+			        mod(substr(#{saId}, -2), 33), 
+			        mod(to_char(sysdate, 'YY'), 10), 
+			        #{saId}           , 
+			        #{stbMac}         , 
+			        #{contsId}        , 
+			        'V', 
+			        '99', 
+			        replace(#{contsName}, '    ', ' '), 
+			        #{chaNum}         , 
+			        NVL(#{price}, '0') , 
+			        #{prInfo}         , 
+			        #{catId}          , 
+			        TO_CHAR(SYSDATE, 'YYYYMMDD') 
+			       ) 
+	</insert> 
+</mapper> 

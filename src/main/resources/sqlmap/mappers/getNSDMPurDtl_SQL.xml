@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSDMPurDtl.GetNSDMPurDtlDao">
+
+	<!-- 구매 상세 정보 조회 -->
+	<select id="getBuyDmDetail" parameterType="GetNSDMPurDtlRequestVO" resultType="GetNSDMPurDtlResponseVO">
+		SELECT  B.PRODUCT_ID 	PRODUCT_ID,
+				B.DM_USE_FLAG 	DM_USE_FLAG,
+				B.DM_PRICE 		DM_PRICE,
+				A.BUY_AMT 		BUY_AMT,
+				A.ERROR_MSG 	REAL_PRICE,
+				DECODE(SUBSTR(A.ERROR_MSG,1,1), 'I', 'Y', 'N') AS IDOL_BUY_YN,
+                CASE WHEN DECODE(SUBSTR(A.ERROR_MSG,1,1), 'I', 'Y', 'N') = 'Y' THEN (
+                SELECT CPN_CANCEL_URL
+                  FROM IMCSUSER.PT_LB_CUESHEET_MST A,
+                       IMCSUSER.PT_LB_CUESHEET_PAY_INFO B
+                 WHERE A.CUESHEET_ID = B.CUESHEET_ID
+                   AND A.ALBUM_ID = case when length(#{contsId}) != 5 then #{contsId} else (
+								SELECT ALBUM_ID 
+								  FROM ${@kr.co.wincom.imcs.common.util.GlobalCom@getDBMcustUser()}.NPT_VO_BUY_META 
+								 WHERE P_IDX_SA = MOD(#{pIdxSa}, 33) 
+								   AND SA_ID = #{saId} 
+								   AND MAC_ADDR = #{stbMac}
+								   AND BUY_DATE = #{buyingDate}) end
+						) ELSE '' END AS CANCEL_LINK_URL
+			FROM PT_VO_BUY_NSC A,													
+			  	 PT_VO_BUY_DM_DETAIL_NSC B									
+			WHERE B.P_IDX_SA = MOD(#{pIdxSa}, 33)										
+			  AND B.SA_ID = #{saId}													
+			  AND B.MAC_ADDR = #{stbMac}												
+			  AND B.PRODUCT_ID like #{contsId} || '%'									
+			  AND B.BUY_DATE = #{buyingDate}												
+			  AND B.PRODUCT_ID = A.PRODUCT_ID											
+			  AND A.SA_ID = B.SA_ID														
+			  AND A.MAC_ADDR = B.MAC_ADDR												
+			  AND A.BUY_DATE = B.BUY_DATE
+			  AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+	</select>
+	
+	<!-- 구매 상세 정보 조회 - IPTV(엔스크린) -->
+	<select id="getBuyDmDetail_iptv" parameterType="GetNSDMPurDtlRequestVO" resultType="GetNSDMPurDtlResponseVO">
+		SELECT
+			DISTINCT
+			B.PRODUCT_ID
+			, B.DM_USE_FLAG
+			, B.DM_PRICE	
+			, A.BUY_AMT
+			, A.ERROR_MSG AS REAL_PRICE
+			, '' AS IDOL_BUY_YN
+			, '' CANCEL_LINK_URL
+		FROM PT_VO_BUY A,
+			PT_VO_BUY_DM_DETAIL B,
+			PT_VO_BUY_DETAIL C
+		WHERE A.SA_ID = #{nSaId}
+		AND A.MAC_ADDR = #{nStbMac}
+		AND A.BUY_DATE = #{buyingDate}
+		AND A.SA_ID = C.SA_ID
+		AND A.MAC_ADDR = C.MAC_ADDR
+		AND A.BUY_DATE = C.BUY_DATE
+		AND A.PRODUCT_ID = C.PRODUCT_ID
+		AND (C.CONTENTS_ID like #{contsId} || 'HD%' or C.CONTENTS_ID like #{contsId} || 'SH%' OR LENGTH(C.PRODUCT_ID) = 5)
+		AND C.SA_ID = B.SA_ID
+		AND C.MAC_ADDR = B.MAC_ADDR
+		AND B.P_IDX_SA = mod(#{pIdxSa}, 33)
+		AND C.PRODUCT_ID = B.PRODUCT_ID
+		AND C.BUY_DATE = B.BUY_DATE
+		AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+	</select>
+	
+</mapper> 

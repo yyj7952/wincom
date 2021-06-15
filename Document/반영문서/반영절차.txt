@@ -1,0 +1,123 @@
+#Connect Server
+su -
+
+vi /etc/hosts
+	172.21.182.14	NSQLRS01
+	172.21.182.15	NSQLRS02
+	172.21.182.16	NSQLRS03
+	172.21.182.17	NSQLRS04
+	172.21.182.18	NSQLRS05
+	172.21.182.19	NSQLRS06
+	172.21.182.20	NSQLRS07
+	172.21.182.21	NSQLRS08
+	172.21.182.22	NSQLRS09
+	172.21.182.23	NSQLRS10
+
+	172.21.179.44	NSQLHD01
+	172.21.179.45	NSQLHD02
+	172.21.179.46	NSQLHD03
+	172.21.179.47	NSQLHD04
+	172.21.179.48	NSQLHD05
+	172.21.179.49	NSQLHD06
+	172.21.179.50	NSQLHD07
+
+	172.21.179.42	NSQLHN01
+	172.21.179.43	NSQLHN02
+
+#Check DB
+telnet [����DB IP] 1521
+
+#Check NoSQL Network
+sh check_network.sh
+
+#Make Directory
+sh make_directory.sh
+
+#Setting Check WAS
+cd /app/jboss/domains/ctis11/bin
+vi env.sh 
+  EXTERNAL_DEPLOYMENT_DIR=/app/ctis/webroot
+  JAVA_OPTS=" $JAVA_OPTS -Dnosqlcache.config.path=/app/ctis/external-files/nosql1.conf"
+  JAVA_OPTS=" $JAVA_OPTS -Dtempdb.config.path=/app/ctis/external-files/tempdb1.conf"
+  JAVA_OPTS=" $JAVA_OPTS -Dtlolog.index.name=ctis11"
+
+cd /app/jboss/domains/ctis11/configuration/standalong.xml
+      <subsystem xmlns="urn:jboss:domain:datasources:1.2">
+            <datasources>
+                <datasource jndi-name="java:/comp/env/jdbc/ctis" pool-name="ORACLE" enabled="true">
+                    <connection-url>jdbc:oracle:thin:@[IP]:1521:[SID]</connection-url>
+                    <driver>oracle6NONXA</driver>
+                    <pool>
+                        <min-pool-size>20</min-pool-size>
+                        <max-pool-size>200</max-pool-size>
+                        <prefill>true</prefill>
+                        <use-strict-min>true</use-strict-min>
+                    </pool>
+                    <security>
+                        <user-name>VODUSER</user-name>
+                        <password>VODUSER2008</password>
+                    </security>
+                    <validation>
+                        <valid-connection-checker class-name="org.jboss.jca.adapters.jdbc.extensions.oracle.OracleValidConnectionChecker"/>
+                        <validate-on-match>false</validate-on-match>
+                        <background-validation>true</background-validation>
+                        <background-validation-millis>60000</background-validation-millis>
+                        <stale-connection-checker class-name="org.jboss.jca.adapters.jdbc.extensions.oracle.OracleStaleConnectionChecker"/>
+                        <exception-sorter class-name="org.jboss.jca.adapters.jdbc.extensions.oracle.OracleExceptionSorter"/>
+                    </validation>
+                    <statement>
+                        <track-statements>true</track-statements>
+                        <prepared-statement-cache-size>50</prepared-statement-cache-size>
+                        <share-prepared-statements>true</share-prepared-statements>
+                    </statement>
+                </datasource>
+                <drivers>
+                    <driver name="oracle6NONXA" module="com.oracle">
+                        <driver-class>oracle.jdbc.driver.OracleDriver</driver-class>
+                    </driver>
+                </drivers>
+            </datasources>
+        </subsystem>
+
+#File Move
+cp deploy.sh /app/ctis/war/
+cp curation_api.war /app/ctis/war/
+cp tempdb-0.1.0-jar-with-dependencies.jar /app/nosql/
+
+#Change Owner
+sh change_owner.sh
+
+#change User
+su - ctis
+
+#WAR Deploy
+cd /app/ctis/war
+sh deploy.sh
+ls /app/ctis/webroot/curation_api.war
+
+#TempDB Module Setting
+cp /app/ctis/external-files/tempdb1.conf /app/nosql/tempdb_consumer.conf  
+cp /app/ctis/external-files/tempdb1.conf /app/nosql/tempdb_history_consumer.conf  
+vi /app/nosql/tempdb_consumer.conf -> Modify LogPath
+vi /app/nosql/tempdb_history_consumer.conf -> Modify LogPath
+
+#Application Start
+sh /app/ctis/external-files/tempdb-consumer.sh
+cd /app/jboss/domains/ctis11/bin
+sh start.sh
+cd /app/jboss/domains/ctis12/bin
+sh start.sh
+
+#Setting crontab
+crontab -e
+00 03 * * * /app/ctis/external-files/tlolog.sh > /data/logs/cronlog/cron_tlolog_$(date +\%Y\%m).log
+crontab -l
+
+#Check API
+sh check_url.sh
+
+#Check Non-Stop Mode
+cd /app/ctis/external-files
+sh mjdstart.sh
+sh mjdstop.sh
+

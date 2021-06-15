@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSCatBillInfo.GetNSCatBillInfoDao">
+	
+	<!-- 앨범 ID로 해당 앨범의 앨범 정보 및 svod only 여부 조회-->
+	<select id="getAlbumInfo" resultType="GetNSCatBillInfoResponseVO">
+		SELECT  H.NSC_ALBUM_ID ALBUM_ID,															
+				H.ADI_ALBUM_NAME ALBUM_NAME,                            							
+				NVL(H.SUGGESTED_PRICE, '0')  PRICE,    							
+				MIN(B.PRODUCT_TYPE) PRODUCT_TYPE_MIN,  	
+				MAX(B.PRODUCT_TYPE) PRODUCT_TYPE_MAX, 			                          							
+				CASE WHEN MIN(B.PRODUCT_TYPE) = '3'                         							
+					THEN CASE WHEN MIN(B.PRODUCT_TYPE) = MAX(B.PRODUCT_TYPE)                							
+							THEN 'Y'                        							
+							ELSE 'N' END                    							
+					ELSE 'N' END IS_SVOD_ONLY,                   							
+		       SUBSTR(NVL(H.CP_PROPERTY_BIN,'000'), length(NVL(H.CP_PROPERTY_BIN,'000')), LENGTH(NVL(H.CP_PROPERTY_BIN,'000')) - 1) CP_PROPERTY_BIN,
+		       INAPP_PRICE 
+		FROM (                                             							
+			SELECT D.NSC_ALBUM_ID ,                          							
+				   ADI_ALBUM_NAME ,                         							
+				   NVL(E.SUGGESTED_PRICE, '0') SUGGESTED_PRICE ,                      	                  							
+				   G.CP_PROPERTY_BIN,
+				   D.ASSET_ID,		                                                                                                                
+				   NVL(I.APPROVAL_PRICE, '0') INAPP_PRICE													
+			  FROM IMCSUSER.PT_LA_ALBUM_MST C ,             							
+				   IMCSUSER.PT_LA_PACKAGE_ASSET D ,         							
+				   IMCSUSER.PT_LA_TITLE_ASSET E,              							
+				   IMCSUSER.PT_LA_RESERVE_ASSET F,										
+				   IMCSUSER.PT_CD_CP_MST G,	                                                                                                        
+				   IMCSUSER.PT_LA_APPROVAL_INFO I												
+			 WHERE D.NSC_ALBUM_ID IN
+			 <foreach item="item" index="index" collection="arrAlbumList" separator="," open="(" close=")" >	 
+				#{item}
+			 </foreach>      							
+			   AND C.ADI_ALBUM_ID = D.NSC_ALBUM_ID	               							
+			   AND D.ADI_PRODUCT_ID = E.ADI_PRODUCT_ID  	           							
+			   AND E.ADI_PRODUCT_ID = F.ADI_PRODUCT_ID(+)   								
+			   AND F.CP_ID = G.CP_ID(+)	
+			   AND TO_NUMBER(SUGGESTED_PRICE) BETWEEN TO_NUMBER(PRICE_FROM) AND TO_NUMBER(PRICE_TO)
+			   AND NVL(I.APPROVAL_GB, 'N') = 'N'	  
+			   ) H,		                                                                                                                                
+	       	IMCSUSER.PT_PD_PACKAGE_DETAIL A,	                                                                                                    	
+          	IMCSUSER.PT_PD_PACKAGE B	                                                                                                          		
+	 		WHERE H.ASSET_ID = A.CONTENTS_ID	                                                                                                          	
+	   		AND A.PRODUCT_ID = B.PRODUCT_ID												
+			 GROUP BY H.NSC_ALBUM_ID,
+			 		H.ADI_ALBUM_NAME,                        							
+				    SUGGESTED_PRICE,                          							
+				   	CP_PROPERTY_BIN,
+				   	INAPP_PRICE
+	</select>	
+	
+	<!-- 프로그램명 조회 -->
+	<select id="getInappInfo" resultType="String" >
+		SELECT                                           							                
+		       NVL(APPROVAL_PRICE, '0') APPROVAL_PRICE                             							
+		FROM 			                                    										
+		       IMCSUSER.PT_LA_APPROVAL_INFO                                            				
+		WHERE       																					
+		       TO_NUMBER(#{price}) BETWEEN TO_NUMBER(PRICE_FROM) AND TO_NUMBER(PRICE_TO)
+		       AND NVL(APPROVAL_GB, 'N') = 'N'   
+		       AND ROWNUM = 1
+	</select>
+	
+	<!-- 앨범 ID가 포함된 svod에 가입 되어 있는지 조회 -->
+	<select id="getSubcription" resultType="String" >                                                          
+		    SELECT /*+ LEADING(B C A D E) USE_NL(B C A D E) */
+		        D.NSC_ALBUM_ID                                     
+		    FROM                                       
+		        IMCSUSER.PT_PD_PACKAGE_DETAIL A        
+		        , PT_VO_CUSTOM_PRODUCT B               
+		        , IMCSUSER.PT_PD_PACKAGE_RELATION C    
+		        , IMCSUSER.PT_LA_PACKAGE_ASSET D 	    
+		        , IMCSUSER.PT_PD_PACKAGE E 		    
+		    WHERE                                      
+		        D.NSC_ALBUM_ID IN
+		        <foreach item="item" index="index" collection="arrAlbumList" separator="," open="(" close=")" >	 
+				#{item}
+			 	</foreach>  	    
+		        AND A.CONTENTS_ID = D.ASSET_ID		    
+		        AND A.PRODUCT_ID = C.PRODUCT_ID        
+		        AND C.P_PRODUCT_ID = B.PRODUCTCD       
+		        AND B.SA_ID = #{saId}		 	        
+		        AND B.MAC_ADDR = #{stbMac} 			
+				 AND C.PRODUCT_ID = E.PRODUCT_ID		
+				 AND E.PRODUCT_TYPE = '3'				
+
+	</select>
+	
+		<!-- 부가세요율 조회 -->
+	<select id="isBuy" resultType="String" >
+			SELECT
+				B.CONTENTS_ID
+			FROM
+				PT_VO_BUY_NSC A, PT_VO_BUY_DETAIL_NSC B
+			WHERE
+				A.SA_ID = #{saId}
+				AND A.MAC_ADDR = #{stbMac}
+				AND A.SA_ID = B.SA_ID
+				AND A.MAC_ADDR = B.MAC_ADDR
+				AND A.BUY_DATE = B.BUY_DATE
+				AND A.PRODUCT_ID = B.PRODUCT_ID
+				AND B.CONTENTS_ID IN 
+				<foreach item="item" index="index" collection="arrAlbumList" separator="," open="(" close=")" >	 
+				#{item}
+			 	</foreach>
+				AND NVL(EXPIRED_DATE, '0') <![CDATA[>=]]> TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS')
+				AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+	</select>	
+
+	<!-- 부가세요율 조회 -->
+	<select id="getSurtaxRateInfo" resultType="String" >
+		SELECT NVL(TO_NUMBER(MIN_VALUE),0) MIN_VALUE
+		FROM IMCSUSER.PT_CD_COM_CD
+		WHERE GRP_ID = 'SURTAXRATE'	
+		  AND ROWNUM = 1
+	</select>	
+		
+</mapper>
+	
+	
+	

@@ -1,0 +1,542 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSWatchList.GetNSWatchListDao">
+
+	<resultMap type="java.util.HashMap" id="mTestSbcInfo">
+		<result property="TEST_SBC" column="TEST_SBC" javaType="String"/>
+		<result property="STB_SA_ID" column="STB_SA_ID" javaType="String"/>
+		<result property="STB_MAC" column="STB_MAC" javaType="String"/>
+		<result property="STB_PAIRING" column="STB_PAIRING" javaType="String"/>
+		<result property="SYS_DATE" column="SYS_DATE" javaType="String"/>
+	</resultMap>
+
+	<resultMap type="java.util.HashMap" id="mNscreenInfo">
+		<result property="ICOUNT" column="ICOUNT" javaType="String"/>
+		<result property="PROD_TYPE" column="PROD_TYPE" javaType="String"/>
+	</resultMap>
+	
+	<resultMap type="java.util.HashMap" id="mBuyCheckInfo">
+		<result property="BUY_YN" column="BUY_YN" javaType="String"/>
+		<result property="BUY_DATE" column="BUY_DATE" javaType="String"/>
+		<result property="EXPIRED_DATE" column="EXPIRED_DATE" javaType="String"/>
+	</resultMap>
+	
+	<resultMap type="java.util.HashMap" id="mIptvBuyCheck">
+		<result property="ICOUNT" column="ICOUNT" javaType="String"/>
+		<result property="EXPIRED_DATE" column="EXPIRED_DATE" javaType="String"/>
+		<result property="CHK_PROD_ID" column="CHK_PROD_ID" javaType="String"/>
+	</resultMap>
+
+	<!--  검수 STB여부 조회 -->
+	<select id="getTestSbc" parameterType="GetNSWatchListRequestVO" resultMap="mTestSbcInfo">
+	    SELECT case when A.test_sbc = 'Y' then A.test_sbc else 'N' end TEST_SBC,
+	           NVL(T.stb_sa_id, '') STB_SA_ID, NVL(T.stb_mac, '') STB_MAC, NVL(T.flag, 'N') STB_PAIRING, TO_CHAR(sysdate, 'yyyymmdd') SYS_DATE
+	      FROM PT_VO_CUSTOM_ID A,
+	           (SELECT m_sa_id, stb_sa_id, stb_mac, flag
+	              FROM PT_VO_SBC_PAIRING_TBL
+	             WHERE m_sa_id = #{saId} AND m_mac = #{macAddr} AND flag = 'Y') T
+	     WHERE A.sa_id = #{saId}
+	       AND A.mac_addr = #{macAddr}
+	       AND A.sa_id = T.m_sa_id (+)
+	</select>
+	
+	<!--  모바일 가입자 가입상품 조회 -->
+	<select id="getNscCustProd" parameterType="GetNSWatchListRequestVO" resultType="String">
+	    SELECT DISTINCT product_id
+		  FROM (
+			SELECT productcd product_id FROM PT_VO_CUSTOM_PRODUCT
+			 WHERE sa_id = #{saId}
+			   AND mac_addr = #{macAddr}
+			   AND xcion_billing_typ = 'P'
+			UNION ALL
+			SELECT prod_cd product_id FROM PT_VO_NSC_PRODUCT
+			 WHERE sbc_cont_no = #{saId}
+			   AND mac_addr = #{macAddr}
+			   AND TO_CHAR(sysdate , 'yyyymmddhh24miss') between buy_date and expired_date
+			) X
+	</select>
+	
+	<!--  IPTV 가입자 가입상품 조회 -->
+	<select id="getIptvCustProd" parameterType="GetNSWatchListRequestVO" resultType="String">
+	    SELECT productcd FROM PT_VO_CUSTOM_PRODUCT
+		  WHERE sa_id = #{stbSaId}
+		    AND mac_addr = #{stbMac}
+		    AND xcion_billing_typ = 'P'
+	</select>
+	
+	
+	<select id="getSubscribeList1" parameterType="GetNSWatchListRequestVO" resultType="GetNSWatchListResponseVO" timeout="10">
+		SELECT X.album_id, X.album_name, X.watch_date, X.link_time, X.screen_type, X.series_desc, X.pr_info, X.runtime, X.genre_mid, X.nsc_info,
+		       NVL(case when regexp_substr(category_id_tmp, '[^^]+', 1,5,'i')  = 'Y' then SUBSTR(regexp_substr(category_id_tmp, '[^^]+', 1,3,'i'), 1, instr(regexp_substr(category_id_tmp, '[^^]+', 1,3,'i'), '|') - 1) 
+                                                        else NVL(DECODE(regexp_substr(category_id_tmp, '[^^]+', 1,4,'i'), 'XXXXX', '', regexp_substr(category_id_tmp, '[^^]+', 1,4,'i')), 
+                                                                     DECODE(regexp_substr(category_id_tmp, '[^^]+', 1,2,'i'), 'XXXXX', '', regexp_substr(category_id_tmp, '[^^]+', 1,2,'i'))) end, 'ZZZZZ') category_id,
+               case when regexp_substr(category_id_tmp, '[^^]+', 1,5,'i')  = 'Y' then SUBSTR(regexp_substr(category_id_tmp, '[^^]+', 1,3,'i'), instr(regexp_substr(category_id_tmp, '[^^]+', 1,3,'i'), '|') + 1, 10) else '' end series_no,
+               regexp_substr(category_id_tmp, '[^^]+', 1,5,'i') series_yn,
+               X.product_type, X.svod_yn, X.poster_p,     
+		       (SELECT I.main_img_file_name FROM IMCSUSER.PT_LA_ALBUM_IMG I
+		         WHERE I.adi_album_id = X.album_id AND I.img_flag = 'N'
+		           AND rownum = 1) still_file_name, genre_small, genre_large, vr_type, release_date, sub_title, round, vod_type,
+		           X.series_conts_yn, X.LICENSING_WINDOW_END,
+		           regexp_substr(category_id_tmp, '[^^]+', 1,6,'i') as book_yn
+		  FROM (SELECT /*+ LEADING(W A T P S C D G)  USE_NL(W A T P S C D G)*/   
+		               W.adi_album_id album_id, W.watch_date, W.link_time, 'N' as screen_type, A.album_name, A.series_no series_desc,
+		               T.rating_cd pr_info, SUBSTR(T.run_time, 1, 6) runtime, T.genre_mid,                                              
+		               MIN(( 
+                                      SELECT  
+                                              min(case when V.nsc_gb = 'KID' then case when V.actors_display = 'B' then '1' else '2' end else '3' end) || '^' || 
+                                               min(case when V.test_sbc = 'Y' then V.CATEGORY_ID else 'XXXXX' end)  || '^' ||
+                                               MIN(case when NVL(V.series_yn, 'N') = 'Y' and NVL(V.test_sbc, 'N') = 'N' and NVL(V.edu_type, 'Y') = 'Y' then V.category_id||'|'||M.series_no else 'XXXXX' end) || '^' ||
+                                               MIN(case when NVL(V.series_yn, 'N') = 'N' and NVL(V.test_sbc, 'N') = 'N' then V.category_id else 'XXXXX' end) || '^' ||
+                                               MAX(case when NVL(V.series_yn, 'N') = 'Y' and NVL(V.test_sbc, 'N') = 'N' and NVL(V.edu_type, 'Y') = 'Y' then 'Y' else 'N' end) || '^' ||
+                                               MIN(case when V.nsc_gb = 'KID' and V.actors_display = 'H' then 'Y' else 'N' end) book_yn
+                                      FROM PT_VO_CATEGORY V, 
+                                          PT_VO_CATEGORY_MAP M 
+                                     WHERE W.adi_album_id = M.contents_id 
+                                       AND NVL(M.viewing_flag, 'V') != 'N' 
+                                       and M.category_id = V.category_id 
+                                       and V.category_gb = 'NSC' 
+                                       AND ((#{rqsFlag} <![CDATA[<>]]> 'U' and (#{rqsFlag} != 'K' and #{rqsFlag} != 'B') and 1 = 1) or (#{rqsFlag} = 'U' AND V.nsc_gb = 'UFX') or ((#{rqsFlag} = 'K' or #{rqsFlag} = 'B') AND V.nsc_gb = 'KID')) 
+                         )) AS category_id_tmp,  
+		               MAX(DECODE(G.product_type, '3', 'Y', 'N')) svod_yn, 
+		               MIN(G.product_type) product_type, 
+		               MAX(S.content_value) poster_p,     
+					   MAX(NVL(T.genre_small, ' ')) genre_small,
+					   MAX(NVL(T.genre_large, '')) genre_large,
+					   MAX(T.vr_type) vr_type,
+					   MAX(A.RELEASE_DATE) RELEASE_DATE,
+					   MAX(T.SUB_TITLE) SUB_TITLE,
+					   MAX(T.NFC_CODE) ROUND,
+					   MAX(A.VOD_TYPE) VOD_TYPE,
+					   (MCUSTUSER.nuf_get_nscreen_info(W.adi_album_id, #{testSbc} )) nsc_info,
+					   MAX(W.series_conts_yn) series_conts_yn,
+					   MAX(P.LICENSING_WINDOW_END) LICENSING_WINDOW_END					   
+		          FROM (SELECT /*+ LEADING(W S) USE_NL(W S) INDEX(S IDX_PT_LA_ALBUM_RELATION_01) */ W.adi_album_id, W.watch_date, W.link_time, case when S.group_type = 'S' then 'Y' else 'N' end series_conts_yn
+		          		  FROM PT_VO_SET_TIME_PTT_NSC W
+		          		  	   LEFT OUTER JOIN IMCSUSER.PT_LA_ALBUM_RELATION S ON W.adi_album_id = S.album_id AND S.group_type = 'S'
+		          		 WHERE W.sa_id = #{conSaId}                 
+				           AND W.p_idx_sa = #{idxSa}         
+				           AND W.nscn_cust_no = #{appFlag}
+				           AND W.watch_date <![CDATA[>]]> '0'
+		           		) W,             
+		               IMCSUSER.PT_LA_ALBUM_INFO A,      
+		               IMCSUSER.PT_LA_ALBUM_SUB T,       
+		               IMCSUSER.PT_LA_ALBUM_PLATFORM P,             
+		               IMCSUSER.PT_LA_ASSET_INFO C,      
+		               IMCSUSER.PT_PD_PACKAGE_DETAIL D,  
+		               IMCSUSER.PT_PD_PACKAGE G,         
+		               IMCSUSER.PT_LA_ALBUM_POSTER S          
+		         WHERE 1=1                               
+		           AND W.adi_album_id = A.album_id       
+		           AND W.adi_album_id = T.album_id       
+		           AND A.album_id = P.album_id           
+		           AND A.album_id = C.album_id           
+		           AND P.screen_type = 'N'               
+		           AND P.screen_type = C.screen_type     
+		           AND C.asset_id = D.contents_id        
+		           AND D.product_id = G.product_id       
+		           AND A.album_id = S.album_id           
+		           AND P.screen_type = S.screen_type
+				<if test="possessionYn.equals('Y'.toString())">
+				   AND TRUNC(TO_NUMBER(NVL(SUBSTR(P.MAXIMUM_VIEWING_LENGTH, 1, LENGTH(P.MAXIMUM_VIEWING_LENGTH) - 2), '48')) / 24) <![CDATA[>=]]> 2000
+  				</if>
+		           AND S.poster_type = 'P'               
+		           AND S.service_yn = 'Y'                		                    
+		         GROUP BY W.adi_album_id, W.watch_date, W.link_time, A.album_name, A.series_no,  
+		                  T.rating_cd, T.run_time, T.genre_mid      
+		         ORDER BY watch_date desc 
+		       ) X
+		       <if test="rqsFlag.equals('K'.toString())"> 
+									WHERE regexp_substr(category_id_tmp, '[^^]+', 1,1,'i') IN ('1', '2')
+				</if>
+				<if test="rqsFlag.equals('B'.toString())"> 
+									WHERE regexp_substr(category_id_tmp, '[^^]+', 1,1,'i') IN ('1', '2')
+				</if>
+	</select>
+	
+	<select id="getSubscribeList2" parameterType="GetNSWatchListRequestVO" resultType="GetNSWatchListResponseVO" timeout="10">
+		SELECT X.album_id, X.album_name, X.watch_date, X.link_time, X.screen_type, X.series_desc, X.pr_info, X.runtime, X.genre_mid, X.nsc_info,
+		       case when NVL(X.series_yn, 'N') = 'Y' then SUBSTR(ser_category, 1, instr(ser_category, '|') - 1)    
+		                                             else NVL(X.gen_category, X.test_category) end category_id,    
+		       case when NVL(X.series_yn, 'N') = 'Y' then SUBSTR(ser_category, instr(ser_category, '|') + 1, 10) else '' end series_no, 
+		       NVL(X.series_yn, 'N') series_yn, X.product_type, X.svod_yn, X.poster_p,                                                  
+		       (SELECT I.main_img_file_name FROM IMCSUSER.PT_LA_ALBUM_IMG I                                                             
+		         WHERE I.adi_album_id = X.album_id AND I.img_flag = 'N'                                                                 
+		           AND rownum = 1) still_file_name, genre_small, genre_large, vr_type, release_date, sub_title, round, vod_type,
+		           X.series_conts_yn, X.LICENSING_WINDOW_END,
+				   book_yn
+		  FROM (SELECT /*+ LEADING(W A T) USE_NL(P C S M R D G K)*/                                                                     
+		               W.adi_album_id album_id, W.watch_date, W.link_time, 'I' as screen_type, A.album_name, A.series_no series_desc,                       
+		               T.rating_cd pr_info, SUBSTR(T.run_time, 1, 6) runtime, T.genre_mid,                                                    
+		               MIN(case when NVL(R.series_yn, 'N') = 'Y' and NVL(R.test_sbc, 'N') = 'N' and NVL(R.edu_type, 'Y') = 'Y' then R.category_id||'|'||M.series_no else '' end) ser_category,  
+		               MIN(case when NVL(R.series_yn, 'N') = 'N' and NVL(R.test_sbc, 'N') = 'N' then R.category_id else '' end) gen_category,               
+		               MIN(case when NVL(R.test_sbc, 'N') = 'Y' then R.category_id else '' end) test_category,                                              
+		               MIN(case when NVL(R.series_yn, 'N') = 'Y' and NVL(R.test_sbc, 'N') = 'N' and NVL(R.edu_type, 'Y') = 'Y' then 'Y' else '' end) series_yn, 
+		               MAX(DECODE(G.product_type, '3', 'Y', 'N')) svod_yn, 
+		               MIN(G.product_type) product_type, 
+		               MAX(S.content_value) poster_p,     
+					   MAX(NVL(T.genre_small, ' ')) genre_small,
+					   MAX(NVL(T.genre_large, '')) genre_large,
+					   MAX(T.vr_type) vr_type,
+					   MAX(A.RELEASE_DATE) RELEASE_DATE,
+					   MAX(T.SUB_TITLE) SUB_TITLE,
+					   MAX(T.NFC_CODE) ROUND,
+					   MAX(A.VOD_TYPE) VOD_TYPE,
+					   (MCUSTUSER.nuf_get_nscreen_info(W.adi_album_id, #{testSbc} )) nsc_info,
+					   MAX(W.series_conts_yn) series_conts_yn,
+					   MAX(P.LICENSING_WINDOW_END) LICENSING_WINDOW_END,
+					   MIN(case when R.nsc_gb = 'KID' and R.actors_display = 'H' then 'Y' else 'N' end) book_yn
+		          FROM (SELECT /*+ INDEX(S IDX_PT_LA_ALBUM_RELATION_01) */ W.adi_album_id, W.watch_date, W.link_time, case when S.group_type = 'S' then 'Y' else 'N' end series_conts_yn
+		          		  FROM PT_VO_SET_TIME_PTT W
+		          		  	   LEFT OUTER JOIN IMCSUSER.PT_LA_ALBUM_RELATION S ON W.adi_album_id = S.album_id AND S.group_type = 'S'
+		          		 WHERE W.sa_id        = #{conSaId}                
+				           AND W.p_idx_sa     = #{idxSa}            
+				           AND W.nscn_cust_no = #{appFlag}      
+				           AND W.watch_date <![CDATA[>]]> '0'
+		           		) W,             
+		               IMCSUSER.PT_LA_ALBUM_INFO A,      
+		               IMCSUSER.PT_LA_ALBUM_SUB T,       
+		               IMCSUSER.PT_LA_ALBUM_PLATFORM P,  
+		               PT_VO_CATEGORY_MAP M,             
+		               PT_VO_CATEGORY R,                 
+		               IMCSUSER.PT_LA_ASSET_INFO C,      
+		               IMCSUSER.PT_PD_PACKAGE_DETAIL D,  
+		               IMCSUSER.PT_PD_PACKAGE G,         
+		               IMCSUSER.PT_LA_ALBUM_POSTER S     
+		         WHERE 1=1
+		           AND W.adi_album_id = A.album_id       
+		           AND W.adi_album_id = T.album_id       
+		           AND W.adi_album_id = M.contents_id    
+		           AND R.category_id  = M.category_id     
+		           AND NVL(M.viewing_flag, 'V') != 'N'   
+		           AND A.album_id     = P.album_id           
+		           AND A.album_id     = C.album_id           
+		           AND P.screen_type  = 'N'
+		           AND P.screen_type  = C.screen_type
+		           AND C.asset_id     = D.contents_id
+		           AND D.product_id   = G.product_id
+		           AND A.album_id     = S.album_id
+		           AND P.screen_type  = S.screen_type
+		        <if test="possessionYn.equals('Y'.toString())">
+				   AND TRUNC(TO_NUMBER(NVL(SUBSTR(P.MAXIMUM_VIEWING_LENGTH, 1, LENGTH(P.MAXIMUM_VIEWING_LENGTH) - 2), '48')) / 24) <![CDATA[>=]]> 2000
+  				</if>
+		           AND S.poster_type  = 'P'               
+		           AND S.service_yn   = 'Y'                		          
+		           AND R.category_gb  = 'NSC'         
+		           AND ((#{rqsFlag} <![CDATA[<>]]> 'U' and (#{rqsFlag} != 'K' and #{rqsFlag} != 'B') and 1 = 1) or (#{rqsFlag} = 'U' AND R.nsc_gb = 'UFX') or ((#{rqsFlag} = 'K' or #{rqsFlag} = 'B') AND R.nsc_gb = 'KID'))            
+		         GROUP BY W.adi_album_id, W.watch_date, W.link_time, A.album_name, A.series_no,  
+		                  T.rating_cd, T.run_time, T.genre_mid 
+		         ORDER BY watch_date desc 
+		       ) X 	where x.nsc_info like 'Y%' 
+	</select>
+	
+	<select id="getSubscribeList3" parameterType="GetNSWatchListRequestVO" resultType="GetNSWatchListResponseVO" timeout="10">
+		SELECT X.album_id, X.album_name, X.watch_date, X.link_time, X.screen_type, X.series_desc, X.pr_info, X.runtime, X.genre_mid, X.nsc_info,
+               NVL(case when regexp_substr(category_id_tmp, '[^^]+', 1,5,'i')  = 'Y' then SUBSTR(regexp_substr(category_id_tmp, '[^^]+', 1,3,'i'), 1, instr(regexp_substr(category_id_tmp, '[^^]+', 1,3,'i'), '|') - 1) 
+                                                        else NVL(DECODE(regexp_substr(category_id_tmp, '[^^]+', 1,4,'i'), 'XXXXX', '', regexp_substr(category_id_tmp, '[^^]+', 1,4,'i')), 
+                                                                     DECODE(regexp_substr(category_id_tmp, '[^^]+', 1,2,'i'), 'XXXXX', '', regexp_substr(category_id_tmp, '[^^]+', 1,2,'i'))) end, 'ZZZZZ') category_id,
+               case when regexp_substr(category_id_tmp, '[^^]+', 1,5,'i')  = 'Y' then SUBSTR(regexp_substr(category_id_tmp, '[^^]+', 1,3,'i'), instr(regexp_substr(category_id_tmp, '[^^]+', 1,3,'i'), '|') + 1, 10) else '' end series_no,
+               regexp_substr(category_id_tmp, '[^^]+', 1,5,'i') series_yn,
+               X.product_type, X.svod_yn, X.poster_p,                                             
+               (SELECT I.main_img_file_name FROM IMCSUSER.PT_LA_ALBUM_IMG I                                                             
+                 WHERE I.adi_album_id = X.album_id AND I.img_flag = 'N'                                                                 
+                   AND rownum = 1) still_file_name, genre_small, genre_large, vr_type, release_date, sub_title, round, vod_type,
+                   X.series_conts_yn, X.LICENSING_WINDOW_END,
+				   regexp_substr(category_id_tmp, '[^^]+', 1,6,'i') as book_yn
+          FROM (SELECT /*+ LEADING(W A T P S C D G)  USE_NL(W A T P S C D G)*/                                                                     
+                       W.adi_album_id album_id, W.watch_date, W.link_time, W.screen_type , A.album_name, A.series_no series_desc,                       
+                       T.rating_cd pr_info, SUBSTR(T.run_time, 1, 6) runtime, T.genre_mid,                                                    
+                       MIN(( 
+                                      SELECT  
+                                              min(case when V.nsc_gb = 'KID' then case when V.actors_display = 'B' then '1' else '2' end else '3' end) || '^' || 
+                                               min(case when V.test_sbc = 'Y' then V.CATEGORY_ID else 'XXXXX' end)  || '^' ||
+                                               MIN(case when NVL(V.series_yn, 'N') = 'Y' and NVL(V.test_sbc, 'N') = 'N' and NVL(V.edu_type, 'Y') = 'Y' then V.category_id||'|'||M.series_no else 'XXXXX' end) || '^' ||
+                                               MIN(case when NVL(V.series_yn, 'N') = 'N' and NVL(V.test_sbc, 'N') = 'N' then V.category_id else 'XXXXX' end) || '^' ||
+                                               MAX(case when NVL(V.series_yn, 'N') = 'Y' and NVL(V.test_sbc, 'N') = 'N' and NVL(V.edu_type, 'Y') = 'Y' then 'Y' else 'N' end) || '^' ||
+                                               MIN(case when V.nsc_gb = 'KID' and V.actors_display = 'H' then 'Y' else 'N' end) book_yn
+                                      FROM PT_VO_CATEGORY V, 
+                                          PT_VO_CATEGORY_MAP M 
+                                     WHERE W.adi_album_id = M.contents_id 
+                                       AND NVL(M.viewing_flag, 'V') != 'N' 
+                                       and M.category_id = V.category_id 
+                                       and V.category_gb = 'NSC'
+									   AND ((#{rqsFlag} <![CDATA[<>]]> 'U' and (#{rqsFlag} != 'K' and #{rqsFlag} != 'B') and 1 = 1) or (#{rqsFlag} = 'U' AND V.nsc_gb = 'UFX') or ((#{rqsFlag} = 'K' or #{rqsFlag} = 'B') AND V.nsc_gb = 'KID'))                                          
+                         )) AS category_id_tmp,  
+                       MAX(DECODE(G.product_type, '3', 'Y', 'N')) svod_yn, 
+                       MIN(G.product_type) product_type, 
+                       MAX(S.content_value) poster_p,     
+                       MAX(NVL(T.genre_small, ' ')) genre_small,
+                       MAX(NVL(T.genre_large, '')) genre_large,
+                       MAX(T.vr_type) vr_type,
+                       MAX(A.RELEASE_DATE) RELEASE_DATE,
+                       MAX(T.SUB_TITLE) SUB_TITLE,
+                       MAX(T.NFC_CODE) ROUND,
+                       MAX(A.VOD_TYPE) VOD_TYPE,
+                       W.nsc_info,
+                       MAX(W.series_conts_yn) series_conts_yn,
+                       MAX(P.LICENSING_WINDOW_END) LICENSING_WINDOW_END					    
+                  FROM ( select adi_album_id ,
+                  				max(watch_date) watch_date, 
+                  				max(link_time) KEEP(DENSE_RANK FIRST ORDER BY watch_date DESC) link_time, 
+                  				max(screen_type) KEEP(DENSE_RANK FIRST ORDER BY watch_date DESC) screen_type ,
+                  				MCUSTUSER.nuf_get_nscreen_info(adi_album_id, #{testSbc}) nsc_info,
+                  				max(series_conts_yn) series_conts_yn
+                           from (select /*+ INDEX(S IDX_PT_LA_ALBUM_RELATION_01) */ W.adi_album_id, W.watch_date, W.link_time, 'N' as screen_type, case when S.group_type = 'S' then 'Y' else 'N' end series_conts_yn
+		                           from PT_VO_SET_TIME_PTT_NSC W
+		                                LEFT OUTER JOIN IMCSUSER.PT_LA_ALBUM_RELATION S ON W.adi_album_id = S.album_id AND S.group_type = 'S'
+		                          where W.sa_id      = #{conSaId}                
+		           				    AND W.p_idx_sa     = #{idxSa}            
+		           			    	AND W.nscn_cust_no = #{appFlag}
+		                          UNION ALL
+		                         select /*+ INDEX(S IDX_PT_LA_ALBUM_RELATION_01) */ W.adi_album_id, W.watch_date, W.link_time, 'I' as screen_type, case when S.group_type = 'S' then 'Y' else 'N' end series_conts_yn
+		                           from PT_VO_SET_TIME_PTT W
+		                                LEFT OUTER JOIN IMCSUSER.PT_LA_ALBUM_RELATION S ON W.adi_album_id = S.album_id AND S.group_type = 'S'
+		                          where W.sa_id      = #{conSaId2}                
+		           				    AND W.p_idx_sa     = #{idxSa2}            
+		           			    	AND W.nscn_cust_no = #{appFlag}) 
+		                  GROUP BY adi_album_id 
+		               ) W,             
+                       IMCSUSER.PT_LA_ALBUM_INFO A,      
+                       IMCSUSER.PT_LA_ALBUM_SUB T,       
+                       IMCSUSER.PT_LA_ALBUM_PLATFORM P,            
+                       IMCSUSER.PT_LA_ASSET_INFO C,      
+                       IMCSUSER.PT_PD_PACKAGE_DETAIL D,  
+                       IMCSUSER.PT_PD_PACKAGE G,         
+                       IMCSUSER.PT_LA_ALBUM_POSTER S       
+                 WHERE 1=1
+                   AND W.adi_album_id = A.album_id       
+                   AND W.adi_album_id = T.album_id 
+                   AND A.album_id     = P.album_id           
+                   AND A.album_id     = C.album_id           
+                   AND P.screen_type  = 'N'
+                   AND P.screen_type  = C.screen_type
+                   AND C.asset_id     = D.contents_id
+                   AND D.product_id   = G.product_id
+                   AND A.album_id     = S.album_id
+                   AND P.screen_type  = S.screen_type
+                <if test="possessionYn.equals('Y'.toString())">
+				   AND TRUNC(TO_NUMBER(NVL(SUBSTR(P.MAXIMUM_VIEWING_LENGTH, 1, LENGTH(P.MAXIMUM_VIEWING_LENGTH) - 2), '48')) / 24) <![CDATA[>=]]> 2000
+  				</if>
+                   AND S.poster_type  = 'P'               
+                   AND S.service_yn   = 'Y'    
+                   AND W.watch_date <![CDATA[>]]> '0'          
+                   AND ((W.screen_type = 'I' and SUBSTR(W.nsc_info, 1, 1) ='Y') or (W.screen_type = 'N'))       
+		         GROUP BY W.adi_album_id, W.watch_date, W.link_time, W.screen_type, A.album_name, A.series_no,  
+		                  T.rating_cd, T.run_time, T.genre_mid, W.nsc_info
+		         ORDER BY watch_date desc 
+		       ) X
+		       <if test="rqsFlag.equals('K'.toString())"> 
+									WHERE regexp_substr(category_id_tmp, '[^^]+', 1,1,'i') IN ('1', '2')
+				</if>
+				<if test="rqsFlag.equals('B'.toString())"> 
+									WHERE regexp_substr(category_id_tmp, '[^^]+', 1,1,'i') IN ('1', '2')
+				</if>
+	</select>
+	
+	<select id="getBuyCheck" parameterType="GetNSWatchListResponseVO" resultMap="mBuyCheckInfo">
+        SELECT case when MAX(expired_date) >= TO_CHAR(sysdate, 'yyyymmddhh24miss') then 'Y' else 'N' end buy_yn,                 
+               MAX(buy_date) buy_date, MAX(expired_date) expired_date                                                            
+          FROM (                                                                                                                 
+                SELECT /*+LEADING(A X B) USE_NL(A X B)*/
+                 	   case when MAX(A.buy_date) over (partition by 0) = A.buy_date then A.buy_date else '' end buy_date,        
+                       case when MAX(A.buy_date) over (partition by 0) = A.buy_date then A.expired_date else '' end expired_date 
+                  FROM PT_VO_BUY_NSC A,                 
+                       imcsuser.PT_PD_PACKAGE_DETAIL B,
+                       IMCSUSER.PT_LA_ASSET_INFO X
+                 WHERE A.product_id = CASE WHEN A.PKG_YN = 'Y' THEN B.PRODUCT_ID ELSE X.ALBUM_ID END
+                   AND A.sa_id = #{chkSaId}  
+                   AND A.MAC_ADDR = #{chkMacAddr}
+                   AND X.ALBUM_ID = #{albumId}
+                   AND X.SCREEN_TYPE = 'N'
+                   AND B.CONTENTS_ID = X.ASSET_ID  
+                   AND NVL(A.refund_yn,'N') <![CDATA[<>]]> 'P'  
+					AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X' 
+                UNION ALL                           
+                SELECT MIN(A.present_date) buy_date, MIN(A.expired_date) expired_date 
+                  FROM PT_VO_PRESENT A              
+                 WHERE A.rcv_sa_id = #{chkSaId}
+                   AND A.contents_id = #{albumId}
+                   AND NVL(A.del_flg,'N') = 'N'     
+               ) X	
+	</select>	
+	
+	<select id="getDatafreeCheck" parameterType="GetNSWatchListResponseVO" resultType="String">
+		SELECT 1
+	      FROM PT_VO_BUY_NSC
+	     WHERE sa_id = #{chkSaId}
+	       AND expired_date >= TO_CHAR(sysdate, 'yyyymmddhh24miss')
+	       AND product_id   = #{tempId}
+	       AND NVL(refund_yn,'N') <![CDATA[<>]]> 'P'
+	       AND NVL(regexp_substr(replace(replace(ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+	</select>
+	
+	<select id="getSvodCheck" parameterType="GetNSWatchListResponseVO" resultType="String">
+        SELECT DISTINCT product_id                   
+          FROM                                       
+          ( SELECT B.product_id product_id           
+              FROM IMCSUSER.PT_LA_ASSET_INFO A,      
+                   IMCSUSER.PT_PD_PACKAGE B,         
+                   IMCSUSER.PT_PD_PACKAGE_DETAIL C   
+             WHERE A.album_id = #{albumId}          
+               AND A.screen_type = 'N'               
+               AND A.asset_id = C.contents_id        
+               AND B.product_id = C.product_id       
+               AND B.product_type = '3'              
+            UNION ALL                                
+            SELECT D.p_product_id product_id         
+              FROM IMCSUSER.PT_LA_ASSET_INFO A,      
+                   IMCSUSER.PT_PD_PACKAGE B,         
+                   IMCSUSER.PT_PD_PACKAGE_DETAIL C,  
+                   IMCSUSER.PT_PD_PACKAGE_RELATION D 
+             WHERE A.album_id = #{albumId}         
+               AND A.screen_type = 'N'               
+               AND A.asset_id = C.contents_id        
+               AND B.product_id = C.product_id       
+               AND D.product_id = C.product_id       
+               AND B.product_type = '3'              
+           ) X 
+	</select>
+	
+	<select id="getIptvBuyCheck" parameterType="GetNSWatchListResponseVO" resultMap="mIptvBuyCheck">
+	    SELECT COUNT(*) ICOUNT, MAX(buy_date) BUY_DATE, MAX(expired_date) EXPIRED_DATE
+          FROM (
+            SELECT A.buy_date BUY_DATE, A.expired_date EXPIRED_DATE
+              FROM PT_VO_BUY A,
+                   (SELECT K.album_id, K.asset_id, DECODE(K.asset_type, 'SH', 'HD', K.asset_type) asset_type
+                      FROM IMCSUSER.PT_LA_ASSET_INFO K
+                     WHERE K.album_id = #{albumId} AND K.screen_type = 'I') P
+             WHERE A.sa_id = #{chkStbSaId}
+               AND A.expired_date <![CDATA[>]]> to_char(sysdate, 'yyyymmddhh24miss')
+               AND A.product_id LIKE SUBSTR(P.asset_id, 1, 17)||'%%'
+               AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+            UNION ALL
+            SELECT G.buy_date BUY_DATE, G.expired_date EXPIRED_DATE
+              FROM PT_VO_BUY G,
+                (SELECT D.product_id, H.asset_id
+                               FROM IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+                                    IMCSUSER.PT_PD_PACKAGE P,
+                                    (SELECT asset_id
+                                       FROM IMCSUSER.PT_LA_ASSET_INFO
+                                      WHERE album_id = #{albumId} AND screen_type = 'I') H
+                              WHERE D.contents_id LIKE SUBSTR(H.asset_id, 1, 17) || '%'
+                                AND D.product_id = P.product_id
+                                AND P.product_type = '2' 
+                             ) Z
+             WHERE G.sa_id = #{chkStbSaId}
+              AND G.product_id = Z.product_id
+              AND G.expired_date <![CDATA[>]]> to_char(sysdate, 'yyyymmddhh24miss')
+              AND NVL(regexp_substr(replace(replace(G.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+              )X
+	</select>
+	
+	<select id="getIptvSvodCheck" parameterType="GetNSWatchListResponseVO" resultType="String">
+        SELECT DISTINCT product_id                   
+          FROM                                       
+          ( SELECT B.product_id product_id           
+              FROM IMCSUSER.PT_LA_ASSET_INFO A,      
+                   IMCSUSER.PT_PD_PACKAGE B,         
+                   IMCSUSER.PT_PD_PACKAGE_DETAIL C   
+             WHERE A.album_id = #{albumId}          
+               AND A.screen_type = 'I'               
+               AND A.asset_id = C.contents_id        
+               AND B.product_id = C.product_id       
+               AND B.product_type = '3'              
+            UNION ALL                                
+            SELECT D.p_product_id product_id         
+              FROM IMCSUSER.PT_LA_ASSET_INFO A,      
+                   IMCSUSER.PT_PD_PACKAGE B,         
+                   IMCSUSER.PT_PD_PACKAGE_DETAIL C,  
+                   IMCSUSER.PT_PD_PACKAGE_RELATION D 
+             WHERE A.album_id = #{albumId}          
+               AND A.screen_type = 'I'               
+               AND A.asset_id = C.contents_id        
+               AND B.product_id = C.product_id       
+               AND D.product_id = C.product_id       
+               AND B.product_type = '3'              
+           ) X 
+	</select>
+	
+	<select id="addNextSeries" parameterType="GetNSWatchListResponseVO" resultType="addNextSeriesResponseVO" timeout="10">
+        SELECT X.album_id, X.album_name, X.series_desc, X.pr_info, X.runtime,          
+               X.series_no, X.product_type, X.poster_p, 
+               (SELECT I.main_img_file_name FROM IMCSUSER.PT_LA_ALBUM_IMG I            
+                 WHERE I.adi_album_id = X.album_id AND I.img_flag = 'N'                
+                   AND rownum = 1) still_file_name, X.nsc_info                               
+          FROM ( SELECT                                                                                          
+                        M.contents_id album_id, A.album_name, A.series_no series_desc, T.rating_cd pr_info, SUBSTR(T.run_time, 1, 6) runtime,    
+                        M.series_no, M.rank_no,                
+                        MIN(G.product_type) product_type,      
+                        MAX(S.content_value) poster_p,
+                        (MCUSTUSER.nuf_get_nscreen_info(M.contents_id, #{testSbc})) nsc_info                
+                   FROM PT_VO_CATEGORY R,                      
+                        PT_VO_CATEGORY_MAP M,                  
+                        IMCSUSER.PT_LA_ALBUM_INFO A,           
+                        IMCSUSER.PT_LA_ALBUM_SUB T,            
+                        IMCSUSER.PT_LA_ALBUM_PLATFORM P,       
+                        IMCSUSER.PT_LA_ASSET_INFO C,           
+                        IMCSUSER.PT_LA_ALBUM_POSTER S,         
+                        IMCSUSER.PT_PD_PACKAGE_DETAIL D,       
+                        IMCSUSER.PT_PD_PACKAGE G,              
+                        IMCSUSER.PT_CD_CP_MST K                
+                  WHERE 1 = 1                                  
+                    AND R.category_id = M.category_id          
+                    AND M.contents_id = A.album_id             
+                    AND A.album_id = t.album_id                
+                    AND A.album_id = P.album_id                
+                    AND P.screen_type = 'N'                    
+                    AND A.album_id = C.album_id                
+                    AND A.album_id = S.album_id                
+                    AND P.screen_type = C.screen_type          
+                    AND P.screen_type = S.screen_type          
+                    AND S.poster_type = 'P'
+                    AND S.service_yn = 'Y'
+                    AND C.asset_id = D.contents_id             
+                    AND D.product_id = G.product_id            
+                    AND P.cp_id = K.cp_id(+)                   
+                    AND R.category_id = #{categoryId}
+                    AND NVL(M.viewing_flag, 'V') != 'N'        
+                    AND TO_NUMBER(M.series_no) > #{seriesNo}  
+                  GROUP BY M.contents_id, A.album_name, A.series_no, T.rating_cd, T.run_time, 
+                           M.series_no, M.rank_no                 
+                  ORDER BY M.rank_no DESC 
+               ) X        
+         WHERE rownum = 1 and nsc_info like 'Y%'
+	</select>
+	
+	<!-- CATEGORY_TYPE 을 구하기 위해서 kids_type 을 조회함 -->
+	<select id="getKidsType_1" parameterType="GetNSWatchListRequestVO" resultType="String">
+		SELECT
+			MAX(SUBSTR(A.asset_id, 1, 1)) AS kids_type
+		FROM PT_VO_WATCH_HISTORY_NSC A
+		WHERE A.sa_id = #{saId}
+		AND A.p_idx_sa = mod(substr(#{saId}, -2), 33)
+		AND A.contents_id = #{albumId}
+	</select>
+	
+	<!-- CATEGORY_TYPE 을 구하기 위해서 kids_type 을 조회함 -->
+	<select id="getKidsType_2" parameterType="GetNSWatchListRequestVO" resultType="String">
+		SELECT
+			MAX(SUBSTR(A.asset_id, 1, 1)) AS kids_type
+		FROM PT_VO_WATCH_HISTORY A
+		WHERE A.sa_id = #{stbSaId}
+		AND A.p_idx_sa = mod(substr(#{stbSaId}, -2), 33)
+		AND A.contents_id IN (SELECT asset_id FROM IMCSUSER.PT_LA_ASSET_INFO WHERE album_id = #{albumId} and screen_type = 'I' and asset_type in ('HD','SH'))
+	</select>
+	
+	<select id="kidProductCd" parameterType="GetNSWatchListResponseVO" resultType="Integer">
+		SELECT  DISTINCT '1' 
+		  FROM PVSUSER.XCION_VOD_BOOK_TRF_TBL A,    
+		       PVSUSER.PV_PROD_PRODUCT_TBL B, 
+		       IMCSUSER.PT_LA_ASSET_INFO C,
+		       IMCSUSER.PT_PD_PACKAGE_DETAIL D
+		 WHERE A.pvs_sbc_cont_no = #{chkStbSaId}   
+		   AND A.tbdv_prod_divs_cd IN ('B', 'C', 'D')    
+		   AND A.tbdv_prod_rqst_dt >= TO_CHAR(add_months(sysdate, -24), 'YYYYMMDD')    
+		   AND A.tbdv_prod_cd = B.prod_cd    
+		   AND B.product_cd = D.product_id    
+		   AND C.album_id = #{albumId}
+		   AND C.screen_type = 'I'
+		   AND C.asset_id = D.contents_id
+	</select>
+	
+
+</mapper> 

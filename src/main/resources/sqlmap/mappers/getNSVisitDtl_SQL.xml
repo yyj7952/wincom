@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSVisitDtl.GetNSVisitDtlDao">
+	
+	<!-- Face-Matching 준비여부 조회 -->
+	<select id="getFminfo" parameterType="GetNSVisitDtlRequestVO"  resultType="FmInfoVO" >
+		<![CDATA[
+		SELECT NVL(N.FM_YN, 'N') AS FM_YN, NVL(N.ADI_PRODUCT_ID, '') AS ADI_PRODUCT_ID,
+		       (SELECT COUNT(*) 
+		          FROM IMCSUSER.PT_LA_PACKAGE_ASSET A,
+		               IMCSUSER.PT_LB_BRO_MATERIAL B,
+		               IMCSUSER.PT_LA_CONTENT_ASSET C 
+		         WHERE A.NSC_ALBUM_ID = #{albumId}
+		           AND A.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID
+		           AND B.ASSET_ID = C.ASSET_ID
+		           AND SUBSTR(C.ASSET_ID, 16, 2) IN ('M2', 'M9')
+		           AND (NVL(B.QD_YN, 'N') = 'N' OR (NVL(B.QD_YN, 'N') = 'Y' AND NVL(B.QD_FLAG, 'N') = '2'))
+		       ) AS DOWN_CNT 
+		  FROM IMCSUSER.PT_LA_ALBUM_MST M,
+		       (SELECT #{albumId} AS ALBUM_ID,
+		               NVL(C.FM_YN, 'N') FM_YN,
+		               A.ADI_PRODUCT_ID 
+		          FROM IMCSUSER.PT_LA_PACKAGE_ASSET A,
+		               IMCSUSER.PT_LB_BRO_MATERIAL B,
+		               IMCSUSER.PT_LA_CONTENT_ASSET C 
+		         WHERE A.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID
+		           AND B.ASSET_ID = C.ASSET_ID
+		           AND A.NSC_ALBUM_ID = #{albumId}
+		           AND SUBSTR(C.ASSET_ID, 16, 2) = 'M2'
+		           AND (NVL(B.QD_YN, 'N') = 'N' OR (NVL(B.QD_YN, 'N') = 'Y' AND NVL(B.QD_FLAG, 'N') = '2'))
+		           AND NVL(C.FM_YN, 'N') = 'Y'
+		       ) N 
+		 WHERE M.ADI_ALBUM_ID = #{albumId}
+		   AND M.ADI_ALBUM_ID = N.ALBUM_ID (+)
+		]]>
+	</select>
+	
+	
+	<!-- 트레일러 정보 조회 -->
+	<select id="getTrailerInfo" resultType="ComTrailerVO" >
+		<![CDATA[
+		SELECT 'cirtspt://'||D.STB_PLAY_IP1||'/' AS TRAILER_URL1,
+		       'cirtspt://'||D.STB_PLAY_IP2||'/' AS TRAILER_URL2,
+		       'cirtspt://'||D.STB_PLAY_IP3||'/' AS TRAILER_URL3,
+		       B.CONTENT_VALUE AS TRAILER_FILE_NAME1,
+		       B.CONTENT_FILESIZE AS TRAILER_FILE_SIZE1,
+		       B.ADI_PRODUCT_ID || '00' AS CONTENTS_ID,
+		       B.ASSET_NAME AS CONTENTS_NAME
+		  FROM IMCSUSER.PT_LA_CONTENT_ASSET B,
+		       IMCSUSER.PT_LV_RANGE_IP_INFO C,
+		       IMCSUSER.PT_LV_NODE_INFO D,
+		       IMCSUSER.PT_LA_PACKAGE_ASSET F
+		 WHERE C.RANGE_IP_CD = '1234567890'
+		   AND D.SUB_NODE_CD = C.SUB_NODE_CD
+		   AND F.NSC_ALBUM_ID = #{albumId}
+		   AND B.ADI_PRODUCT_ID = F.ADI_PRODUCT_ID
+		   AND SUBSTR(F.ADI_PRODUCT_ID, 16, 2) = 'NT'
+		 ORDER BY B.ADI_PRODUCT_ID
+		]]>
+	</select>
+	
+	
+	<!-- 컨텐츠정보 조회 -->
+	<select id="getNSVisitDtl" resultType="GetNSVisitDtlResponseVO" >
+		<![CDATA[
+		SELECT DISTINCT NVL(A.ADI_PRODUCT_ID,'') AS PRODUCT_ID,
+		       A.ASSET_ID AS ASSET_ID,
+		       TRIM(NVL(B.CONTENT_VALUE, '')) AS IMG_FILE_NAME,
+		       '' AS PROMOTION_COPY,
+		       A.LATITUDE AS LATITUDE,
+		       A.LONGITUDE AS LONGITUDE,
+		       A.VISIT_DESC AS VISIT_DESC,
+		       A.STORE_NAME AS STORE_NAME,
+		       A.TEL_NO AS TEL_NO
+		 FROM IMCSUSER.PT_LA_VISIT_ASSET A,
+		      (SELECT * FROM IMCSUSER.PT_LA_POSTER_ASSET WHERE POSTER_TYPE = 'P') B,
+		      IMCSUSER.PT_LA_RESERVE_ASSET C
+		WHERE A.ADI_PRODUCT_ID = ( SELECT MIN(ADI_PRODUCT_ID)
+                 FROM IMCSUSER.PT_LA_PACKAGE_ASSET A, PT_VO_CATEGORY_MAP B
+                WHERE B.CATEGORY_ID = #{catId}
+                  AND B.CONTENTS_ID = #{albumId}
+                  AND A.NSC_ALBUM_ID = B.CONTENTS_ID )
+		  AND A.ADI_PRODUCT_ID = B.ADI_PRODUCT_ID(+)
+		  AND A.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID(+)
+		]]>
+	</select>	
+	
+	
+	<!-- 스틸이미지 정보 조회 -->
+	<select id="getStillImage" resultType="StillImageVO" >
+		SELECT 'http:'||REPLACE(NVL(A.MAIN_IMG_URL, ''), '\', '/') AS IMG_URL,
+		       A.MAIN_IMG_FILE_NAME AS IMG_FILE_NAME,
+		       A.IMG_FLAG AS IMG_FLAG 
+		  FROM IMCSUSER.PT_LA_ALBUM_IMG A 
+		 WHERE A.ADI_ALBUM_ID = #{albumId}
+		   AND A.IMG_FLAG = 'N'
+		 ORDER BY TO_NUMBER(ADI_ALBUM_SEQ)
+	</select>
+	
+	<!-- 데이터 프로 유/무료 여부 조회 -->
+	<select id="getDataFreeBillYn" resultType="String" >
+		SELECT DISTINCT DECODE(NVL(B.CLOSED_CAPTIONING, 'Y'), 'N', 'N', 'Y') DATAFREE_BILL_YN 
+		  FROM IMCSUSER.PT_LA_PACKAGE_ASSET A,                                        
+	  		   IMCSUSER.PT_LA_TITLE_ASSET B     	                                  
+		WHERE A.NSC_ALBUM_ID = #{albumId}                   			          
+	    AND A.ADI_PRODUCT_ID = B.ADI_PRODUCT_ID
+	</select>
+	
+</mapper>
+	
+	
+	

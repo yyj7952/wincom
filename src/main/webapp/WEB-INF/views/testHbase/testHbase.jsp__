@@ -1,0 +1,87 @@
+<%@ page import="java.io.IOException" %>
+<%@ page import="lguplus.nosqlcache.CacheConnection" %>
+<%@ page import="lguplus.nosqlcache.CountingPoolWrapper" %>
+<%@ page import="lguplus.nosqlcache.conf.ConfigurationChangeListener" %>
+<%@ page import="lguplus.nosqlcache.conf.RuntimeAdaptableConfiguration" %>
+<%@ page import="lguplus.nosqlcache.exceptions.NosqlCacheException" %>
+<%@ page import="lguplus.nosqlcache.log.CLogger" %>
+<%@ page import="org.apache.hadoop.conf.Configuration" %>
+<%@ page import="org.apache.hadoop.hbase.HBaseConfiguration" %>
+<%@ page import="org.apache.hadoop.hbase.client.HBaseAdmin" %>
+<%@ page import="org.apache.hadoop.hbase.client.HTable" %>
+<%@ page import="org.apache.hadoop.hbase.client.HTablePool" %>
+<%@ page import="org.slf4j.Logger" %>
+<%@ page import="java.net.InetSocketAddress" %>
+<html>
+<head>
+        <title>Home</title>
+<script type="text/javascript">
+
+function test_hbase(){
+
+        document.form.action="/servlets/testHbase";
+
+        document.form.submit();
+}
+
+</script>
+</head>
+<body>
+<h1>
+        Test Hbase!
+</h1>
+
+<P>  Test Hbase </P>
+<form name="form">
+<%
+
+        HBaseAdmin mHBaseAdmin = null;
+        Configuration hconfig = null;
+        String exception_1 = "Exception : ";
+        String exception_2 = "Exception2 : ";
+        String exception_3 = "Exception3 : ";
+
+        String result = "RESULT : ";
+        String avail_result = "";
+
+        hconfig = HBaseConfiguration.create();
+        hconfig.set("hbase.zookeeper.quorum", "172.21.143.202,172.21.143.203,172.21.143.204");
+        //hconfig.set("hbase.zookeeper.property.clientPort", "2181");
+        hconfig.set("hbase.client.pause", "750");
+        hconfig.set("hbase.client.retries.number", "2");
+        hconfig.set("hbase.rpc.timeout", "1500");
+        hconfig.set("ipc.socket.timeout", "1000");
+        hconfig.set("ipc.ping.interval", "4000");
+        hconfig.set("hbase.ipc.client.tcpnodelay", "Y");
+
+        try {
+                mHBaseAdmin = new HBaseAdmin(hconfig);
+
+                exception_1 += "No Exception";
+        } catch (IOException ignored) {
+                exception_2 += ignored.toString();
+        }catch(Exception e){
+                exception_3 += e.toString();
+        }
+
+        try {
+                if (mHBaseAdmin.isTableAvailable("PT_CD_COM_CD") == false) {
+                        avail_result = "NON EXIST";
+                }else{
+                        avail_result = "EXIST";
+                }
+        } catch (IOException ignored) {
+                exception_2 += ignored.toString();
+        }catch(Exception e){
+                exception_3 += e.toString();
+        }
+%>
+
+<%= exception_1 %>\n
+<%= exception_2 %>\n
+<%= exception_3 %>\n
+<%= avail_result %>\n
+<button onclick="test_hbase();" > Test Hbase </button>
+</form>
+</body>
+</html>

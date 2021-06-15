@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSCHRatings.GetNSCHRatingsDao">
+	
+	<!-- 검수 STB 여부 조회 -->
+	<select id="testSbc" resultType="String" >
+		SELECT CASE WHEN TEST_SBC = 'Y' THEN TEST_SBC ELSE 'N' END AS TEST_SBC 
+		  FROM PT_VO_CUSTOM_ID 
+		 WHERE SA_ID = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	<!-- 채널정보 조회 -->
+	<select id="getNSChnlList" resultType="GetNSCHRatingsResponseVO" >
+		<![CDATA[
+		SELECT DISTINCT A.SERVICE_ID AS SERVICE_ID,
+		       TRIM(A.CHNL_NAME) AS SERVICE_NAME,
+		       TRIM(A.CHNL_ENG_NAME) AS SERVICE_ENG_NAME,
+		       B.STB_PLAY_IP1 AS LIVE_IP1,
+		       DECODE(B.CDN_LOCAL_TYP, '1', NVL(A.M3U8_FILE1, ''), '2', NVL(A.M3U8_FILE1_N, '')) AS LIVE_FILE_NAME1,
+		       B.STB_PLAY_IP2 AS LIVE_IP2,
+		       DECODE(B.CDN_NEAR_TYP, '1', NVL(A.M3U8_FILE1, ''), '2', NVL(A.M3U8_FILE1_N, '')) AS LIVE_FILE_NAME2,
+		       B.STB_PLAY_IP3 AS LIVE_IP3,
+		       DECODE(B.CDN_CENTER_TYP, '1', NVL(A.M3U8_FILE1, ''), '2', NVL(A.M3U8_FILE1_N, '')) AS LIVE_FILE_NAME3,
+		       B.STB_PLAY_IP1 AS LIVE_IP4,
+		       DECODE(B.CDN_LOCAL_TYP, '1', NVL(A.M3U8_FILE2, ''), '2', NVL(A.M3U8_FILE2_N, '')) AS LIVE_FILE_NAME4,
+		       B.STB_PLAY_IP2 AS LIVE_IP5,
+		       DECODE(B.CDN_NEAR_TYP, '1', NVL(A.M3U8_FILE2, ''), '2', NVL(A.M3U8_FILE2_N, '')) AS LIVE_FILE_NAME5,
+		       B.STB_PLAY_IP3 AS LIVE_IP6,
+		       DECODE(B.CDN_CENTER_TYP, '1', NVL(A.M3U8_FILE2, ''), '2', NVL(A.M3U8_FILE2_N, '')) AS LIVE_FILE_NAME6,
+		       'http:'||REPLACE(A.ICON_URL, '\', '/') AS IMG_URL,
+		       A.ICON_FILE_NAME AS IMG_FILE_NAME,
+		       A.CHANNELNUMBER AS CHANNEL_NO,
+		       B.CDN_LOCAL_TYP AS VOD_SERVER1_TYPE,
+		       B.CDN_NEAR_TYP AS VOD_SERVER2_TYPE,
+		       B.CDN_CENTER_TYP AS VOD_SERVER3_TYPE,
+		       NVL(C.RATINGS, '0') AS RATINGS,
+		       A.SORT_NO AS SORT_NO,
+		       A.FILTERING_CODE AS FILTERING_CODE,
+		       B.SUB_NODE_PORT1 AS LIVE_PORT,
+		       A.SERVICE_ID||'.jpg' AS THM_FILE                                                    
+		  FROM IMCSUSER.PT_CD_PLAY_CHNL A,                                                                 
+		       IMCSUSER.PT_LV_NODE_INFO B,                                                                 
+		       IMCSUSER.PT_CD_CHNL_RATINGS C                                                               
+	 	 WHERE A.FILTERING_CODE in ('1', '3', '5', '7', '8', '9', '10', '11', '12', '13', '14', '15')      
+		   AND B.SUB_NODE_CD = #{nodeCd}
+		]]>
+		  	<if test='pooqYn == "P"'>
+		  	AND NVL(A.POOQ_YN,'N') = 'N'
+		    </if>
+		    <if test='pooqYn == "N"'>
+		    AND NVL(A.POOQ_YN,'N') = 'Y'
+		    </if>
+		    AND A.SERVICE_ID = C.SERVICE_ID(+)                                                              
+		  ORDER BY TO_NUMBER(NVL(C.RATINGS,'0')) DESC, TO_NUMBER(A.SORT_NO), A.CHANNELNUMBER, A.SERVICE_ID
+	</select>	
+	
+	<!-- 프로그램명 조회 -->
+	<select id="getProName" resultType="String" >
+		<![CDATA[
+		SELECT PRO_NAME 
+		  FROM IMCSUSER.PT_LE_AV_EPG 
+		 WHERE CHNL_CD = #{chnlCd}
+		   AND PRO_DATE = TO_CHAR(SYSDATE , 'YYYYMMDD')
+		   AND PRO_DATE||PRO_ENDTIME >= TO_CHAR(SYSDATE , 'YYYYMMDDHH24MISS')
+		   AND PRO_DATE||PRO_TIME <= TO_CHAR(SYSDATE , 'YYYYMMDDHH24MISS')
+		   AND ROWNUM = 1
+		]]>
+	</select>
+	
+	<!-- 기지국 정보 조회 -->	
+	<select id="getNode" resultType="ComNodeVO" >
+		SELECT SUB_NODE_CD AS NODE_CD,
+		       RANGE_IP_CD AS RBASE_CODE 
+		  FROM IMCSUSER.PT_LV_RANGE_IP_CHNL
+		 WHERE RANGE_IP_CD = #{baseCondi}
+		   AND NVL(USE_YN, 'Y') = 'Y'
+	</select>
+		
+</mapper>
+	
+	
+	

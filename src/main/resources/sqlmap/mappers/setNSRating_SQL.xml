@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.setNSRating.SetNSRatingDao">
+
+	<!-- 연령정보 조회 -->
+	<select id="getRatingChk" resultType="Integer">
+		SELECT 1 
+		  FROM DUAL 
+		 WHERE EXISTS (
+		        SELECT RATING 
+		          FROM PT_VO_CUSTOM_RATING 
+		         WHERE SA_ID = #{saId}
+		           AND MAC_ADDR = #{stbMac}
+		       )
+	</select>
+	
+	
+	<!-- 연령정보 수정 -->
+	<update id="updateRating" parameterType="SetNSRatingRequestVO">
+		UPDATE PT_VO_CUSTOM_RATING
+		   SET RATING   = #{rating}
+		 WHERE SA_ID    = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+	</update> 
+	
+	
+	<!-- 연령정보 등록 -->
+	<insert id="insertRating" parameterType="SetNSRatingRequestVO">
+		INSERT INTO PT_VO_CUSTOM_RATING( sa_id, mac_addr, rating)
+		VALUES ( #{saId}, #{stbMac}, #{rating})
+	</insert>
+	
+</mapper> 

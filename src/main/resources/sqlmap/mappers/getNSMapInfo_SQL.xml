@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSMapInfo.GetNSMapInfoDao">
+
+	<resultMap type="HashMap" id="myMultiAlbumInfo">
+		<result property="CONTENTS_ID" column="CONTENTS_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="CAT_ID" column="CAT_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="SER_CAT_ID" column="SER_CAT_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="SERIES_NO" column="SERIES_NO" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="POSTER_V" column="POSTER_V" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="ALBUM_NAME" column="ALBUM_NAME" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="CREATE_DATE" column="CREATE_DATE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="WATCH_YN" column="WATCH_YN" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="CNT" column="CNT" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="RESULT_CODE" column="RESULT_CODE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="SERIES_YN" column="SERIES_YN" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<!-- 멀티 앨범 정보 가져오기 -->
+	<select id="listMultiAlbumInfo" resultMap="myMultiAlbumInfo" parameterType="GetNSMapInfoRequestVO">		
+		SELECT
+			AA.contents_id
+			, AA.cat_id
+			, AA.ser_cat_id
+			, AA.series_no
+			, AA.poster_v
+			, AA.album_name
+			, AA.create_date
+			, AA.watch_yn
+			, AA.cnt
+			, CASE WHEN AA.cnt > 0 THEN 'Y' ELSE 'N' END AS result_code
+			, CASE WHEN LENGTH(AA.ser_cat_id) > 0 THEN 'Y' ELSE 'N' END AS series_yn
+		FROM (
+			SELECT
+				A.contents_id
+				, A.cat_id
+				, A.ser_cat_id
+				, A.series_no
+				, A.poster_v
+				, A.album_name
+				, A.create_date
+				, NVL(
+					(SELECT adi_album_id FROM PT_VO_SET_TIME_PTT_NSC 
+						WHERE sa_id = #{saId} AND p_idx_sa = mod(substr(#{saId}, -2), 33) 
+						AND adi_album_id = A.contents_id AND nscn_cust_no = 'M' 
+						GROUP BY adi_album_id),
+					'N') AS watch_yn
+				, A.cnt
+			FROM (
+				SELECT
+					MAX(contents_id) AS contents_id
+					, MAX(cat_id) AS cat_id
+					, MAX(ser_cat_id) AS ser_cat_id
+					, MAX(series_no) AS series_no
+					, MAX(poster_v) AS poster_v
+					, MAX(album_name) AS album_name
+					, MAX(create_date) AS create_date
+					, COUNT(*) AS cnt
+				FROM (
+					SELECT 
+						M.contents_id
+						, CASE WHEN NVL(R.series_yn, 'N') = 'Y' THEN MIN(R.category_id) OVER (PARTITION BY NVL(R.series_yn, 'N'), M.contents_id) ELSE '' END AS ser_cat_id
+						, CASE WHEN NVL(R.series_yn, 'N') = 'N' THEN MIN(R.category_id) OVER (PARTITION BY NVL(R.series_yn, 'N'), M.contents_id) ELSE '' END AS cat_id
+						, CASE WHEN NVL(R.series_yn, 'N') = 'Y' AND R.category_id = MIN(R.category_id) OVER (PARTITION BY NVL(R.series_yn, 'N'), M.contents_id)
+							THEN M.series_no ELSE '' END AS series_no
+						, CASE WHEN S.poster_type = 'P' THEN S.content_value ELSE '' END AS poster_v
+						, I.album_name AS album_name
+						, M.create_date
+					FROM PT_VO_CATEGORY R,
+						PT_VO_CATEGORY_MAP M,
+						IMCSUSER.PT_LA_ALBUM_POSTER S,
+						IMCSUSER.PT_LA_ALBUM_INFO	I
+					WHERE R.category_id = M.category_id
+					AND M.contents_id IN (
+<foreach item="item" index="index" collection="arrAlbumIds" open="" separator="," close="">
+						#{item}
+</foreach>
+					)
+					AND R.category_gb = 'NSC'
+					AND M.contents_id = S.album_id
+					AND S.screen_type = 'N'
+					AND S.service_yn = 'Y'
+					AND S.album_id = I.album_id
+				)
+				GROUP BY contents_id
+			) A
+		) AA
+		ORDER BY AA.watch_yn desc, AA.create_date desc, AA.album_name
+	</select>
+	
+</mapper> 

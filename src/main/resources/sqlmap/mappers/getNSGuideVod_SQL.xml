@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSGuideVod.GetNSGuideVodDao">
+
+    <!-- 1. BASE_CD를 기반으로 서버IP 리스트 조회  -->
+    <select id="getServerIpbyBaseCd" parameterType="GetNSGuideVodRequestVO" resultType="UrlListVO">
+		SELECT 'http://'||B.STB_PLAY_IP1||':'||B.SUB_NODE_PORT1||'/' AS URL1, 
+		       'http://'||B.STB_PLAY_IP2||':'||B.SUB_NODE_PORT1||'/' AS URL2, 
+		       'http://'||B.STB_PLAY_IP3||':'||B.SUB_NODE_PORT1||'/' AS URL3
+		  FROM IMCSUSER.PT_LV_RANGE_IP_INFO A, 
+		       IMCSUSER.PT_LV_NODE_INFO B      
+		 WHERE A.RANGE_IP_CD = #{baseCondi}
+		   AND A.SUB_NODE_CD = B.SUB_NODE_CD   
+		   AND ROWNUM = 1                  
+    </select>
+    
+
+    <!-- 2. SA_ID, STB_MAC 을 기반으로 서버IP 리스트 조회  -->
+    <select id="getServerIpBySaMac" parameterType="GetNSGuideVodRequestVO" resultType="UrlListVO">
+		SELECT 'http://'||B.STB_PLAY_IP1||':'||B.SUB_NODE_PORT1||'/' AS URL1, 
+		       'http://'||B.STB_PLAY_IP2||':'||B.SUB_NODE_PORT1||'/' AS URL2, 
+		       'http://'||B.STB_PLAY_IP3||':'||B.SUB_NODE_PORT1||'/' AS URL3  
+		 FROM PT_VO_CUSTOM_ID A,              
+		      IMCSUSER.PT_LV_NODE_INFO B,     
+		      IMCSUSER.PT_LV_DONG_INFO C      
+		 WHERE A.SA_ID = #{saId}            
+		   AND A.MAC_ADDR = #{stbMac}        
+		   AND C.DONG_CD = A.HJDONG_NO         
+		   AND B.SUB_NODE_CD = C.NSC_SUB_NODE_CD 
+		   AND ROWNUM = 1   
+    </select>
+
+
+    <!-- 3. SA_ID, STB_MAC 을 기반으로 서버IP 리스트 조회 DONG_CD는 고정 -->
+    <select id="getServerIpBySaMacDong" parameterType="GetNSGuideVodRequestVO" resultType="UrlListVO">
+		SELECT 'http://'||B.STB_PLAY_IP1||':'||B.SUB_NODE_PORT1||'/' AS URL1, 
+		       'http://'||B.STB_PLAY_IP2||':'||B.SUB_NODE_PORT1||'/' AS URL2, 
+		       'http://'||B.STB_PLAY_IP3||':'||B.SUB_NODE_PORT1||'/' AS URL3  
+		 FROM PT_VO_CUSTOM_ID A,              
+		      IMCSUSER.PT_LV_NODE_INFO B,     
+		      IMCSUSER.PT_LV_DONG_INFO C      
+		 WHERE A.SA_ID = #{saId}            
+		   AND A.MAC_ADDR = #{stbMac}        
+		   AND C.DONG_CD = '1234567890'         
+		   AND B.SUB_NODE_CD = C.NSC_SUB_NODE_CD 
+		   AND ROWNUM = 1   
+    </select>
+
+
+    <!-- 4. GUIDE VOD 리스트를 조회 -->
+	<select id="getGuideVodInfo" parameterType="GetNSGuideVodRequestVO" resultType="GetNSGuideVodResponseVO">
+		SELECT A.IDX, A.ALBUM_NAME AS TITLE, A.NSC_ALBUM_ID AS ALBUM_ID, A.HDCONTENT, 
+			   A.CONTENT_FILESIZE AS VODFILESIZE, A.CONTENT_VALUE AS VODFILENAME,
+		       DECODE(A.HIGH_LOW, 'H', 'Y', 'N') AS IS_FLAG, A.SERIES_YN, A.SERIES_NO, 
+		       A.CATEGORY_ID AS CAT_ID,  B.CATEGORY_NAME AS CAT_NAME
+		  FROM PT_VO_GUIDE_VOD A, PT_VO_CATEGORY B 
+		 WHERE A.CATEGORY_ID = B.CATEGORY_ID
+		   AND A.CONTENT_STAT = 'Y'
+		   AND A.HIGH_LOW = #{highLow}
+		   AND (NVL(B.YOUTH_YN, '2') = '2' OR NVL(B.YOUTH_YN, '2') = #{youthYnCom})
+		 ORDER BY TO_NUMBER(A.IDX), A.ASSET_ID
+    </select>
+</mapper> 

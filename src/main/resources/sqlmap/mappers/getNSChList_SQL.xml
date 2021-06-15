@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="kr.co.wincom.imcs.api.getNSChList.GetNSChListDao">
+	
+	<resultMap type="HashMap" id="CjChChnl">
+		<result property="CJ_CHNL_URL" column="CJ_CHNL_URL" javaType="String"/>
+		<result property="CJ_HEVC_CHNL_URL" column="CJ_HEVC_CHNL_URL" javaType="String"/>
+	</resultMap>
+	
+	<!-- 테스트 가입자 여부 조회 -->
+	<select id="getTestSbc" resultType="String" >
+		SELECT CASE WHEN TEST_SBC = 'Y' THEN TEST_SBC ELSE 'N' END TEST_SBC 
+		  FROM PT_VO_CUSTOM_ID 
+		 WHERE SA_ID = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	
+	<!-- 가입 상품 조회 -->
+	<select id="getmProdId" resultType="String" >
+		SELECT A.PRODUCT_ID M_PROD_ID 
+		  FROM IMCSUSER.PT_PD_PACKAGE A, PT_VO_CUSTOM_PRODUCT B 
+		 WHERE A.PRODUCT_ID = B.PRODUCTCD
+		   AND A.PRODUCT_KIND = '1'
+		   AND B.SA_ID = #{saId}
+		   AND B.MAC_ADDR = #{stbMac}
+		   AND NVL(A.UFLIX_PROD_YN, 'N') = 'N'
+		   AND A.NSC_PROD_KIND = '1'
+	</select>
+	
+	
+	<!-- 타임머신 CDN IP 정보 조회 -->
+	<select id="getLiveTimeServer" resultType="ComCdVO" >
+		SELECT COM_CD, COM_NAME, NVL(MAX_VALUE, 'I') AS COM_NODE_TYPE
+		  FROM IMCSUSER.PT_CD_COM_CD 
+		 WHERE GRP_ID='TIMECDNIP'
+		 ORDER BY SYNOP
+	</select>
+	
+	
+	<!-- 노드 조회 -->
+	<select id="getNode" resultType="ComNodeVO" >
+		SELECT SUB_NODE_CD NODE_CD,
+		       RANGE_IP_CD R_BASE_CODE 
+		  FROM IMCSUSER.PT_LV_RANGE_IP_CHNL
+		 WHERE RANGE_IP_CD = #{baseCondi}
+		   AND NVL(USE_YN, 'Y') = 'Y'
+	</select>
+	
+	
+	<!-- 동 여부 조회 -->
+	<select id="getDongYn" resultType="String" >
+		SELECT B.STB_PLAY_IP1 DONG_YN 
+		  FROM IMCSUSER.PT_LV_NODE_INFO B,
+		       IMCSUSER.PT_LV_DONG_INFO C,
+		       PT_VO_CUSTOM_ID D 
+		 WHERE D.SA_ID = #{saId}
+		   AND D.MAC_ADDR = #{stbMac}
+		   AND C.DONG_CD = D.HJDONG_NO
+		   AND B.SUB_NODE_CD = C.NSC_SUB_NODE_CD
+	</select>
+	
+	
+	<!-- 인기순으로  Nscreen 가상채널 EPG전체 채널정보 조회 -->
+	<!-- <select id="getNSVSIListH" resultType="GetNSVSIResponseVO" > -->
+	<select id="getNSChList" resultType="GetNSChListResponseVO" timeout="60">
+	<![CDATA[
+			SELECT SERVICE_ID SERVICE_ID, CHNL_NAME SERVICE_NAME, CHNL_ENG_NAME SERVICE_ENG_NAME, 
+				           ICON_FILE_NAME IMG_FILE_NAME, SVC_TYPE SERVICE_TYPE, 
+				           BARKER_CHANNEL, SORT_NO SORT_NO, 
+				           MAX_BITRATE MAX_BITRATE, 
+				           GENRE1 GENRE1, 
+				           VIRTUAL_TYPE VIRTUAL_TYPE, TIME_APP_YN TIME_APP_YN, POOQ_YN POOQ_YN, POOQ_GENRE_NAME POOQ_GENRE_NAME, CONTENTS_ID CONTENTS_ID, 
+				           START_CHUNK START_CHUNK, IS_UHD IS_UHD, ADULT_YN ADULT_YN, RATINGS RATINGS, CHNL_GRP CHNL_GRP, IS_FHD IS_FHD, 
+				           NVL(CHATTING_YN,'N') CHAT_YN, CHATTING_ID CHAT_ID, CHATTING_NAME CHAT_NAME, HDTV_VIEW_GB, SERVICE_REF_ID M_SVC_ID, CHNL_TYPE, M3U8_INFO,
+				           PAY_YN, ARS_NO2 CJ_CHNL_CD, CJ_HEVC_CHNL_YN, IPTV_CASTING_YN
+				      FROM ( 
+				            SELECT DISTINCT 0 ORD_NUM, A.SERVICE_ID, A.CHNL_NAME, A.CHNL_ENG_NAME, 
+				                   A.ICON_FILE_NAME, A.SVC_TYPE, A.RUNNINGSTATUS, DECODE(A.BARKER_CHANNEL, 'A', 'A', '') BARKER_CHANNEL, 
+				                   A.SORT_NO  SORT_NO, TO_CHAR(TO_NUMBER(A.MAX_BITRATE) * 1000) MAX_BITRATE, 
+				                   A.GENRE1, 
+				                   '' VIRTUAL_TYPE, NVL(A.TIME_APP_YN, 'N') TIME_APP_YN, DECODE(NVL(A.POOQ_YN , 'N'), 'Y', 'N', 'Y') POOQ_YN, 
+				                   A.POOQ_GENRE_NAME, F.CONTENTS_ID, A.START_CHUNK, 'N' IS_UHD, NVL(A.ADULT_YN,'N') ADULT_YN, NVL(H.RATINGS,'0.0') RATINGS, 
+			                       A.CHNL_GRP CHNL_GRP, CASE WHEN NVL(A.IS_RESOLUTION,'N') = 'F' THEN 'Y' ELSE 'N' END IS_FHD, 
+			                       A.CHATTING_YN, A.CHATTING_ID, A.CHATTING_NAME, A.HDTV_VIEW_GB, A.SERVICE_REF_ID, A.CHNL_TYPE, NVL(A.M3U8_INFO,'0000000000') M3U8_INFO,
+			                       A.PAY_YN, A.ARS_NO2, NVL(A.TIME_DIVI_YN, 'N') CJ_HEVC_CHNL_YN, NVL(NVOD_TRANS_YN, 'N') AS IPTV_CASTING_YN
+				              FROM IMCSUSER.PT_CD_PLAY_CHNL A, 
+								   IMCSUSER.PT_PD_CONTENTS_MST F, 
+				                   IMCSUSER.PT_CD_CHNL_RATINGS H 
+				             WHERE A.FILTERING_CODE in ('1', '3', '5', '7', '9', '11', '13', '15') 
+				               AND F.SERVICE_ID = A.SERVICE_ID 
+				               AND F.CONTENTS_ID LIKE 'C%' 
+				               AND A.SERVICE_ID = H.SERVICE_ID(+) 
+	]]>
+	<if test='(fiveChYn == "Y")'> 
+								AND A.HDTV_VIEW_GB = '9' 
+	</if>
+	<if test='!(fiveChYn == "Y")'>
+		<if test='(hdtvViewGb == "G")'> 
+								AND SUBSTR(NVL(A.ARS_NO1, '00'), 1, 1) = '1'
+		</if>
+		<if test='(hdtvViewGb == "R")'> 
+								AND SUBSTR(DECODE(A.HDTV_VIEW_GB, '1', '1100', '2', '1110', '3', '1101', '4', '1111', '5', '1010', '6', '1011', '7', '1001', '8', '1111', 'A', '0001'), 3, 1) = '1' 
+		</if>
+		<if test='(hdtvViewGb == "P")'>
+    							AND SUBSTR(DECODE(A.HDTV_VIEW_GB, '1', '1100', '2', '1110', '3', '1101', '4', '1111', '5', '1010', '6', '1011', '7', '1001', '8', '1111', 'A', '0001'), 4, 1) = '1'
+    							AND SUBSTR(NVL(A.ARS_NO1, '00'), 1, 2) <![CDATA[=]]> '00'
+		</if>
+		<if test='(hdtvViewGb == "M")'>
+								AND SUBSTR(NVL(A.ARS_NO1, '00'), 2, 1) = '1'
+		</if>
+		<if test='(hdtvViewGb == "K")'>
+								AND SUBSTR(NVL(A.ARS_NO1, '0000'), 3, 1) = '1'
+		</if>
+		<if test='(hdtvViewGb == "C")'>
+								AND SUBSTR(NVL(A.ARS_NO1, '0000'), 4, 1) = '1'
+		</if>
+				            UNION ALL                                                                                                                                                                                                                  
+				            SELECT DISTINCT 1 ORD_NUM, A.SERVICE_ID, A.CHNL_NAME, A.CHNL_ENG_NAME, A.ICON_FILE_NAME, A.SVC_TYPE,
+				                   A.RUNNINGSTATUS, DECODE(A.BARKER_CHANNEL, 'A', 'A', '') BARKER_CHANNEL, A.SORT_NO SORT_NO, '' MAX_BITRATE, A.GENRE1,
+				                   A.VIRTUAL_TYPE, 'N' TIME_APP_YN, 'N' POOQ_YN, '' POOQ_GENRE_NAME, '' CONTENTS_ID, '' START_CHUNK,
+				                   NVL(A.IS_RESOLUTION,'N') IS_UHD, '' ADULT_YN, NVL(H.RATINGS,'0.0') RATINGS, '' CHNL_GRP, 'N' IS_FHD,
+			                       '' CHATTING_YN, '' CHATTING_ID, '' CHATTING_NAME, '' HDTV_VIEW_GB, '' M_SVC_ID <!-- SERVICE_REF_ID -->, '' CHNL_TYPE, '0000000000' M3U8_INFO,
+			                       '' PAY_YN, '' CJ_CHNL_CD <!-- ARS_NO2 -->, '' CJ_HEVC_CHNL_YN <!-- TIME_DIVI_YN -->, 'N' IPTV_CASTING_YN <!-- NVOD_TRANS_YN -->
+				              FROM IMCSUSER.PT_CD_VIRTUAL_CHNL A,
+									IMCSUSER.PT_CD_CHNL_RATINGS H
+							 WHERE A.SERVICE_ID = H.SERVICE_ID(+)
+				               AND NVL(A.USE_YN, 'N') = 'Y'
+				               AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.START_DATE AND A.END_DATE
+		<if test='!(hdtvViewGb == "R") and !(hdtvViewGb == "M") and !(hdtvViewGb == "G")'>
+							   AND 1=2 --case1
+		</if>			
+		<if test='!(!(hdtvViewGb == "R") and !(hdtvViewGb == "M")  and !(hdtvViewGb == "G"))'>
+			<if test='(virtualChFlag == "0")'>
+				<if test='(hdtvViewGb == "R")'>
+					AND A.VIRTUAL_TYPE = 'VOD'
+				</if>
+				<if test='(hdtvViewGb == "G")'>
+					AND A.VIRTUAL_TYPE = 'GLF'
+				</if>
+				<if test='(hdtvViewGb == "M")'>
+					AND A.VIRTUAL_TYPE = 'MSC'
+				</if>							  
+			</if>
+			<if test='!(virtualChFlag == "0")'>
+							  AND 1=2 --case2
+			</if>
+		</if>			               
+	</if>
+			              ) 
+				     WHERE POOQ_YN IN ('N', #{pooqYnCom})
+				     ORDER BY DECODE(HDTV_VIEW_GB, '8', 1, 2), ORD_NUM, TO_NUMBER(SORT_NO), SERVICE_ID
+
+	</select>
+		
+	<!-- 장르명 조회 -->
+	<select id="getComName" resultType="String" >
+		SELECT COM_NAME 
+		  FROM IMCSUSER.PT_CD_COM_CD 
+		 WHERE GRP_ID = 'HSVCKIND'
+		   AND COM_CD = #{genre1}
+	</select>
+	
+	
+	<!-- 앨범이 속한 상품 조회 -->
+	<select id="getProdInfo" resultType="ComProdInfoVO" >
+		SELECT *
+		  FROM (
+					SELECT A.PRODUCT_ID PROD_ID, A.PRODUCT_NAME PROD_NAME, '' PROD_GB
+					  FROM IMCSUSER.PT_PD_PACKAGE A,
+					       IMCSUSER.PT_PD_PACKAGE_RELATION B,
+					       PVSUSER.PV_PROD_PRODUCT_TBL C,
+					       IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+					       (SELECT COM_NAME, MIN_VALUE 
+					          FROM IMCSUSER.PT_CD_COM_CD 
+					         WHERE GRP_ID = 'HDTVPROD'
+					           AND COM_NAME = #{mProdId}
+					       ) P,
+					       IMCSUSER.PT_PD_PACKAGE_SUB F
+					 WHERE B.PRODUCT_ID = D.PRODUCT_ID
+					   AND A.PRODUCT_ID = B.P_PRODUCT_ID
+					   AND D.CONTENTS_ID = #{contentsId}
+					   AND A.PRODUCT_TYPE = '4'
+					   AND A.PRODUCT_KIND = '2'
+					   AND A.AMOUNT_GB    = 'F'
+					   AND A.NSC_PROD_KIND = '1'
+					   AND ( A.PRICE <![CDATA[>]]> 0 OR (A.PRICE = 0 AND F.PPV_BLOCK_YN = 'E') )
+					   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.PRODUCT_START_DATETIME AND A.PRODUCT_EXPIRY_DATETIME
+					   AND C.PRODUCT_CD = A.PRODUCT_ID
+					   AND C.PROD_CD = P.MIN_VALUE
+					   AND A.PRODUCT_ID = F.PRODUCT_ID
+					 UNION
+					SELECT A.PRODUCT_ID PROD_ID, A.PRODUCT_NAME PROD_NAME, '' PROD_GB
+					  FROM IMCSUSER.PT_PD_PACKAGE A,
+					       IMCSUSER.PT_PD_PACKAGE_RELATION B,
+					       IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+					       IMCSUSER.PT_PD_PACKAGE_SUB F
+					 WHERE B.PRODUCT_ID = D.PRODUCT_ID
+					   AND A.PRODUCT_ID = B.P_PRODUCT_ID
+					   AND D.CONTENTS_ID = #{contentsId}
+					   AND A.PRODUCT_TYPE = '7'
+					   AND A.NSC_PROD_KIND = '1'
+					   AND ( A.PRICE <![CDATA[>]]> 0 OR (A.PRICE = 0 AND F.PPV_BLOCK_YN = 'E') )
+					   AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN A.PRODUCT_START_DATETIME AND A.PRODUCT_EXPIRY_DATETIME
+					   AND A.PRODUCT_ID = F.PRODUCT_ID
+					 UNION
+					SELECT 'XXXXX' AS PROD_ID, 'XXXXX' AS PROD_NAME, DECODE(MIN(TO_NUMBER(DECODE(A.PRODUCT_ID, '50502', 1, '50506', 2, '50500', 3, 4))), 1, '50502', 2, '50506', 3, '50500', '99999') PROD_GB
+					   FROM IMCSUSER.PT_PD_PACKAGE A,
+					             IMCSUSER.PT_PD_PACKAGE_DETAIL B 
+					  WHERE CONTENTS_ID = #{contentsId}
+					      AND B.PRODUCT_ID = A.PRODUCT_ID 
+					      AND A.PRODUCT_TYPE = '5' 
+					      AND A.NSC_PROD_KIND = '1' 
+					      AND A.AMOUNT_GB    = 'F'
+					 ORDER BY PROD_ID
+			)
+	</select>		
+	
+	
+	<!-- 선호채널 여부 조회 -->
+	<select id="getFavorYn" resultType="String" >
+		SELECT 'Y' 
+		  FROM PT_VO_FAVORITE_CH 
+		 WHERE SA_ID = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+		   AND SERVICE_ID = #{serviceId}
+	</select>
+	
+	
+	<!-- 최소 SAVE_TIME 조회 -->
+	<select id="getSaveTime" resultType="String" >
+		SELECT MIN(SAVE_TIME) 
+		  FROM IMCSUSER.PT_CD_NSC_CHNL 
+		 WHERE SERVICE_ID = #{serviceId}
+		   AND SAVE_TIME IS NOT NULL
+	</select>
+	
+	<select id="getChnlm3u8" resultType="M3u8ProfileVO" >
+		SELECT /*+ INDEX(A PT_LA_M3U8_INFO_IDX01) */
+		       A.M3U8_ORDER ORDER_NUM, A.M3U8_FILE_1 CASTIS_M3U8, A.M3U8_FILE_2 ONNURI_M3U8
+		  FROM IMCSUSER.PT_LA_M3U8_INFO A
+		 WHERE A.M3U8_ID = #{serviceId}
+	</select>		
+
+	<select id="getCjUrl" parameterType="GetNSChListResponseVO" resultMap="CjChChnl">
+		select 'http://'||#{cjChnlCd}||STB_PLAY_IP1||#{cjChnlCd}||'/_definst_/' AS CJ_CHNL_URL,
+			   case when #{cjHevcChnlYn} = 'Y' then 'http://'||'hv-'||#{cjChnlCd}||STB_PLAY_IP1||#{cjChnlCd}||'hv'||'/_definst_/'
+			   else '' end as CJ_HEVC_CHNL_URL
+		  from imcsuser.pt_lv_node_info where cm_node_yn = 'C'	
+	</select>
+	
+	
+	<select id="getConsertInfo" resultType="ConcertInfoVO">
+		SELECT *
+		FROM
+		(
+			SELECT A.PAY_FLAG ,#{serviceId} as SERVICE_ID, A.ALBUM_ID, A.PERFORM_DATE, A.PERFORM_TIME, A.PERFORM_END_DATE, A.PERFORM_END_TIME, B.BUY_BGN_DT PPV_BGN_TIME, B.BUY_END_DT PPV_END_TIME
+	          FROM IMCSUSER.PT_LB_CUESHEET_MST A, IMCSUSER.PT_LB_CUESHEET_PAY_INFO B
+	         WHERE A.SERVICE_ID IN (#{serviceId}, case when #{mSvcId} is not null then #{mSvcId} else 'X' end) 
+	           AND A.CUESHEET_ID = B.CUESHEET_ID
+	           AND A.STATUS IN ('0','1')
+	           AND A.ALBUM_ID IS NOT NULL
+	        ORDER BY A.PERFORM_TIME || A.PERFORM_END_DATE
+	    )
+	    WHERE rownum = 1
+	</select>
+	
+	
+</mapper>

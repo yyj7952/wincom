@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.rmNSFavorite.RmNSFavoriteDao">
+	
+	<!-- 찜목록 IDX 일괄 수정 -->
+	<update id="uptFavoriteIndex" parameterType="RmNSFavoriteRequestVO" >
+		UPDATE PT_VO_FAVORITE 
+		   SET FAV_IDX = TRIM(TO_CHAR(TO_NUMBER(TRIM(FAV_IDX)) - 1)) 
+		 WHERE SA_ID    = #{saId}                                   
+		   AND MAC_ADDR = #{stbMac}                                 
+		   AND TO_NUMBER(TRIM(FAV_IDX)) <![CDATA[>]]> ( 
+		    SELECT TO_NUMBER(TRIM(FAV_IDX)) 
+		      FROM PT_VO_FAVORITE 
+		     WHERE SA_ID = #{saId}
+		       AND MAC_ADDR = #{stbMac}
+		       AND (CONTENTS_ID = #{contentId} OR CONTENTS_ID IN (
+		            SELECT ASSET_ID 
+		              FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+		             WHERE ADI_ALBUM_ID = #{contentId}
+		)))
+	</update>
+	
+	<!-- 찜목록 삭제 -->
+	<delete id="rmNSFavoriteInfo" parameterType="RmNSFavoriteRequestVO" >
+		DELETE FROM (
+		    SELECT *
+		      FROM PT_VO_FAVORITE 
+		     WHERE SA_ID = #{saId}
+		       AND MAC_ADDR = #{stbMac}    
+		       AND (CONTENTS_ID = #{contentId} OR CONTENTS_ID IN (
+		            SELECT ASSET_ID 
+		              FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+		             WHERE ADI_ALBUM_ID = #{contentId}
+		)))
+	</delete>
+	
+	<delete id="rmNSFavoriteInfo2" parameterType="RmNSFavoriteRequestVO" >
+		 DELETE FROM 
+		 (    
+		     SELECT * FROM SMARTUX.PT_CM_FAVORITE 
+		 	 WHERE p_idx_sa = mod(substr(#{saId}, -2), 33) 
+			   AND P_IDX_YEAR IN ( mod(to_number(to_char(sysdate,'YY'))-1,10), mod(to_number(to_char(sysdate,'YY')),10) ) 
+		        AND sa_id    = #{saId}
+		 	   AND mac_addr = #{stbMac} 
+		 	   AND contents_id = #{contentId} 
+			   AND service_type IN ('V', 'U') 
+		 ) 
+	</delete>	
+
+</mapper> 

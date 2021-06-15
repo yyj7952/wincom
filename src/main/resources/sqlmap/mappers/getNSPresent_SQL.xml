@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSPresent.GetNSPresentDao">
+
+	<!-- 오늘날짜 시간 조회 -->
+	<select id="getSysdate" resultType="String" >
+			SELECT TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS') AS CURRENT_DATE FROM DUAL
+	</select>	
+	
+	<!-- 받은,보낸 선물함 조회 -->
+	<select id="getNSPresent" resultType="GetNSPresentResponseVO" >
+		<if test='pageNo != "A" and pageCnt != "A"'>
+			SELECT * FROM (
+		</if>
+		<![CDATA[
+			SELECT '1'AS CONTS_TYPE, A.CONTENTS_ID AS ALBUM_ID, MAX(B.ADI_ALBUM_NAME) AS CONTS_NAME, A.BUYING_PRICE AS BUYING_PRICE,
+				A.PRESENT_PRICE AS PRESENT_PRICE, A.PRESENT_DATE AS PRESENT_DATE, A.EXPIRED_DATE AS EXPIRED_DATE, A.PRESENT_GB AS PRESENT_GB,
+				NVL(A.USE_YN,'N') AS USE_YN, A.USE_DATE AS USE_DATE, A.SA_ID AS SEND_SA_ID, A.MAC_ADDR AS SEND_STB_MAC, A.CTN_NO AS SEND_CTN_NO,
+				A.RCV_SA_ID AS RCV_SA_ID, A.RCV_MAC_ADDR AS RCV_STB_MAC, A.RCV_CTN_NO AS RCV_CTN_NO, 
+				ROW_NUMBER() OVER(ORDER BY A.PRESENT_DATE desc) AS ORD_NUM,
+				SUM(1) OVER(PARTITION BY 0) AS TOTAL_CNT,
+				A.REAL_PRESENT_PRICE REAL_PRESENT_PRICE
+			FROM PT_VO_PRESENT A,
+			     IMCSUSER.PT_LA_ALBUM_MST B,
+			     PT_VO_CATEGORY_MAP C,
+			     PT_VO_CATEGORY D,
+			     IMCSUSER.PT_PD_PACKAGE_DETAIL E,
+			     IMCSUSER.PT_PD_PACKAGE_UNITED F,
+			     IMCSUSER.PT_LA_PACKAGE_ASSET I,
+			     IMCSUSER.PT_LA_TITLE_ASSET G,
+			     IMCSUSER.PT_LA_CONTENT_ASSET H
+		]]>
+		<if test='pageNo == "A" or pageCnt == "A"'>
+			<if test='presentGb == "G"'>
+				WHERE A.RCV_SA_ID			= #{saId}
+				AND A.RCV_MAC_ADDR			= #{stbMac}
+				AND NVL(A.DEL_FLG,'N')		= 'N'
+			</if>
+			<if test='presentGb != "G"'>
+				WHERE A.SA_ID				= #{saId}
+				AND A.MAC_ADDR				= #{stbMac}
+				AND NVL(A.PRESENT_GB,'N')	= 'N'
+			</if>
+			<![CDATA[
+			    AND (A.EXPIRED_DATE > #{currentDate} OR A.EXPIRED_DATE is null)
+			    AND B.ADI_ALBUM_ID       = A.CONTENTS_ID
+			    AND C.CONTENTS_ID        = A.CONTENTS_ID
+			    AND D.CATEGORY_ID        = C.CATEGORY_ID
+			    AND A.SERVICE_GB         = 'NSC'
+			    AND D.CATEGORY_GB        = 'NSC'
+			    AND I.NSC_ALBUM_ID       = B.ADI_ALBUM_ID
+			    AND E.CONTENTS_ID        = I.ASSET_ID
+			    AND F.IMCS_PRODUCT_ID    = E.PRODUCT_ID
+			    AND F.IMCS_PRODUCT_TYPE  = '1'
+			    AND H.ADI_PRODUCT_ID = I.ADI_PRODUCT_ID
+			    AND G.ADI_PRODUCT_ID = I.ADI_PRODUCT_ID
+			  GROUP BY A.CONTENTS_ID, A.PRESENT_DATE, A.BUYING_PRICE, A.PRESENT_PRICE,
+			         A.PRESENT_DATE, A.EXPIRED_DATE, A.PRESENT_GB, A.USE_YN,
+			         A.USE_DATE, A.SA_ID, A.MAC_ADDR, A.CTN_NO, A.RCV_SA_ID,
+			         A.RCV_MAC_ADDR, A.RCV_CTN_NO, A.REAL_PRESENT_PRICE
+			  ORDER BY A.PRESENT_DATE DESC
+			]]>
+		</if>
+		<if test='pageNo != "A" and pageCnt != "A"'>
+			<if test='presentGb == "G"'>
+				WHERE A.RCV_SA_ID			= #{saId}
+				AND A.RCV_MAC_ADDR			= #{stbMac}
+				AND NVL(A.DEL_FLG,'N')		= 'N'
+			</if>
+			<if test='presentGb != "G"'>
+				WHERE A.SA_ID				= #{saId}
+				AND A.MAC_ADDR				= #{stbMac}
+				AND NVL(A.PRESENT_GB,'N')	= 'N'
+			</if>
+			<![CDATA[
+			AND (A.EXPIRED_DATE > #{currentDate} OR A.EXPIRED_DATE is null)
+		    AND B.ADI_ALBUM_ID       = A.CONTENTS_ID
+		    AND C.CONTENTS_ID        = A.CONTENTS_ID
+		    AND D.CATEGORY_ID        = C.CATEGORY_ID
+		    AND A.SERVICE_GB         = 'NSC'
+		    AND D.CATEGORY_GB        = 'NSC'
+		    AND I.NSC_ALBUM_ID       = B.ADI_ALBUM_ID
+		    AND E.CONTENTS_ID        = I.asset_id
+		    AND F.IMCS_PRODUCT_ID    = E.PRODUCT_ID
+		    AND F.IMCS_PRODUCT_TYPE  = '1'
+		    AND H.ADI_PRODUCT_ID = I.ADI_PRODUCT_ID
+		    AND G.ADI_PRODUCT_ID = I.ADI_PRODUCT_ID
+		  GROUP BY A.CONTENTS_ID, A.PRESENT_DATE, A.BUYING_PRICE, A.PRESENT_PRICE,
+		         A.PRESENT_DATE, A.EXPIRED_DATE, A.PRESENT_GB, A.USE_YN,
+		         A.USE_DATE, A.SA_ID, A.MAC_ADDR, A.CTN_NO, A.RCV_SA_ID,
+		         A.RCV_MAC_ADDR, A.RCV_CTN_NO, A.REAL_PRESENT_PRICE
+		  ORDER BY A.PRESENT_DATE DESC
+		   ) X
+		  WHERE X.ORD_NUM >= ((TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt})) - (TO_NUMBER(#{pageCnt}) - 1))
+		    AND X.ORD_NUM <= (TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt}))
+		  ORDER BY X.PRESENT_DATE DESC
+		  ]]>
+		</if>
+		
+	</select>	
+	
+	<!-- 선물 상세 정보 조회 -->
+	<select id="getNSPresentDtl" resultType="GetNSPresentDtlVO" >
+		<![CDATA[
+			SELECT A.SERIES_NO,
+			      NVL(MAX(D.PRESENT_YN), 'N') AS PRESENT_YN,
+			      NVL(MAX(C.SUGGESTED_PRICE), '0') AS SUGGESTED_PRICE,
+			      NVL(MAX(D.PRESENT_PRICE), '0') AS PRESENT_PRICE,
+			      NVL(MAX(D.PRESENT_RATE), '0') AS PRESENT_RATE,
+			      MAX(D.HDCONTENT) AS HDCONTENT,
+			      CASE WHEN MAX(NVL(C.RATING, '')) = '06' THEN '05'
+			           ELSE MAX(NVL(C.RATING, '')) END PR_INFO
+			 FROM IMCSUSER.PT_LA_ALBUM_MST A,
+			      IMCSUSER.PT_LA_PACKAGE_ASSET B,
+			      IMCSUSER.PT_LA_TITLE_ASSET C,
+			      IMCSUSER.PT_LA_CONTENT_ASSET D
+			WHERE A.ADI_ALBUM_ID = #{albumId}
+			  AND A.ADI_ALBUM_ID = B.NSC_ALBUM_ID
+			  AND B.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID
+			  AND B.ADI_PRODUCT_ID = D.ADI_PRODUCT_ID
+			GROUP BY A.SERIES_NO, A.IS_RH
+		]]>
+	</select>
+
+
+
+	<!-- 카테고리 ID 조회 -->
+	<select id="getNSCatId" resultType="String" >
+			SELECT C.CATEGORY_ID AS CAT_ID_ARR
+			  FROM PT_VO_CATEGORY_MAP C,
+			       PT_VO_CATEGORY D
+			 WHERE C.CATEGORY_ID = D.CATEGORY_ID
+			   AND C.CONTENTS_ID = #{albumId}
+			   AND D.CATEGORY_GB = 'NSC'
+			   AND NVL(D.NSC_GB, 'LTE') = 'LTE'
+			   AND (D.TEST_SBC = 'N' OR D.TEST_SBC IS NULL OR D.TEST_SBC = '')
+	</select>
+	
+	
+	<!-- 이미지 파일명 조회 -->
+	<select id="getStillImage" resultType="String" >
+		  SELECT MAX(A.CONTENT_VALUE) AS IMG_FILE_NAME
+			FROM IMCSUSER.PT_LA_POSTER_ASSET A,
+			     IMCSUSER.PT_LA_PACKAGE_ASSET B
+		   WHERE A.ADI_PRODUCT_ID = B.ADI_PRODUCT_ID
+			 AND B.NSC_ALBUM_ID   = #{albumId}
+			 AND A.POSTER_TYPE    = 'P'
+	</select>
+	
+</mapper>
+	
+	
+	

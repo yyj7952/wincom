@@ -1,0 +1,61 @@
+1. L4에서 제외
+
+2. jeus 서비스 중지
+jdown
+
+
+
+
+
+
+3. 소스 백업
+cd /home/jeus/ImcsNSC/WEB-INF/classes/kr/co/wincom/imcs/
+
+tar -cvf api_20180228.tar ./api
+
+cd /home/jeus/ImcsNSC/WEB-INF/classes/sqlmap/
+
+tar -cvf mappers_20180228.tar ./mappers
+
+
+
+
+
+
+4. 소스 적용
+
+cp ./api.tar /home/jeus/ImcsNSC/WEB-INF/classes/kr/co/wincom/imcs/api/
+
+cd /home/jeus/ImcsNSC/WEB-INF/classes/kr/co/wincom/imcs/api
+
+tar -xvf api.tar
+
+
+cp ./mappers.tar /home/jeus/ImcsNSC/WEB-INF/classes/sqlmap/mappers/
+
+cd /home/jeus/ImcsNSC/WEB-INF/classes/sqlmap/mappers
+
+tar -xvf mappers.tar
+
+
+
+
+5. jeus 서비스 기동
+jboot
+
+
+
+6. 서비스 로그 확인
+tail -1000 /data/log/ulog/getNSCatBillInf.log | grep start | awk {'print "curl \"http://localhost/servlets/CommSvl?CMD="substr($4,8,16)"&PARAM=" substr($7,5,length($7)-5) "\""'}
+curl "http://127.0.0.1/servlets/CommSvl?CMD=getNSCatBillInf&PARAM=SA_ID=211098279426|STB_MAC=v110.9827.9426|MULTI_ALBUM_ID=M01151Q165PPV00,M01151Q164PPV00,M0763Z0553PPV00,M0763Z0553PPV00,M0763Z0553PPV00,M0763Z0553PPV00,M0763Z0553PPV00|"
+
+
+tail -1000 /datalog/ulog/getNSCatBillInf | grep start | awk {'print "curl \"http://localhost/servlets/CommSvl?CMD="substr($4,8,16)"&PARAM=" substr($7,5,length($7)-5) "\""'}
+curl "http://127.0.0.1/servlets/CommSvl?CMD=getNSCatBillInf&PARAM=SA_ID=M01022338541|STB_MAC=vv10.2233.8541|MULTI_ALBUM_ID=M01115VA01PPV00,M0113BT001PPV00|"
+
+
+
+
+
+7. tx_time 확인
+grep tx_time /tmax/lgvod/common/log/lgvod_20180226.log | grep getUXContDtl   | awk '{print substr($2,1,4)" "substr($8,2,5)}' | awk '{cnt[$1]++;sum[$1]+=$2};END{for(i in cnt)print i" "sum[i]/cnt[i]}' | sort

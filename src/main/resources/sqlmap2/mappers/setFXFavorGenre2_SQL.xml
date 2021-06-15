@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom2.imcs.api.setFXFavorGenre.SetFXFavorGenreDao2">
+	
+	<select id="getDB2Time" resultType="String">
+		SELECT TO_CHAR(SYSDATE,'YYYYMMDDHH24MISS') DBTIME FROM DUAL
+	</select>
+	
+	<!-- 선호장르 전체삭제 -->
+	<delete id="deleteFavorGenre" parameterType="kr.co.wincom.imcs.api.setFXFavorGenre.SetFXFavorGenreRequestVO">
+		DELETE FROM (                                      
+		    SELECT * 
+		      FROM PT_VO_FAVORITE_GENRE 
+		     WHERE SA_ID	= #{saId}
+		       AND MAC_ADDR = #{stbMac}
+		    )
+	</delete> 
+	
+	
+	<!-- 관심장르 등록 -->
+	<insert id="insertFavorGenre" parameterType="kr.co.wincom.imcs.api.setFXFavorGenre.SetFXFavorGenreRequestVO">
+		INSERT INTO PT_VO_FAVORITE_GENRE (SA_ID, MAC_ADDR, FAV_IDX , CATEGORY_ID, REG_UPDATE) 
+		VALUES (#{saId}, #{stbMac}, #{favCnt}, #{catInputId}, TO_CHAR(SYSDATE, 'YYYYMMDD'))
+	</insert>
+		
+</mapper>
+	
+	

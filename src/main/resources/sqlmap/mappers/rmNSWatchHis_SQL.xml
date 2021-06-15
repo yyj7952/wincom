@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.rmNSWatchHis.RmNSWatchHisDao">
+
+	<update id="rmNSWatchHisUpdate" parameterType="RmNSWatchHisRequestVO" >
+		UPDATE PT_VO_WATCH_HISTORY_NSC A
+		   SET DEL_YN = 'Y'
+		 WHERE A.SA_ID         = #{saId}
+		   AND A.MAC_ADDR      = #{stbMac}
+		   AND ( A.CONTENTS_ID = #{contentId} OR A.CONTENTS_ID IN (
+		    SELECT ASSET_ID 
+		      FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+		     WHERE ADI_ALBUM_ID = #{contentId} ) 
+		   )
+		   AND (A.DEL_YN = 'N' OR A.DEL_YN IS NULL OR A.DEL_YN = '')
+		   AND P_IDX_SA = MOD(#{pIdxSa}, 33)
+	</update>
+	
+	<!-- 이어보기 시간 갱신 -->
+	<update id="updateSetTime">
+		UPDATE /*+ index(A IDX_PT_VO_SET_TIME_02_PTT_N) */ PT_VO_SET_TIME_PTT_NSC A
+		SET WATCH_DATE = '0'
+		WHERE A.sa_id = #{saId}
+		AND A.adi_album_id = #{contentId}
+		AND A.NSCN_CUST_NO IN ('M', 'V', 'F')
+		AND A.P_IDX_SA = mod(#{pIdxSa}, 33)
+	</update>
+</mapper> 

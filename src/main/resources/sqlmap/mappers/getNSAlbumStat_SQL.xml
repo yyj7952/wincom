@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSAlbumStat.GetNSAlbumStatDao">
+
+	<resultMap type="HashMap" id="myCustPairingChk">
+		<result property="ncn_sa_id" column="NCN_SA_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="ncn_stb_mac" column="NCN_STB_MAC" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="TEST_SBC" column="TEST_SBC" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="myMultiAlbumInfo">
+		<result property="ALBUM_ID" column="ALBUM_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="SCREEN_TYPE" column="SCREEN_TYPE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="PRODUCTTYPEMIN" column="PRODUCTTYPEMIN" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="PRODUCTTYPEMAX" column="PRODUCTTYPEMAX" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="NPRODUCTTYPEMIN" column="NPRODUCTTYPEMIN" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="NPRODUCTTYPEMAX" column="NPRODUCTTYPEMAX" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="NSCREEN_YN" column="NSCREEN_YN" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="MAX_VIEWING_LEN" column="MAX_VIEWING_LEN" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="NSCREEN_FUNCTION" column="NSCREEN_FUNCTION" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="BOOK_YN" column="BOOK_YN" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="myContsBuyChk">
+		<result property="ALBUM_ID" column="ALBUM_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="BUY_DATE" column="BUY_DATE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="EXPIRED_DATE" column="EXPIRED_DATE" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="myReadingCnt">
+		<result property="TEMP_ALBUM_ID" column="TEMP_ALBUM_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="READ_COUNT" column="READ_COUNT" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<!-- custom_info 조회 -->
+	<select id="getCustPairingChk" resultMap="myCustPairingChk" parameterType="GetNSAlbumStatRequestVO">
+		SELECT
+			A.STB_SA_ID AS ncn_sa_id
+			, A.STB_MAC AS ncn_stb_mac
+			, NVL(B.TEST_SBC, 'N') AS test_sbc
+		FROM PT_VO_CUSTOM_ID B,
+		(
+			SELECT
+				STB_SA_ID
+				, STB_MAC
+				, M_SA_ID
+				, M_MAC 
+			FROM PT_VO_SBC_PAIRING_TBL
+			WHERE M_SA_ID = #{saId}
+			AND M_MAC = #{stbMac}
+			AND FLAG = 'Y'
+		) A
+		WHERE B.SA_ID = #{saId}
+		AND B.MAC_ADDR = #{stbMac}
+		AND B.SA_ID = A.M_SA_ID(+)
+		AND B.MAC_ADDR = A.M_MAC(+)
+	</select>
+	
+	<!-- multi_album_info 조회 -->
+	<select id="listMultiAlbumInfo" resultMap="myMultiAlbumInfo" parameterType="GetNSAlbumStatRequestVO" timeout="10">		
+		SELECT
+			album_id
+			, 'N' AS screen_type
+			, '' AS productTypeMin
+			, '' AS productTypeMax
+			, MIN(C.PRODUCT_TYPE) AS nProductTypeMin
+			, MAX(C.PRODUCT_TYPE) AS nProductTypeMax
+			, '' AS nscreen_yn
+			, CASE
+				WHEN MIN(C.PRODUCT_TYPE) = '0' THEN '24'
+				WHEN MIN(C.PRODUCT_TYPE) = '2' THEN TO_CHAR(TO_NUMBER( CASE WHEN MIN(C.PRODUCT_TYPE) = '2' THEN MIN(C.expired_date) ELSE '' END)*60)
+				WHEN MIN(C.PRODUCT_TYPE) = '3' THEN ''
+				ELSE NVL(SUBSTR(MAX(MAXIMUM_VIEWING_LENGTH), 1, LENGTH(MAX(MAXIMUM_VIEWING_LENGTH)) - 2), '48') END AS max_viewing_len
+			, MCUSTUSER.NUF_GET_NSCREEN_INFO(H.album_id, #{testSbc}) AS nscreen_function
+			, min(book_yn) book_yn
+		FROM (
+			SELECT
+				A.ALBUM_ID,
+				A.ALBUM_NAME,
+				D.ASSET_ID,
+				C.MAXIMUM_VIEWING_LENGTH,
+				case when G.nsc_gb = 'KID' and G.actors_display = 'H' then 'Y' else 'N' end book_yn 
+			FROM IMCSUSER.PT_LA_ALBUM_INFO A, 
+				IMCSUSER.PT_LA_ALBUM_PLATFORM C, 
+				IMCSUSER.PT_LA_ASSET_INFO D, 
+				IMCSUSER.PT_VO_CATEGORY_MAP F, 
+				IMCSUSER.PT_VO_CATEGORY G 
+			WHERE A.ALBUM_ID IN (
+<foreach item="item" index="index" collection="arrAlbumIds" open="" separator="," close="">
+						#{item}
+</foreach>
+				) 
+			AND A.ALBUM_ID = C.ALBUM_ID 
+			AND C.ALBUM_ID = D.ALBUM_ID 
+			AND D.ALBUM_ID = F.CONTENTS_ID 
+			AND C.SCREEN_TYPE = 'N' 
+			AND C.SCREEN_TYPE = D.SCREEN_TYPE 
+			AND G.CATEGORY_GB = 'NSC' 
+			AND F.CATEGORY_ID = G.CATEGORY_ID 
+		) H, IMCSUSER.PT_PD_PACKAGE_DETAIL B, IMCSUSER.PT_PD_PACKAGE C 
+		WHERE H.ASSET_ID = B.CONTENTS_ID 
+		AND B.PRODUCT_ID = C.PRODUCT_ID 
+		GROUP BY H.ALBUM_ID
+	</select>
+	
+	<!-- SVOD에 편성된 앨범의 경우 가입 여부를 확인한다. -->
+	<select id="listSvodCheck" resultType="java.lang.String" parameterType="GetNSAlbumStatRequestVO">
+		SELECT /*+ LEADING(D A C E) USE_NL(B C E A D) */
+			D.ALBUM_ID
+		FROM IMCSUSER.PT_PD_PACKAGE_DETAIL A
+			, PT_VO_CUSTOM_PRODUCT B
+			, IMCSUSER.PT_PD_PACKAGE_RELATION C
+			, IMCSUSER.PT_LA_ASSET_INFO D
+			, IMCSUSER.PT_PD_PACKAGE E
+		WHERE B.SA_ID = #{saId}
+		AND B.MAC_ADDR = #{stbMac}
+		AND D.ALBUM_ID IN (
+<foreach item="item" index="index" collection="arrSvodAlbumIds" open="" separator="," close="">
+				#{item}
+</foreach>
+		)
+		AND A.CONTENTS_ID = D.ASSET_ID
+		AND D.SCREEN_TYPE = 'N'
+		AND A.PRODUCT_ID = C.PRODUCT_ID
+		AND C.P_PRODUCT_ID = B.PRODUCTCD
+		AND C.PRODUCT_ID = E.PRODUCT_ID
+		AND E.PRODUCT_TYPE = '3'
+		GROUP BY D.ALBUM_ID
+	</select>
+	
+	<!-- 구매 여부 조회 -->
+	<select id="listContsBuyCheck" resultMap="myContsBuyChk" parameterType="GetNSAlbumStatRequestVO">
+		SELECT
+			B.CONTENTS_ID AS ALBUM_ID
+			, A.BUY_DATE
+			, A.EXPIRED_DATE
+		FROM PT_VO_BUY_NSC A,
+			PT_VO_BUY_DETAIL_NSC B
+		WHERE A.SA_ID = #{saId}
+		AND A.MAC_ADDR = #{stbMac}
+		AND A.SA_ID = B.SA_ID
+		AND A.MAC_ADDR = B.MAC_ADDR
+		AND A.BUY_DATE = B.BUY_DATE
+		AND A.PRODUCT_ID = B.PRODUCT_ID
+		AND B.CONTENTS_ID IN (
+<foreach item="item" index="index" collection="buy_arr" open="" separator="," close="">
+				#{item}
+</foreach>
+		)
+		AND NVL(EXPIRED_DATE, '0') >= TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS')
+	</select>
+	
+	<!-- 엔스크린 SVOD에 편성된 앨범의 경우 가입 여부를 확인한다. -->
+	<select id="listNScreenSvodCheck" resultType="java.lang.String" parameterType="GetNSAlbumStatRequestVO">
+		SELECT /*+ LEADING(X Y) USE_NL(Z X Y) */
+			DISTINCT X.ALBUM_ID
+		FROM (
+			SELECT 
+				PRODUCTCD
+			FROM PT_VO_CUSTOM_PRODUCT
+			WHERE SA_ID = #{ncn_sa_id}
+			AND MAC_ADDR = #{ncn_stb_mac}
+			) Z,
+			(
+			SELECT /*+ INDEX(C PT_PD_PACKAGE_UNITED_IX03) */
+				C.PRODUCT_ID
+				, A.ALBUM_ID 
+			FROM IMCSUSER.PT_LA_ASSET_INFO A,
+				IMCSUSER.PT_PD_PACKAGE_DETAIL B,
+				IMCSUSER.PT_PD_PACKAGE C
+			WHERE A.ALBUM_ID IN (
+<foreach item="item" index="index" collection="arrSvodAlbumIds" open="" separator="," close="">
+				#{item}
+</foreach>
+			)
+			AND A.ASSET_TYPE IN ('HD','SH')
+			AND A.SCREEN_TYPE = 'I'
+			AND A.ASSET_ID = B.CONTENTS_ID
+			AND C.PRODUCT_ID = B.PRODUCT_ID
+			AND C.PRODUCT_TYPE = '3'
+		) X, IMCSUSER.PT_PD_PACKAGE_RELATION Y
+		WHERE X.PRODUCT_ID = Y.PRODUCT_ID(+)
+		AND (Z.PRODUCTCD = Y.P_PRODUCT_ID or Z.PRODUCTCD = X.PRODUCT_ID)
+	</select>
+	
+	<!-- 엔스크린 구매 여부 조회 -->
+	<select id="listNScreenContsBuyCheck" resultMap="myContsBuyChk" parameterType="GetNSAlbumStatRequestVO">
+		SELECT
+			X.ALBUM_ID
+			, X.buy_date
+			, X.expired_date
+		FROM (
+			SELECT
+				P.ALBUM_ID
+				, A.buy_date
+				, A.expired_date
+			FROM PT_VO_BUY A,
+				(SELECT K.ASSET_ID, K.ALBUM_ID FROM IMCSUSER.PT_LA_ASSET_INFO K
+					WHERE K.ALBUM_ID IN (
+<foreach item="item" index="index" collection="buy_arr" open="" separator="," close="">
+				#{item}
+</foreach>					
+					)
+					AND SCREEN_TYPE = 'I'
+					AND ASSET_TYPE IN ('HD','SH')
+				) P
+			WHERE A.sa_id = #{ncn_sa_id}
+			AND A.expired_date <![CDATA[ > ]]> to_char(sysdate, 'yyyymmddhh24miss')
+			AND A.product_id LIKE SUBSTR(P.ASSET_ID, 1, 17)||'%'
+			UNION
+			SELECT
+				Z.ALBUM_ID
+				, A.buy_date
+				, CASE WHEN A.expired_date = '0' THEN TO_CHAR(sysdate+1 ,'YYYYMMDDHH24MISS')
+                    ELSE A.expired_date END
+			FROM PT_VO_BUY A,
+			( SELECT /*+ USE_NL(P D G) */ G.product_id, P.ALBUM_ID, NVl(G.pre_sale_yn, 'N') pre_sale_yn,
+							case when Trim(G.close_date) is null                                      
+										then TO_CHAR(sysdate + 1, 'yyyymmddhh24miss')                        
+										else TO_CHAR(TO_DATE(SUBSTR(G.close_date, 1, 12), 'yyyymmddhh24mi')  
+															 + to_number(G.expired_date), 'yyyymmddhh24mi')  
+															 || substr(G.close_date, 13, 2) end expired_date 
+				FROM IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+					IMCSUSER.PT_PD_PACKAGE G,
+					(
+						SELECT K.asset_id, K.ALBUM_ID FROM IMCSUSER.PT_LA_ASSET_INFO K
+						WHERE K.ALBUM_ID IN (
+<foreach item="item" index="index" collection="buy_arr" open="" separator="," close="">
+				#{item}
+</foreach>
+						)
+						AND SCREEN_TYPE = 'I'
+						AND ASSET_TYPE IN ('HD','SH')
+					) P
+				WHERE D.contents_id LIKE SUBSTR(P.asset_id, 1, 17)||'%'
+				AND D.product_id = G.product_id
+				AND G.product_type = '2'
+			) Z
+			WHERE A.sa_id = #{ncn_sa_id}
+            AND ((A.expired_date <![CDATA[ > ]]> to_char(sysdate, 'yyyymmddhh24miss') ) or (A.expired_date = '0' AND Z.expired_date <![CDATA[ > ]]> to_char(sysdate, 'yyyymmddhh24miss'))) 
+            AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+            AND A.product_id = Z.product_id
+		 ) X
+	</select>
+	
+	<!-- SVOD에 편성된 앨범의 경우 가입 여부를 확인 -->
+	<select id="listReadingCnt" resultMap="myReadingCnt" parameterType="GetNSAlbumStatRequestVO">
+		SELECT
+			album_id AS temp_album_id
+			, TO_CHAR(count(*)) AS read_count
+		FROM MCUSTUSER.NPT_VO_WATCH_TIME
+		WHERE sa_id = #{saId}
+		AND p_idx_sa = MOD(SUBSTR(#{saId}, -2), 33)
+		AND end_flag = 'Y'
+		AND album_id IN (
+<foreach item="item" index="index" collection="arrSvodAlbumIds" open="" separator="," close="">
+				#{item}
+</foreach>
+		)
+		GROUP BY ALBUM_ID
+	</select>
+	
+	
+	
+	<select id="kidProductCd" parameterType="GetNSContStatRequestVO" resultType="String">
+		SELECT C.album_id    
+		  FROM PVSUSER.XCION_VOD_BOOK_TRF_TBL A,    
+		       PVSUSER.PV_PROD_PRODUCT_TBL B, 
+		       IMCSUSER.PT_LA_ASSET_INFO C,
+		       IMCSUSER.PT_PD_PACKAGE_DETAIL D
+		 WHERE A.pvs_sbc_cont_no = #{ncn_sa_id}   
+		   AND A.tbdv_prod_divs_cd IN ('B', 'C', 'D')    
+		   AND A.tbdv_prod_rqst_dt >= TO_CHAR(add_months(sysdate, -24), 'YYYYMMDD')    
+		   AND A.tbdv_prod_cd = B.prod_cd    
+		   AND B.product_cd = D.product_id  
+		   AND C.album_id IN (  
+<foreach item="item" index="index" collection="arrKidSvodIds" open="" separator="," close="">
+				#{item}
+</foreach>
+		    )
+		    GROUP BY C.album_id 
+	</select>
+
+	
+</mapper> 

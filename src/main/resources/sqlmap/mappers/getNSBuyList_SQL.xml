@@ -1,0 +1,1123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="kr.co.wincom.imcs.api.getNSBuyList.GetNSBuyListDao">
+	
+	<resultMap type="HashMap" id="mPairInfo">
+		<result property="N_SA_ID" column="N_SA_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="N_STB_MAC" column="N_STB_MAC" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="TEST_SBC" column="TEST_SBC" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mTypeInfo">
+		<result property="CAT_GB1" column="CAT_GB1" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="CAT_GB2" column="CAT_GB2" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="IPTV_PROD_CHK" column="IPTV_PROD_CHK" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="NSC_PROD_CHK" column="NSC_PROD_CHK" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="IPTV_TEST_SBC" column="IPTV_TEST_SBC" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="NSC_TEST_SBC" column="NSC_TEST_SBC" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<!-- 페어링 체크 -->
+	<select id="getCustPairingChk" parameterType="GetNSBuyListRequestVO" resultMap="mPairInfo" >
+		SELECT A.STB_SA_ID AS N_SA_ID, A.STB_MAC AS N_STB_MAC, NVL(B.TEST_SBC, 'N') TEST_SBC 
+		 	FROM PT_VO_SBC_PAIRING_TBL A, 
+				 PT_VO_CUSTOM_ID B 
+		  WHERE A.M_SA_ID = #{saId}
+			 AND A.M_MAC = #{stbMac}
+		    AND A.FLAG = 'Y' 
+			 AND A.M_SA_ID = B.SA_ID 
+			 AND A.M_MAC = B.MAC_ADDR 
+	</select>
+	
+	<!-- 테스트 가입자 여부 조회 -->
+	<select id="getTestSbc" resultType="String" >
+		SELECT CASE WHEN TEST_SBC = 'Y' THEN TEST_SBC ELSE 'N' END TEST_SBC 
+		  FROM PT_VO_CUSTOM_ID 
+		 WHERE SA_ID = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	<!-- 구매 리스트 조회 -->
+	<select id="getNSBuyList_1" resultType="GetNSBuyListResponseVO" timeout="10">
+	<![CDATA[
+		SELECT * FROM ( 
+			 SELECT CONTS_TYPE, 
+			 		CONTS_ID, 
+			 	 	CONTS_NAME, 
+					regexp_substr(NVL(case when regexp_substr(category_id_tmp, '[^^]+', 1,2,'i') != 'XXXXX' then '1^'||regexp_substr(category_id_tmp, '[^^]+', 1,2,'i') 
+											when regexp_substr(category_id_tmp, '[^^]+', 1,3,'i') != 'XXXXX' then '2^'||regexp_substr(category_id_tmp, '[^^]+', 1,3,'i') 
+											when regexp_substr(category_id_tmp, '[^^]+', 1,4,'i') != 'XXXXX' then '3^'||regexp_substr(category_id_tmp, '[^^]+', 1,4,'i') 
+											END, '9^ZZZZZ'), '[^^]+', 1,2,'i') CAT_ID,  
+			 	 	nvl((select A.category_id||'|'||A.series_no  
+			           from pt_vo_category_map A, pt_vo_category B  
+			          where A.contents_id = CONTS_ID_2 AND NVL(A.viewing_flag, 'V') != 'N' and A.category_id = B.category_id and B.series_yn = 'Y' and B.category_gb = 'NSC'  
+			            and nvl(b.nsc_gb, 'LTE') = 
+	]]>
+			            <choose>
+							<when test='requestFlag.equals("K")'>
+								'KID'
+							</when>
+							<when test='requestFlag.equals("B")'>
+								'KID'
+							</when>
+							<otherwise>
+								'LTE'
+							</otherwise>
+						</choose>
+	<![CDATA[
+			             and (B.test_sbc = 'N' or B.test_sbc is null or B.test_sbc = '') AND rownum = 1), '') ser_info,  
+			 	 	SERIES_DESC, 
+			 	 	BUY_DATE AS BUYING_DATE, 
+			 	 	EXPIRED_DATE, 
+			 	 	PR_INFO AS RATING, 
+			 	 	POSTER_IMG_FILE AS POSTER_FILE_NAME, 
+			 	 	STILL_IMG_FILE AS STILL_FILE_NAME, 
+			 	 	DECODE(BUY_TYPE, 'N', 'B', 'Y', 'C', BUY_TYPE) AS BUYING_TYPE, 
+			 	 	PRESENT_YN, 
+			 	 	DATAFREE_BUY_YN AS DATA_FREE_YN,	 
+			 	 	DECODE(DATAFREE_BUY_TYPE, 'N', 'B', 'Y', 'C', DATAFREE_BUY_TYPE) AS DATAFREE_BUYING_TYPE, 
+			 	 	BUY_PRICE AS BUYING_PRICE, 
+			 	 	DATAFREE_BUY_PRICE AS DATAFREE_PRICE,
+					BALACE, 
+					DATAFREE_BALACE, 
+			 	 	REAL_BUYING_PRICE AS REAL_PRICE_TMP,
+			 	 	REAL_DATAFREE_BUYING_PRICE AS REAL_DF_PRICE_TMP, 
+			 	 	NSCREEN_YN,	 
+			 	 	VR_TYPE,
+			 	 	APP_TYPE AS VR_BUY_INFO,
+			 	 	nscreen_screen_type AS SCREEN_TYPE,
+			 		SUM(1) OVER(PARTITION BY 0) CNT, 
+		]]> 
+			            <choose>
+							<when test='requestFlag.equals("K")'>
+								ROW_NUMBER() OVER(ORDER BY expired_day desc, BUY_DATE desc) ORD_NUM,
+							</when>
+							<when test='requestFlag.equals("B")'>
+								ROW_NUMBER() OVER(ORDER BY expired_day desc, BUY_DATE desc) ORD_NUM,
+							</when>
+							<otherwise>
+								ROW_NUMBER() OVER(ORDER BY BUY_DATE desc) ORD_NUM,
+							</otherwise>
+						</choose>
+			<![CDATA[
+					book_flag,
+					LICENSING_WINDOW_END
+			 FROM 
+			 ( 
+			 SELECT /*+ LEADING(BUY INF SUB APT AST PST DTL PKG) USE_NL(BUY INF SUB APT AST PST DTL PKG) */ 
+			 			 	MAX(PKG.product_type) AS CONTS_TYPE,	 
+			 				BUY.product_id AS CONTS_ID, 
+			 				BUY.product_id AS CONTS_ID_2, 
+			 			 	MAX(BUY.product_name) AS CONTS_NAME, 
+			 			 	MIN(( 
+								SELECT  
+										min(case when V.nsc_gb = 'KID' then case when V.actors_display = 'B' then '1' else '2' end else '3' end) || '^' || 
+										min(case when BUY.GENRE_NAME = V.CATEGORY_ID then BUY.GENRE_NAME else 'XXXXX' end) || '^' || 
+										min(case when V.test_sbc = 'N' then V.CATEGORY_ID else 'XXXXX' end) || '^' || 
+										min(case when V.test_sbc = 'Y' then V.CATEGORY_ID else 'XXXXX' end) 
+										FROM PT_VO_CATEGORY V, 
+											PT_VO_CATEGORY_MAP M 
+									WHERE BUY.product_id = M.contents_id 
+									AND NVL(M.viewing_flag, 'V') != 'N' 
+									and M.category_id = V.category_id 
+									and V.category_gb = 'NSC'  
+					]]>	
+										<if test="requestFlag.equals('K'.toString())"> 
+															AND NVL(V.nsc_gb, 'LTE') = 'KID'
+										</if>
+										<if test="requestFlag.equals('B'.toString())"> 
+															AND NVL(V.nsc_gb, 'LTE') = 'KID' AND NVL(V.actors_display, 'N') = 'B'
+										</if>
+					<![CDATA[									
+								)) AS category_id_tmp,  
+			 			 	MAX(INF.series_no) AS SERIES_DESC, 
+			 			 	BUY.buy_date AS BUY_DATE, 
+			 			 	CASE WHEN MAX(BUY.refund_yn) = 'P' then '' ELSE MAX(BUY.expired_date) END AS EXPIRED_DATE, 
+			 			 	MAX(SUB.rating_cd) AS PR_INFO, 
+			 			 	MAX(PST.content_value) AS POSTER_IMG_FILE, 
+							(SELECT /*+ no_unnest */ min(main_img_file_name) from IMCSUSER.PT_LA_ALBUM_IMG IMG where IMG.adi_album_id = BUY.product_id and IMG.img_flag = 'N') AS STILL_IMG_FILE, 
+			 			 	MAX(BUY.buy_type) AS BUY_TYPE, 
+			 			 	MAX(case when BUY.REFUND_YN = 'P' then 'Y' else 'N' end) AS present_yn, 
+			 			 	MAX(BUY.datafree_buy_yn) AS DATAFREE_BUY_YN,	 
+			 			 	MAX(BUY.datafree_buy_type) AS DATAFREE_BUY_TYPE, 
+			 			 	MAX(BUY.buy_price) AS BUY_PRICE, 
+			 			 	MAX(BUY.DATAFREE_BUY_PRICE) AS DATAFREE_BUY_PRICE, 
+							MAX(BUY.BALACE) AS BALACE, 
+						 	MAX(BUY.DATAFREE_BALACE) AS DATAFREE_BALACE, 
+			 			 	MAX(BUY.REAL_BUYING_PRICE) AS REAL_BUYING_PRICE, 
+			 			 	MAX(BUY.REAL_DATAFREE_BUYING_PRICE) AS REAL_DATAFREE_BUYING_PRICE, 
+			 			 	MAX(BUY.NSCREEN_YN) AS NSCREEN_YN,
+							MAX(NVL(SUB.genre_small, ' ')) GENRE_SMALL,
+							MAX(SUB.vr_type) VR_TYPE,
+							MAX(BUY.appl_type) APP_TYPE,
+							MAX(nscreen_screen_type) as nscreen_screen_type,
+							MAX(BUY.book_flag) AS book_flag,
+							MAX(APT.LICENSING_WINDOW_END) as LICENSING_WINDOW_END,
+							]]>
+							MAX(case when (TRUNC(TO_DATE((CASE WHEN NVL(BUY.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE BUY.EXPIRED_DATE END), 'YYYYMMDDHH24MISS') 
+			            	- TO_DATE(BUY.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) <![CDATA[>=]]> 2000) then 'Y' else 'N' end) as expired_day
+			            	<![CDATA[
+			 FROM 		(SELECT  
+			 						CASE WHEN SUBSTR(A.product_id, LENGTH(A.product_id) - 1) = '_D' THEN SUBSTR(A.product_id, 1, LENGTH(A.product_id) - 2) ELSE A.product_id END AS PRODUCT_ID, 
+			 			 			A.product_name, 
+			 			 			A.genre_name, 
+			 			 			A.buy_date, 
+			 			 			A.expired_date, 
+			 			 			substr(A.appl_type,3,1) as appl_type,
+			 			 			MAX(CASE WHEN SUBSTR(A.product_id, LENGTH(A.product_id) - 1) = '_D' THEN '' ELSE A.refund_yn END) AS REFUND_YN,  
+			 			 			MAX(CASE WHEN SUBSTR(A.product_id, LENGTH(A.product_id) - 1) = '_D' THEN '' ELSE A.cp_use_yn END) AS BUY_TYPE, 
+			 			 			MAX(CASE WHEN SUBSTR(A.product_id, LENGTH(A.product_id) - 1) = '_D' THEN 'Y' ELSE 'N' END) AS DATAFREE_BUY_YN, 
+			 			 			MAX(CASE WHEN SUBSTR(A.product_id, LENGTH(A.product_id) - 1) = '_D' THEN A.cp_use_yn ELSE '' END) AS DATAFREE_BUY_TYPE,  
+			 			 			MAX(CASE WHEN SUBSTR(A.product_id, LENGTH(A.product_id) - 1) = '_D' THEN '0' ELSE NVL(A.buy_amt,0) END) AS BUY_PRICE, 
+			 			 			MAX(CASE WHEN SUBSTR(A.product_id, LENGTH(A.product_id) - 1) = '_D' THEN NVL(A.buy_amt,0) ELSE '0' END) AS DATAFREE_BUY_PRICE, 
+									MAX(CASE WHEN SUBSTR(A.PRODUCT_ID, LENGTH(A.PRODUCT_ID) - 1) = '_D' THEN ' ' ELSE A.BALACE END) AS BALACE, 
+									MAX(CASE WHEN SUBSTR(A.PRODUCT_ID, LENGTH(A.PRODUCT_ID) - 1) = '_D' THEN A.BALACE ELSE ' ' END) AS DATAFREE_BALACE, 
+			 			 			MAX(CASE WHEN SUBSTR(A.PRODUCT_ID, LENGTH(A.PRODUCT_ID) - 1) = '_D' THEN '' ELSE A.ERROR_MSG END) AS REAL_BUYING_PRICE, 
+			                       MAX(CASE WHEN SUBSTR(A.PRODUCT_ID, LENGTH(A.PRODUCT_ID) - 1) = '_D' THEN A.ERROR_MSG ELSE '' END) AS REAL_DATAFREE_BUYING_PRICE,
+					       MCUSTUSER.NUF_GET_NSCREEN_INFO(CASE WHEN SUBSTR(A.product_id, LENGTH(A.product_id) - 1) = '_D' THEN SUBSTR(A.product_id, 1, LENGTH(A.product_id) - 2) ELSE A.product_id END, #{testSbc}) AS NSCREEN_YN,
+                                   'N' as nscreen_screen_type,
+                                   MAX(SUBSTR(NVL(A.error_msg, ''), 3, 1)) AS book_flag
+			 			 	FROM 	PT_VO_BUY_NSC A 
+			 			 	WHERE	A.sa_id = #{saId} AND A.mac_addr = #{stbMac} AND A.pkg_yn = 'N' 
+                                    ]]>
+		<if test="possessionYn.equals('Y'.toString())"> 
+						<![CDATA[	AND TRUNC(TO_DATE((CASE WHEN NVL(A.expired_date, '0') = '0' THEN '19900101000000' ELSE A.expired_date END), 'YYYYMMDDHH24MISS') - TO_DATE(A.buy_date, 'YYYYMMDDHH24MISS') , 0) >= 2000 ]]>
+		</if>
+		<if test="possessionYn.equals('N'.toString())"> 
+						<![CDATA[	AND TRUNC(TO_DATE((CASE WHEN NVL(A.expired_date, '0') = '0' THEN '19900101000000' ELSE A.expired_date END), 'YYYYMMDDHH24MISS') - TO_DATE(A.buy_date, 'YYYYMMDDHH24MISS') , 0) < 2000 
+									and A.buy_date > TO_CHAR(ADD_MONTHS(SYSDATE,  - 12), 'YYYYMMDDHH24MISS')]]> 
+		</if>		
+			 			<![CDATA[ 
+                                    AND   (case when A.expired_date > to_char(sysdate, 'YYYYMMDDHH24MISS') then 'Y' else 'N' end)  in ('Y', #{expiredFlag}) 
+									AND ((#{appFlag} = 'E' and substr(A.appl_type, 0, 1) = 'E') or (#{appFlag} != 'E' and substr(A.appl_type, 0, 1) != 'E'))	
+									AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') = 'N']]>	
+		<if test="requestFlag.equals('M'.toString())"> 
+									AND A.ERROR_MSG like 'I%'
+		</if>
+		<if test="!requestFlag.equals('M'.toString())"> 
+									AND A.ERROR_MSG not like 'I%'
+		</if>
+			 				GROUP BY BUY_DATE,  PRODUCT_ID, GENRE_NAME, PRODUCT_NAME, EXPIRED_DATE, appl_type 
+			 				) BUY, 
+			 				IMCSUSER.PT_LA_ALBUM_INFO INF, 
+			 				IMCSUSER.PT_LA_ALBUM_SUB SUB, 
+			 				IMCSUSER.PT_LA_ASSET_INFO AST, 
+			 				IMCSUSER.PT_LA_ALBUM_PLATFORM APT, 
+			 				IMCSUSER.PT_PD_PACKAGE_DETAIL DTL, 
+			 				IMCSUSER.PT_PD_PACKAGE PKG,
+			 				IMCSUSER.PT_LA_ALBUM_POSTER PST
+			 WHERE 	BUY.product_id = INF.album_id 
+			   AND 	BUY.product_id = SUB.album_id 
+			   AND 	BUY.product_id = AST.album_id AND AST.screen_type = 'N' 
+			   AND BUY.product_id = APT.album_id AND APT.screen_type = 'N' 
+			   AND		AST.asset_id = DTL.contents_id 
+			   AND		DTL.product_id = PKG.product_id AND PKG.product_type in ('0', '1') 
+			   AND		BUY.product_id = PST.album_id
+		
+	            <choose>
+					<when test='requestFlag.equals("K")'>
+						AND	PST.poster_type = 'P'
+					</when>
+					<when test='requestFlag.equals("B")'>
+						AND	PST.poster_type = 'P'
+					</when>
+					<otherwise>
+						AND	PST.poster_type = 'T' 
+					</otherwise>
+				</choose>
+	<![CDATA[ 
+			 	AND	PST.screen_type = 'N' AND PST.service_yn = 'Y' 
+			   AND ( 
+					    (TRUNC(TO_DATE((CASE WHEN NVL(BUY.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE BUY.EXPIRED_DATE END), 'YYYYMMDDHH24MISS') 
+			            	- TO_DATE(BUY.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) >= 2000) 
+						OR 
+					    (TRUNC(TO_DATE((CASE WHEN NVL(BUY.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE BUY.EXPIRED_DATE END), 'YYYYMMDDHH24MISS') 
+			            	- TO_DATE(BUY.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) < 2000 AND BUY.buy_date > TO_CHAR(ADD_MONTHS(SYSDATE,  - 12), 'YYYYMMDDHH24MISS') ) 
+			   ) 
+			 GROUP BY BUY.product_id, BUY.genre_name, BUY.buy_date, BUY.expired_date 
+			 UNION ALL 
+			 SELECT /*+ LEADING(BUY INF SUB AST PST APT DTL PKG) USE_NL(BUY INF SUB AST PST APT DTL PKG) */ 
+			 			 	MAX(PKG.product_type) AS CONTS_TYPE, 
+			 				BUY.TEMP_PRODUCT_ID AS CONTS_ID, 
+			 				BUY.PRODUCT_ID AS CONTS_ID_2, 
+			 			 	MAX(PKG.product_name) AS CONTS_NAME, 
+			 			 	MIN(( 
+									SELECT  
+											min(case when V.nsc_gb = 'KID' then case when V.actors_display = 'B' then '1' else '2' end else '3' end) || '^' || 
+											min(case when BUY.GENRE_NAME = V.CATEGORY_ID then BUY.GENRE_NAME else 'XXXXX' end) || '^' || 
+											'XXXXX' || '^' || 
+											'XXXXX'
+									FROM PT_VO_CATEGORY V, 
+										PT_VO_CATEGORY_MAP M 
+									WHERE BUY.product_id = M.contents_id 
+									AND NVL(M.viewing_flag, 'V') != 'N' 
+									and M.category_id = V.category_id 
+									and V.category_gb = 'NSC' 
+									AND V.series_yn = 'Y'
+					]]>	
+									<if test="requestFlag.equals('K'.toString())"> 
+														AND NVL(V.nsc_gb, 'LTE') = 'KID'
+									</if>
+									<if test="requestFlag.equals('B'.toString())"> 
+														AND NVL(V.nsc_gb, 'LTE') = 'KID' AND NVL(V.actors_display, 'N') = 'B'
+									</if>
+					<![CDATA[ 					 
+								)) AS category_id_tmp,  
+			 			 	MAX(INF.series_no) AS SERIES_DESC, 
+			 			 	BUY.buy_date AS BUY_DATE, 
+			 			 	CASE WHEN MAX(BUY.refund_yn) = 'P' then '' ELSE MAX(BUY.expired_date) END AS EXPIRED_DATE, 
+			 			 	MAX(SUB.rating_cd) AS PR_INFO, 
+			 			 	MAX(PST.content_value) AS POSTER_IMG_FILE, 
+							(SELECT /*+ no_unnest */ min(main_img_file_name) from IMCSUSER.PT_LA_ALBUM_IMG IMG where IMG.adi_album_id = BUY.product_id and IMG.img_flag = 'N') AS STILL_IMG_FILE, 
+			 			 	MAX(BUY.buy_type) AS BUY_TYPE, 
+			 			 	MAX(case when BUY.REFUND_YN = 'P' then 'Y' else 'N' end) AS present_yn, 
+			 			 	MAX(BUY.datafree_buy_yn) AS DATAFREE_BUY_YN,	 
+			 			 	MAX(BUY.datafree_buy_type) AS DATAFREE_BUY_TYPE, 
+			 			 	MAX(BUY.buy_price) AS BUY_PRICE, 
+			 			 	MAX(BUY.DATAFREE_BUY_PRICE) AS DATAFREE_BUY_PRICE, 
+							MAX(BUY.BALACE) AS BALACE, 
+						 	MAX(BUY.DATAFREE_BALACE) AS DATAFREE_BALACE, 
+			 			 	MAX(BUY.REAL_BUYING_PRICE) AS REAL_BUYING_PRICE, 
+			 			 	MAX(BUY.REAL_DATAFREE_BUYING_PRICE) AS REAL_DATAFREE_BUYING_PRICE, 
+			 			 	MAX(BUY.NSCREEN_YN) as NSCREE_YN,
+							MAX(NVL(SUB.genre_small, ' ')) GENRE_SMALL,
+							MAX(SUB.vr_type) VR_TYPE,
+							MAX(BUY.appl_type) APP_TYPE,
+							MAX(nscreen_screen_type) as nscreen_screen_type,
+							MAX(BUY.book_flag) AS book_flag,
+							MAX(APT.LICENSING_WINDOW_END) as LICENSING_WINDOW_END,
+							]]>
+							MAX(case when (TRUNC(TO_DATE((CASE WHEN NVL(BUY.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE BUY.EXPIRED_DATE END), 'YYYYMMDDHH24MISS') 
+			            	- TO_DATE(BUY.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) <![CDATA[>=]]> 2000) then 'Y' else 'N' end) as expired_day
+			            	<![CDATA[
+			 FROM 		(SELECT  
+			 						A.product_id AS TEMP_PRODUCT_ID, 
+			 						MAX(C.album_id) AS PRODUCT_ID, 
+			 			 			A.genre_name, 
+			 			 			A.buy_date, 
+			 			 			A.expired_date, 
+			 			 			substr(A.appl_type,3,1) as appl_type,
+			 			 			MAX(refund_yn) AS REFUND_YN,  
+			 			 			MAX(cp_use_yn) AS BUY_TYPE, 
+			 			 			'N' AS DATAFREE_BUY_YN, 
+			 			 			'' AS DATAFREE_BUY_TYPE,  
+			 			 			MAX(NVL(buy_amt,0)) AS BUY_PRICE, 
+ 			                        '0' AS DATAFREE_BUY_PRICE, 
+                                    MAX(BALACE) AS BALACE, 
+									'' AS DATAFREE_BALACE, 
+			 			 			MAX(ERROR_MSG) AS REAL_BUYING_PRICE, 
+                                    '' AS REAL_DATAFREE_BUYING_PRICE,
+						 'N;' AS NSCREEN_YN,
+			                         'N' as nscreen_screen_type,
+			                         MAX(SUBSTR(NVL(A.error_msg, ''), 3, 1)) AS book_flag
+			 			 	FROM    PT_VO_BUY_NSC A, imcsuser.PT_PD_PACKAGE_DETAIL B, IMCSUSER.PT_LA_ASSET_INFO C
+                            WHERE   A.sa_id = #{saId} AND A.mac_addr = #{stbMac} AND A.pkg_yn = 'Y'  
+                                AND A.product_id = B.product_id 
+                                AND B.contents_id = C.asset_id
+                                AND C.screen_type = 'N'
+                                ]]>
+		<if test="possessionYn.equals('Y'.toString())"> 
+					<![CDATA[	AND TRUNC(TO_DATE((CASE WHEN NVL(A.expired_date, '0') = '0' THEN '19900101000000' ELSE A.expired_date END), 'YYYYMMDDHH24MISS') - TO_DATE(A.buy_date, 'YYYYMMDDHH24MISS') , 0) >= 2000 ]]>
+		</if>
+		<if test="possessionYn.equals('N'.toString())"> 
+					<![CDATA[	AND TRUNC(TO_DATE((CASE WHEN NVL(A.expired_date, '0') = '0' THEN '19900101000000' ELSE A.expired_date END), 'YYYYMMDDHH24MISS') - TO_DATE(A.buy_date, 'YYYYMMDDHH24MISS') , 0) < 2000 
+								and A.buy_date > TO_CHAR(ADD_MONTHS(SYSDATE,  - 12), 'YYYYMMDDHH24MISS')]]> 
+		</if>		
+			 		<![CDATA[	AND   (case when A.expired_date > to_char(sysdate, 'YYYYMMDDHH24MISS') then 'Y' else 'N' end)  in ('Y', #{expiredFlag}) 
+								AND ((#{appFlag} = 'E' and substr(A.appl_type, 0, 1) = 'E') or (#{appFlag} != 'E' and substr(A.appl_type, 0, 1) != 'E'))	
+								AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') = 'N']]>
+		<if test="requestFlag.equals('M'.toString())"> 
+								AND A.ERROR_MSG like 'I%'
+		</if>
+		<if test="!requestFlag.equals('M'.toString())"> 
+								AND A.ERROR_MSG not like 'I%'
+		</if>
+								GROUP BY A.product_id, A.genre_name, A.buy_date, A.expired_date, A.appl_type
+			 				) BUY, 
+			 				IMCSUSER.PT_LA_ALBUM_INFO INF, 
+			 				IMCSUSER.PT_LA_ALBUM_SUB SUB, 
+			 				IMCSUSER.PT_LA_ASSET_INFO AST, 
+			 				IMCSUSER.PT_PD_PACKAGE_DETAIL DTL, 
+			 				IMCSUSER.PT_PD_PACKAGE PKG, 
+			 				IMCSUSER.PT_LA_ALBUM_POSTER PST,
+			 				IMCSUSER.PT_LA_ALBUM_PLATFORM APT 
+			 WHERE 	BUY.product_id = INF.album_id 
+			   AND		BUY.product_id = SUB.album_id 
+			   AND 	BUY.product_id = AST.album_id AND AST.screen_type = 'N' 
+			   AND		AST.asset_id = DTL.contents_id 
+			   AND		DTL.product_id = PKG.product_id AND PKG.product_type = '2' 
+			   AND		BUY.product_id = PST.album_id
+	            <choose>
+					<when test='requestFlag.equals("K")'>
+						AND	PST.poster_type = 'P'
+					</when>
+					<when test='requestFlag.equals("B")'>
+						AND	PST.poster_type = 'P'
+					</when>
+					<otherwise>
+						AND	PST.poster_type = 'T' 
+					</otherwise>
+				</choose>
+	<![CDATA[ 			 	 			 	
+			 	AND	PST.screen_type = 'N' 
+			 	AND PST.service_yn = 'Y' 
+			 	AND PST.album_id = APT.album_id
+			 	AND PST.screen_type = APT.screen_type
+			   AND ( 
+					    (TRUNC(TO_DATE((CASE WHEN NVL(BUY.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE BUY.EXPIRED_DATE END), 'YYYYMMDDHH24MISS') 
+			            	- TO_DATE(BUY.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) >= 2000) 
+						OR 
+					    (TRUNC(TO_DATE((CASE WHEN NVL(BUY.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE BUY.EXPIRED_DATE END), 'YYYYMMDDHH24MISS') 
+			            	- TO_DATE(BUY.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) < 2000 AND BUY.buy_date > TO_CHAR(ADD_MONTHS(SYSDATE,  - 12), 'YYYYMMDDHH24MISS') ) 
+			   ) 
+			 GROUP BY BUY.TEMP_PRODUCT_ID, BUY.product_id, BUY.genre_name, BUY.buy_date, BUY.expired_date 
+			 )
+			 ]]> 
+			 <!-- WHERE genre_small not in ( 
+			                             select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) >= '20190313' then 'SBS' else 'X' end 
+			                               from dual 
+			                             union 
+			                             select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) >= '20190317' then 'KBS' else 'X' end 
+			                               from dual 
+			                             union 
+			                             select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) >= '20190321' then 'MBC' else 'X' end 
+			                               from dual 
+			                            ) --> 
+   				<if test="requestFlag.equals('K'.toString())"> 
+									WHERE regexp_substr(category_id_tmp, '[^^]+', 1,1,'i') IN ('1', '2')
+				</if>
+				<if test="requestFlag.equals('B'.toString())"> 
+									WHERE regexp_substr(category_id_tmp, '[^^]+', 1,1,'i') = '1'
+				</if>
+			<![CDATA[
+			  ) A 
+			  WHERE A.ORD_NUM >= ((TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt})) - (TO_NUMBER(#{pageCnt}) - 1)) 
+			   AND A.ORD_NUM <= (TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt}))
+	]]>
+	</select>
+	
+	<!-- 구매 리스트 조회 -->
+	<select id="getNSBuyList_2" resultType="GetNSBuyListResponseVO" timeout="10">
+	<![CDATA[
+		SELECT * FROM ( 
+				 SELECT CONTS_TYPE,
+						CONTS_ID, 
+						CONTS_NAME, 
+						CAT_ID, 
+						nvl((select A.category_id||'|'||A.series_no  
+						   from pt_vo_category_map A, pt_vo_category B  
+						  where A.contents_id = CONTS_ID AND NVL(A.viewing_flag, 'V') != 'N' and A.category_id = B.category_id and B.series_yn = 'Y' and B.category_gb = 'NSC'  
+							and nvl(b.nsc_gb, 'LTE') = 
+	]]>
+			            <choose>
+							<when test='requestFlag.equals("K")'>
+								'KID'
+							</when>
+							<when test='requestFlag.equals("B")'>
+								'KID'
+							</when>
+							<otherwise>
+								'LTE'
+							</otherwise>
+						</choose>
+	<![CDATA[
+							and (B.test_sbc = 'N' or B.test_sbc is null or B.test_sbc = '') AND rownum = 1), '') ser_info,  
+						SERIES_DESC, 
+						BUY_DATE AS BUYING_DATE, 
+						EXPIRED_DATE, 
+						PR_INFO AS RATING, 
+						POSTER_IMG_FILE AS POSTER_FILE_NAME, 
+						STILL_IMG_FILE AS STILL_FILE_NAME, 
+						DECODE(BUY_TYPE, 'N', 'B', 'Y', 'C', BUY_TYPE) AS BUYING_TYPE, 
+						PRESENT_YN, 
+						DATAFREE_BUY_YN AS DATA_FREE_YN,	
+						DECODE(DATAFREE_BUY_TYPE, 'N', 'B', 'Y', 'C', DATAFREE_BUY_TYPE) AS DATAFREE_BUYING_TYPE, 
+						BUY_PRICE AS BUYING_PRICE, 
+						DATAFREE_BUY_PRICE AS DATAFREE_PRICE,
+						BALACE, 
+						DATAFREE_BALACE, 
+						REAL_BUYING_PRICE AS REAL_PRICE_TMP,
+						REAL_DATAFREE_BUYING_PRICE AS REAL_DF_PRICE_TMP, 
+						NSCREEN_YN, 
+						VR_TYPE,
+						'' AS VR_BUY_INFO,
+						nscreen_screen_type AS SCREEN_TYPE,
+						SUM(1) OVER(PARTITION BY 0) CNT,
+		]]> 
+			            <choose>
+							<when test='requestFlag.equals("K")'>
+								ROW_NUMBER() OVER(ORDER BY expired_day desc, BUY_DATE desc) ORD_NUM,
+							</when>
+							<when test='requestFlag.equals("B")'>
+								ROW_NUMBER() OVER(ORDER BY expired_day desc, BUY_DATE desc) ORD_NUM,
+							</when>
+							<otherwise>
+								ROW_NUMBER() OVER(ORDER BY BUY_DATE desc) ORD_NUM,
+							</otherwise>
+						</choose>
+			<![CDATA[						 
+						book_flag,
+						LICENSING_WINDOW_END
+				 FROM 
+				 ( 
+						SELECT /*+ LEADING(BUY INF SUB APT AST DTL PST CPT MAP CAT) USE_NL(BUY INF SUB APT AST DTL PST MAP CAT) */ 
+								case when MAX(BUY_GB) = '1' then MAX(PKG.product_type) else '1' end AS CONTS_TYPE,	 
+								BUY.product_id AS CONTS_ID, 
+								case when MAX(BUY_GB) = '1' then MAX(BUY.product_name) else max(MAP.contents_name) end AS CONTS_NAME, 
+								MIN(CAT.category_id) AS CAT_ID, 
+								MAX(INF.series_no) AS SERIES_DESC, 
+								BUY.buy_date AS BUY_DATE, 
+								CASE WHEN MAX(BUY.refund_yn) = 'P' then '' ELSE MAX(BUY.expired_date) END AS EXPIRED_DATE, 
+								MAX(SUB.rating_cd) AS PR_INFO, 
+								MAX(PST.content_value) AS POSTER_IMG_FILE, 
+								(SELECT min(main_img_file_name) from IMCSUSER.PT_LA_ALBUM_IMG IMG where IMG.adi_album_id = BUY.product_id and IMG.img_flag = 'N') AS STILL_IMG_FILE, 
+								MAX(BUY.buy_type) AS BUY_TYPE, 
+								MAX(case when BUY.REFUND_YN = 'P' then 'Y' else 'N' end) AS present_yn, 
+								MAX(BUY.datafree_buy_yn) AS DATAFREE_BUY_YN,	 
+								MAX(BUY.datafree_buy_type) AS DATAFREE_BUY_TYPE, 
+								MAX(BUY.buy_price) AS BUY_PRICE, 
+								MAX(BUY.DATAFREE_BUY_PRICE) AS DATAFREE_BUY_PRICE, 
+								MAX(BUY.BALACE) AS BALACE, 
+								MAX(BUY.DATAFREE_BALACE) AS DATAFREE_BALACE, 
+								MAX(BUY.REAL_BUYING_PRICE) AS REAL_BUYING_PRICE, 
+								MAX(BUY.REAL_DATAFREE_BUYING_PRICE) AS REAL_DATAFREE_BUYING_PRICE, 
+								MAX(BUY.NSCREEN_YN) AS NSCREEN_YN,
+								MAX(NVL(SUB.genre_small, ' ')) GENRE_SMALL,
+								MAX(SUB.vr_type) VR_TYPE,
+								MAX(nscreen_screen_type) as nscreen_screen_type,
+								MAX(BUY.book_flag) AS book_flag,
+								MAX(APT.LICENSING_WINDOW_END) as LICENSING_WINDOW_END,
+								]]>
+								MAX(case when (TRUNC(TO_DATE((CASE WHEN NVL(BUY.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE BUY.EXPIRED_DATE END), 'YYYYMMDDHH24MISS') 
+										- TO_DATE(BUY.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) <![CDATA[>=]]> 2000) then 'Y' else 'N' end) as expired_day
+								<![CDATA[
+						FROM (
+									SELECT /*+ LEADING(A DTL AST PKG) USE_NL(A DTL AST PKG) */ 
+											case when MAX(A.PKG_YN) = 'N' then '1' else '2' end AS BUY_GB,
+											AST.album_id AS PRODUCT_ID,
+											A.product_name, 
+											A.genre_name, 
+											A.buy_date, 
+											A.expired_date, 
+											MAX(A.refund_yn) AS REFUND_YN,  
+											MAX(A.cp_use_yn) AS BUY_TYPE, 
+											'N' AS DATAFREE_BUY_YN, 
+											'' AS DATAFREE_BUY_TYPE,  
+											MAX(NVL(A.buy_amt,0)) AS BUY_PRICE, 
+											'0' AS DATAFREE_BUY_PRICE, 
+											MAX(A.BALACE) AS BALACE, 
+											'' AS DATAFREE_BALACE, 
+											MAX(A.ERROR_MSG) AS REAL_BUYING_PRICE, 
+											'' AS REAL_DATAFREE_BUYING_PRICE,
+											MCUSTUSER.NUF_GET_NSCREEN_INFO(AST.album_id, #{testSbc}) AS NSCREEN_YN,
+											'I' as nscreen_screen_type,
+											MAX(SUBSTR(NVL(A.error_msg, ''), 3, 1)) AS book_flag
+									  FROM PT_VO_BUY A, IMCSUSER.PT_LA_ASSET_INFO AST, IMCSUSER.PT_PD_PACKAGE_DETAIL DTL, IMCSUSER.PT_PD_PACKAGE PKG
+									 WHERE A.sa_id = #{nSaId}
+									   AND (case when A.expired_date > to_char(sysdate, 'YYYYMMDDHH24MISS') then 'Y' else 'N' end)  in ('Y', #{expiredFlag}) 
+                                       AND A.PKG_YN = 'Y'
+                                       AND DTL.product_id = A.product_id
+                                       AND AST.asset_id = DTL.contents_id
+                                       AND AST.screen_type = 'I'
+                                       AND substr(AST.album_id,1,1) != 'T'
+                                       AND DTL.product_id = PKG.product_id
+									   ]]>
+				<if test="possessionYn.equals('Y'.toString())"> 
+							<![CDATA[	AND TRUNC(TO_DATE((CASE WHEN NVL(A.expired_date, '0') = '0' THEN '19900101000000' ELSE A.expired_date END), 'YYYYMMDDHH24MISS') - TO_DATE(A.buy_date, 'YYYYMMDDHH24MISS') , 0) >= 2000 ]]>
+				</if>
+				<if test="possessionYn.equals('N'.toString())"> 
+							<![CDATA[	AND TRUNC(TO_DATE((CASE WHEN NVL(A.expired_date, '0') = '0' THEN '19900101000000' ELSE A.expired_date END), 'YYYYMMDDHH24MISS') - TO_DATE(A.buy_date, 'YYYYMMDDHH24MISS') , 0) < 2000 
+										and A.buy_date > TO_CHAR(ADD_MONTHS(SYSDATE,  - 12), 'YYYYMMDDHH24MISS')]]> 
+				</if>
+							<![CDATA[	AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') = 'N' 
+									GROUP BY A.BUY_DATE,  A.PRODUCT_ID, GENRE_NAME, A.PRODUCT_NAME, A.EXPIRED_DATE, AST.album_id
+								UNION
+									SELECT /*+ LEADING(A DTL AST PKG) USE_NL(A DTL AST PKG) */ 
+											case when MAX(A.PKG_YN) = 'N' then '1' else '2' end AS BUY_GB,
+											AST.album_id AS PRODUCT_ID,
+											A.product_name, 
+											A.genre_name, 
+											A.buy_date, 
+											A.expired_date, 
+											MAX(A.refund_yn) AS REFUND_YN,  
+											MAX(A.cp_use_yn) AS BUY_TYPE, 
+											'N' AS DATAFREE_BUY_YN, 
+											'' AS DATAFREE_BUY_TYPE,  
+											MAX(NVL(A.buy_amt,0)) AS BUY_PRICE, 
+											'0' AS DATAFREE_BUY_PRICE, 
+											MAX(A.BALACE) AS BALACE, 
+											'' AS DATAFREE_BALACE, 
+											MAX(A.ERROR_MSG) AS REAL_BUYING_PRICE, 
+											'' AS REAL_DATAFREE_BUYING_PRICE,
+											MCUSTUSER.NUF_GET_NSCREEN_INFO(AST.album_id, #{testSbc}) AS NSCREEN_YN,
+											'I' as nscreen_screen_type,
+											MAX(SUBSTR(NVL(A.error_msg, ''), 3, 1)) AS book_flag
+									  FROM PT_VO_BUY A, IMCSUSER.PT_LA_ASSET_INFO AST, IMCSUSER.PT_PD_PACKAGE_DETAIL DTL, IMCSUSER.PT_PD_PACKAGE PKG
+									 WHERE A.sa_id = #{nSaId}
+									   AND (case when A.expired_date > to_char(sysdate, 'YYYYMMDDHH24MISS') then 'Y' else 'N' end)  in ('Y', #{expiredFlag}) 
+                                       AND A.PKG_YN = 'N'
+                                       AND DTL.contents_id like SUBSTR(A.product_id, 1, 17)||'%%'
+                                       AND AST.asset_id = DTL.contents_id
+                                       AND AST.screen_type = 'I'
+                                       AND substr(AST.album_id,1,1) != 'T'
+                                       AND DTL.product_id = PKG.product_id
+									   ]]>
+				<if test="possessionYn.equals('Y'.toString())"> 
+							<![CDATA[	AND TRUNC(TO_DATE((CASE WHEN NVL(A.expired_date, '0') = '0' THEN '19900101000000' ELSE A.expired_date END), 'YYYYMMDDHH24MISS') - TO_DATE(A.buy_date, 'YYYYMMDDHH24MISS') , 0) >= 2000 ]]>
+				</if>
+				<if test="possessionYn.equals('N'.toString())"> 
+							<![CDATA[	AND TRUNC(TO_DATE((CASE WHEN NVL(A.expired_date, '0') = '0' THEN '19900101000000' ELSE A.expired_date END), 'YYYYMMDDHH24MISS') - TO_DATE(A.buy_date, 'YYYYMMDDHH24MISS') , 0) < 2000 
+										and A.buy_date > TO_CHAR(ADD_MONTHS(SYSDATE,  - 12), 'YYYYMMDDHH24MISS')]]> 
+				</if>
+							<![CDATA[	AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') = 'N' 
+									GROUP BY A.BUY_DATE,  A.PRODUCT_ID, GENRE_NAME, A.PRODUCT_NAME, A.EXPIRED_DATE, AST.album_id
+						) BUY,
+										IMCSUSER.PT_LA_ALBUM_INFO INF, 
+										IMCSUSER.PT_LA_ALBUM_SUB SUB, 
+										IMCSUSER.PT_LA_ASSET_INFO AST, 
+										IMCSUSER.PT_LA_ALBUM_PLATFORM APT, 
+										IMCSUSER.PT_PD_PACKAGE_DETAIL DTL, 
+										IMCSUSER.PT_PD_PACKAGE PKG, 
+										PT_VO_CATEGORY_MAP MAP, 
+										PT_VO_CATEGORY CAT, 
+										IMCSUSER.PT_LA_ALBUM_POSTER PST
+						 WHERE 	BUY.product_id = INF.album_id 
+						   AND		BUY.product_id = SUB.album_id 
+						   AND 	BUY.product_id = AST.album_id AND AST.screen_type = 'N' 
+						   AND 	BUY.product_id = APT.album_id AND AST.screen_type = 'N' 
+						   AND		AST.asset_id = DTL.contents_id 
+						   AND		DTL.product_id = PKG.product_id AND ( (BUY.BUY_GB = 1 AND PKG.product_type IN ('0', '1')) OR BUY.BUY_GB = 2 )
+						   AND		BUY.product_id = MAP.contents_id  
+						   AND 	MAP.category_id = CAT.category_id	AND	CAT.category_gb = 'NSC' 	 
+						   AND NVL(MAP.viewing_flag, 'V') != 'N' 
+						   AND		BUY.product_id = PST.album_id
+	]]>
+				<if test="requestFlag.equals('K'.toString())"> 
+									AND NVL(CAT.nsc_gb, 'LTE') = 'KID'
+				</if>
+				<if test="requestFlag.equals('B'.toString())"> 
+									AND NVL(CAT.nsc_gb, 'LTE') = 'KID' AND NVL(CAT.actors_display, 'N') = 'B'
+				</if>
+				
+	            <choose>
+					<when test='requestFlag.equals("K")'>
+						AND	PST.poster_type = 'P'
+					</when>
+					<when test='requestFlag.equals("B")'>
+						AND	PST.poster_type = 'P'
+					</when>
+					<otherwise>
+						AND	PST.poster_type = 'T' 
+					</otherwise>
+				</choose>
+	<![CDATA[ 						   						   
+						   AND	PST.screen_type = 'N' 
+						   AND PST.service_yn = 'Y' 
+						   AND SUBSTR(BUY.nscreen_yn,1,1) = 'Y'
+						   AND BUY.nscreen_yn not like '%M'
+						   AND ( 
+									(TRUNC(TO_DATE((CASE WHEN NVL(BUY.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE BUY.EXPIRED_DATE END), 'YYYYMMDDHH24MISS') 
+										- TO_DATE(BUY.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) >= 2000) 
+									OR 
+									(TRUNC(TO_DATE((CASE WHEN NVL(BUY.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE BUY.EXPIRED_DATE END), 'YYYYMMDDHH24MISS') 
+										- TO_DATE(BUY.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) < 2000 AND BUY.buy_date > TO_CHAR(ADD_MONTHS(SYSDATE,  - 12), 'YYYYMMDDHH24MISS') ) 
+						   ) 
+						 GROUP BY BUY.product_id, BUY.genre_name, BUY.buy_date, BUY.expired_date
+				 )
+			]]> 
+				 <!-- WHERE genre_small not in ( 
+											 select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) >= '20190313' then 'SBS' else 'X' end 
+											   from dual 
+											 union 
+											 select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) >= '20190317' then 'KBS' else 'X' end 
+											   from dual 
+											 union 
+											 select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) >= '20190321' then 'MBC' else 'X' end 
+											   from dual 
+											) --> 
+			<![CDATA[
+		 ) A 
+		  WHERE A.ORD_NUM >= ((TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt})) - (TO_NUMBER(#{pageCnt}) - 1)) 
+		  AND A.ORD_NUM <= (TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt}))
+		]]>	
+	</select>	
+	
+	
+	<!-- 구매 리스트 조회 -->
+	<select id="getNSBuyList_3" resultType="GetNSBuyListResponseVO" timeout="10">
+	<![CDATA[
+		SELECT * FROM ( 
+			 SELECT CONTS_TYPE, 
+			 		CONTS_ID, 
+			 	 	CONTS_NAME, 
+			 	 	regexp_substr(NVL(case when regexp_substr(category_id_tmp, '[^^]+', 1,2,'i') != 'XXXXX' then '1^'||regexp_substr(category_id_tmp, '[^^]+', 1,2,'i') 
+											when regexp_substr(category_id_tmp, '[^^]+', 1,3,'i') != 'XXXXX' then '2^'||regexp_substr(category_id_tmp, '[^^]+', 1,3,'i') 
+											when regexp_substr(category_id_tmp, '[^^]+', 1,4,'i') != 'XXXXX' then '3^'||regexp_substr(category_id_tmp, '[^^]+', 1,4,'i') 
+											END, '9^ZZZZZ'), '[^^]+', 1,2,'i') CAT_ID,  
+			 	 	nvl((select A.category_id||'|'||A.series_no  
+			           from pt_vo_category_map A, pt_vo_category B  
+			          where A.contents_id = CONTS_ID_2 AND NVL(A.viewing_flag, 'V') != 'N' and A.category_id = B.category_id and B.series_yn = 'Y' and B.category_gb = 'NSC'  
+			            and nvl(b.nsc_gb, 'LTE') = 
+	]]>
+			            <choose>
+							<when test='requestFlag.equals("K")'>
+								'KID'
+							</when>
+							<when test='requestFlag.equals("B")'>
+								'KID'
+							</when>
+							<otherwise>
+								'LTE'
+							</otherwise>
+						</choose>
+	<![CDATA[
+			             and (B.test_sbc = 'N' or B.test_sbc is null or B.test_sbc = '') AND rownum = 1), '') ser_info,  
+			 	 	SERIES_DESC, 
+			 	 	BUY_DATE AS BUYING_DATE, 
+			 	 	EXPIRED_DATE, 
+			 	 	PR_INFO AS RATING, 
+			 	 	POSTER_IMG_FILE AS POSTER_FILE_NAME, 
+			 	 	STILL_IMG_FILE AS STILL_FILE_NAME, 
+			 	 	DECODE(BUY_TYPE, 'N', 'B', 'Y', 'C', BUY_TYPE) AS BUYING_TYPE, 
+			 	 	PRESENT_YN, 
+			 	 	DATAFREE_BUY_YN AS DATA_FREE_YN,	 
+			 	 	DECODE(DATAFREE_BUY_TYPE, 'N', 'B', 'Y', 'C', DATAFREE_BUY_TYPE) AS DATAFREE_BUYING_TYPE, 
+			 	 	BUY_PRICE AS BUYING_PRICE, 
+			 	 	DATAFREE_BUY_PRICE AS DATAFREE_PRICE,
+					BALACE, 
+					DATAFREE_BALACE, 
+			 	 	REAL_BUYING_PRICE AS REAL_PRICE_TMP,
+			 	 	REAL_DATAFREE_BUYING_PRICE AS REAL_DF_PRICE_TMP, 
+			 	 	NSCREEN_YN,	 
+			 	 	VR_TYPE,
+			 	 	APP_TYPE AS VR_BUY_INFO,
+			 	 	nscreen_screen_type as SCREEN_TYPE,
+			 		SUM(1) OVER(PARTITION BY 0) CNT, 
+		]]> 
+			            <choose>
+							<when test='requestFlag.equals("K")'>
+								ROW_NUMBER() OVER(ORDER BY expired_day desc, BUY_DATE desc) ORD_NUM,
+							</when>
+							<when test='requestFlag.equals("B")'>
+								ROW_NUMBER() OVER(ORDER BY expired_day desc, BUY_DATE desc) ORD_NUM,
+							</when>
+							<otherwise>
+								ROW_NUMBER() OVER(ORDER BY BUY_DATE desc) ORD_NUM,
+							</otherwise>
+						</choose>
+			<![CDATA[			 		
+					book_flag,
+					LICENSING_WINDOW_END
+			 FROM 
+			 ( 
+		                SELECT /*+ LEADING(BUY INF SUB APT AST PST DTL PKG) USE_NL(BUY INF SUB APT AST PST DTL PKG) */ 
+		            		 	case when MAX(BUY_GB) != '3' then MAX(PKG.product_type) else '1' end AS CONTS_TYPE,	 
+		            			BUY.product_id AS CONTS_ID, 
+		            			BUY.product_id AS CONTS_ID_2, 
+		            		 	case when MAX(BUY_GB) != '3' then MAX(BUY.product_name) else max(INF.album_name) end AS CONTS_NAME, 
+		            		 	MIN(( 
+									SELECT  
+											min(case when V.nsc_gb = 'KID' then case when V.actors_display = 'B' then '1' else '2' end else '3' end) || '^' || 
+											min(case when BUY.GENRE_NAME = V.CATEGORY_ID then BUY.GENRE_NAME else 'XXXXX' end) || '^' || 
+											min(case when V.test_sbc = 'N' then V.CATEGORY_ID else 'XXXXX' end) || '^' || 
+											min(case when V.test_sbc = 'Y' then V.CATEGORY_ID else 'XXXXX' end) 
+									FROM PT_VO_CATEGORY V, 
+										PT_VO_CATEGORY_MAP M 
+									WHERE BUY.product_id = M.contents_id 
+									AND NVL(M.viewing_flag, 'V') != 'N' 
+									and M.category_id = V.category_id 
+									and V.category_gb = 'NSC' 
+					]]>	
+										<if test="requestFlag.equals('K'.toString())"> 
+															AND NVL(V.nsc_gb, 'LTE') = 'KID'
+										</if>
+										<if test="requestFlag.equals('B'.toString())"> 
+															AND NVL(V.nsc_gb, 'LTE') = 'KID' AND NVL(V.actors_display, 'N') = 'B'
+										</if>
+					<![CDATA[
+									)) AS category_id_tmp, 
+		            		 	MAX(INF.series_no) AS SERIES_DESC, 
+		            		 	BUY.buy_date AS BUY_DATE, 
+		            		 	CASE WHEN MAX(BUY.refund_yn) = 'P' then '' ELSE MAX(BUY.expired_date) END AS EXPIRED_DATE, 
+		            		 	MAX(SUB.rating_cd) AS PR_INFO, 
+		            		 	MAX(PST.content_value) AS POSTER_IMG_FILE, 
+		            			(SELECT /*+ no_unnest */ min(main_img_file_name) from IMCSUSER.PT_LA_ALBUM_IMG IMG where IMG.adi_album_id = BUY.product_id and IMG.img_flag = 'N') AS STILL_IMG_FILE, 
+		            		 	MAX(BUY.buy_type) AS BUY_TYPE, 
+		            		 	MAX(case when BUY.REFUND_YN = 'P' then 'Y' else 'N' end) AS present_yn, 
+		            		 	MAX(BUY.datafree_buy_yn) AS DATAFREE_BUY_YN,	 
+		            		 	MAX(BUY.datafree_buy_type) AS DATAFREE_BUY_TYPE, 
+		            		 	MAX(BUY.buy_price) AS BUY_PRICE, 
+		            		 	MAX(BUY.DATAFREE_BUY_PRICE) AS DATAFREE_BUY_PRICE, 
+		            			MAX(BUY.BALACE) AS BALACE, 
+		            		 	MAX(BUY.DATAFREE_BALACE) AS DATAFREE_BALACE, 
+		            		 	MAX(BUY.REAL_BUYING_PRICE) AS REAL_BUYING_PRICE, 
+		            		 	MAX(BUY.REAL_DATAFREE_BUYING_PRICE) AS REAL_DATAFREE_BUYING_PRICE, 
+		            		 	MCUSTUSER.NUF_GET_NSCREEN_INFO(BUY.product_id, #{testSbc}) AS NSCREEN_YN,
+		            			MAX(NVL(SUB.genre_small, ' ')) GENRE_SMALL,
+		            			MAX(SUB.vr_type) VR_TYPE,
+		            			MAX(BUY.appl_type) APP_TYPE,
+		                        MAX(nscreen_screen_type) as nscreen_screen_type,
+		                        MAX(BUY.book_flag) AS book_flag,
+		                        MAX(APT.LICENSING_WINDOW_END) as LICENSING_WINDOW_END,
+		                        ]]>
+		                        MAX(case when (TRUNC(TO_DATE((CASE WHEN NVL(BUY.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE BUY.EXPIRED_DATE END), 'YYYYMMDDHH24MISS') 
+		                        	- TO_DATE(BUY.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) <![CDATA[>=]]> 2000) then 'Y' else 'N' end) as expired_day
+		                        <![CDATA[
+		                FROM(
+		                            SELECT  
+		                                    '1' as BUY_GB,
+		                        			CASE WHEN SUBSTR(A.product_id, LENGTH(A.product_id) - 1) = '_D' THEN SUBSTR(A.product_id, 1, LENGTH(A.product_id) - 2) ELSE A.product_id END AS PRODUCT_ID, 
+		                         			A.product_name, 
+		                         			A.genre_name, 
+		                         			A.buy_date, 
+		                         			A.expired_date, 
+		                         			substr(A.appl_type,3,1) as appl_type,
+		                         			MAX(CASE WHEN SUBSTR(A.product_id, LENGTH(A.product_id) - 1) = '_D' THEN '' ELSE A.refund_yn END) AS REFUND_YN,  
+		                         			MAX(CASE WHEN SUBSTR(A.product_id, LENGTH(A.product_id) - 1) = '_D' THEN '' ELSE A.cp_use_yn END) AS BUY_TYPE, 
+		                         			MAX(CASE WHEN SUBSTR(A.product_id, LENGTH(A.product_id) - 1) = '_D' THEN 'Y' ELSE 'N' END) AS DATAFREE_BUY_YN, 
+		                         			MAX(CASE WHEN SUBSTR(A.product_id, LENGTH(A.product_id) - 1) = '_D' THEN A.cp_use_yn ELSE '' END) AS DATAFREE_BUY_TYPE,  
+		                         			MAX(CASE WHEN SUBSTR(A.product_id, LENGTH(A.product_id) - 1) = '_D' THEN '0' ELSE NVL(A.buy_amt,0) END) AS BUY_PRICE, 
+		                         			MAX(CASE WHEN SUBSTR(A.product_id, LENGTH(A.product_id) - 1) = '_D' THEN NVL(A.buy_amt,0) ELSE '0' END) AS DATAFREE_BUY_PRICE, 
+		                        			MAX(CASE WHEN SUBSTR(A.PRODUCT_ID, LENGTH(A.PRODUCT_ID) - 1) = '_D' THEN ' ' ELSE A.BALACE END) AS BALACE, 
+		                        			MAX(CASE WHEN SUBSTR(A.PRODUCT_ID, LENGTH(A.PRODUCT_ID) - 1) = '_D' THEN A.BALACE ELSE ' ' END) AS DATAFREE_BALACE, 
+		                         			MAX(CASE WHEN SUBSTR(A.PRODUCT_ID, LENGTH(A.PRODUCT_ID) - 1) = '_D' THEN '' ELSE A.ERROR_MSG END) AS REAL_BUYING_PRICE, 
+		                                   MAX(CASE WHEN SUBSTR(A.PRODUCT_ID, LENGTH(A.PRODUCT_ID) - 1) = '_D' THEN A.ERROR_MSG ELSE '' END) AS REAL_DATAFREE_BUYING_PRICE,                                    
+		                                   'N' as nscreen_screen_type,
+		                                   MAX(SUBSTR(NVL(A.error_msg, ''), 3, 1)) AS book_flag
+		                         	FROM 	PT_VO_BUY_NSC A 
+		                         	WHERE	A.sa_id = #{saId} AND A.mac_addr = #{stbMac} AND A.pkg_yn = 'N'  
+		                        			AND   (case when A.expired_date > to_char(sysdate, 'YYYYMMDDHH24MISS') then 'Y' else 'N' end)  in ('Y', #{expiredFlag}) 
+		                        			AND ((#{appFlag} = 'E' and substr(A.appl_type, 0, 1) = 'E') or (#{appFlag} != 'E' and substr(A.appl_type, 0, 1) != 'E'))	
+		                        			AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') = 'N' 
+									]]>
+		<if test="possessionYn.equals('Y'.toString())"> 
+						<![CDATA[	AND TRUNC(TO_DATE((CASE WHEN NVL(A.expired_date, '0') = '0' THEN '19900101000000' ELSE A.expired_date END), 'YYYYMMDDHH24MISS') - TO_DATE(A.buy_date, 'YYYYMMDDHH24MISS') , 0) >= 2000 ]]>
+		</if>
+		<if test="possessionYn.equals('N'.toString())"> 
+						<![CDATA[	AND TRUNC(TO_DATE((CASE WHEN NVL(A.expired_date, '0') = '0' THEN '19900101000000' ELSE A.expired_date END), 'YYYYMMDDHH24MISS') - TO_DATE(A.buy_date, 'YYYYMMDDHH24MISS') , 0) < 2000 
+									and A.buy_date > TO_CHAR(ADD_MONTHS(SYSDATE,  - 12), 'YYYYMMDDHH24MISS')]]> 
+		</if>
+		<if test="requestFlag.equals('M'.toString())"> 
+									AND A.ERROR_MSG like 'I%'
+		</if>
+		<if test="!requestFlag.equals('M'.toString())"> 
+									AND A.ERROR_MSG not like 'I%'
+		</if>
+									<![CDATA[
+		                        	GROUP BY BUY_DATE,  PRODUCT_ID, GENRE_NAME, PRODUCT_NAME, EXPIRED_DATE, appl_type 
+		                        	UNION
+		                        	SELECT /*+ LEADING(A DTL AST PKG) USE_NL(A DTL AST PKG) */ 
+		                                    case when MAX(A.PKG_YN) = 'N' then '2' else '3' end AS BUY_GB,
+		                                    AST.album_id AS PRODUCT_ID,
+		                                    A.product_name, 
+		                                    A.genre_name, 
+		                            		A.buy_date, 
+		                            		A.expired_date, 
+		                            		'' as appl_type,
+		                            		MAX(A.refund_yn) AS REFUND_YN,  
+		                            		MAX(A.cp_use_yn) AS BUY_TYPE, 
+		                                   	'N' AS DATAFREE_BUY_YN, 
+		                            		'' AS DATAFREE_BUY_TYPE,  
+		                            		MAX(NVL(A.buy_amt,0)) AS BUY_PRICE, 
+		                            		'0' AS DATAFREE_BUY_PRICE, 
+		                            		MAX(A.BALACE) AS BALACE, 
+		                            		'' AS DATAFREE_BALACE, 
+		                            		MAX(A.ERROR_MSG) AS REAL_BUYING_PRICE, 
+		                            		'' AS REAL_DATAFREE_BUYING_PRICE,
+		                            		'I' as nscreen_screen_type,
+		                            		MAX(SUBSTR(NVL(A.error_msg, ''), 3, 1)) AS book_flag
+		                              FROM PT_VO_BUY A, IMCSUSER.PT_LA_ASSET_INFO AST, IMCSUSER.PT_PD_PACKAGE_DETAIL DTL, IMCSUSER.PT_PD_PACKAGE PKG
+		                             WHERE A.sa_id = #{nSaId}
+		                               AND (case when A.expired_date > to_char(sysdate, 'YYYYMMDDHH24MISS') then 'Y' else 'N' end)  in ('Y', #{expiredFlag}) 
+                                       AND A.PKG_YN = 'Y'
+                                       AND DTL.product_id = A.product_id
+                                       AND AST.asset_id = DTL.contents_id
+                                       AND AST.screen_type = 'I'
+                                       AND substr(AST.album_id,1,1) != 'T'
+                                       AND DTL.product_id = PKG.product_id
+		                               ]]>
+		<if test="possessionYn.equals('Y'.toString())"> 
+						<![CDATA[	AND TRUNC(TO_DATE((CASE WHEN NVL(A.expired_date, '0') = '0' THEN '19900101000000' ELSE A.expired_date END), 'YYYYMMDDHH24MISS') - TO_DATE(A.buy_date, 'YYYYMMDDHH24MISS') , 0) >= 2000 ]]>
+		</if>
+		<if test="possessionYn.equals('N'.toString())"> 
+						<![CDATA[	AND TRUNC(TO_DATE((CASE WHEN NVL(A.expired_date, '0') = '0' THEN '19900101000000' ELSE A.expired_date END), 'YYYYMMDDHH24MISS') - TO_DATE(A.buy_date, 'YYYYMMDDHH24MISS') , 0) < 2000 
+									and A.buy_date > TO_CHAR(ADD_MONTHS(SYSDATE,  - 12), 'YYYYMMDDHH24MISS')]]> 
+		</if>
+			 			<![CDATA[ 
+		                               AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') = 'N' 
+		                            GROUP BY A.BUY_DATE,  A.PRODUCT_ID, GENRE_NAME, A.PRODUCT_NAME, A.EXPIRED_DATE, AST.album_id
+		                       UNION
+		                       		SELECT /*+ LEADING(A DTL AST PKG) USE_NL(A DTL AST PKG) */ 
+		                                    case when MAX(A.PKG_YN) = 'N' then '2' else '3' end AS BUY_GB,
+		                                    AST.album_id AS PRODUCT_ID,
+		                                    A.product_name, 
+		                                    A.genre_name, 
+		                            		A.buy_date, 
+		                            		A.expired_date, 
+		                            		'' as appl_type,
+		                            		MAX(A.refund_yn) AS REFUND_YN,  
+		                            		MAX(A.cp_use_yn) AS BUY_TYPE, 
+		                                   	'N' AS DATAFREE_BUY_YN, 
+		                            		'' AS DATAFREE_BUY_TYPE,  
+		                            		MAX(NVL(A.buy_amt,0)) AS BUY_PRICE, 
+		                            		'0' AS DATAFREE_BUY_PRICE, 
+		                            		MAX(A.BALACE) AS BALACE, 
+		                            		'' AS DATAFREE_BALACE, 
+		                            		MAX(A.ERROR_MSG) AS REAL_BUYING_PRICE, 
+		                            		'' AS REAL_DATAFREE_BUYING_PRICE,
+		                            		'I' as nscreen_screen_type,
+		                            		MAX(SUBSTR(NVL(A.error_msg, ''), 3, 1)) AS book_flag
+		                              FROM PT_VO_BUY A, IMCSUSER.PT_LA_ASSET_INFO AST, IMCSUSER.PT_PD_PACKAGE_DETAIL DTL, IMCSUSER.PT_PD_PACKAGE PKG
+		                             WHERE A.sa_id = #{nSaId}
+		                               AND (case when A.expired_date > to_char(sysdate, 'YYYYMMDDHH24MISS') then 'Y' else 'N' end)  in ('Y', #{expiredFlag}) 
+                                       AND A.PKG_YN = 'N'
+                                       AND DTL.contents_id like SUBSTR(A.product_id, 1, 17)||'%%'
+                                       AND AST.asset_id = DTL.contents_id
+                                       AND AST.screen_type = 'I'
+                                       AND substr(AST.album_id,1,1) != 'T'
+                                       AND DTL.product_id = PKG.product_id
+		                               ]]>
+		<if test="possessionYn.equals('Y'.toString())"> 
+						<![CDATA[	AND TRUNC(TO_DATE((CASE WHEN NVL(A.expired_date, '0') = '0' THEN '19900101000000' ELSE A.expired_date END), 'YYYYMMDDHH24MISS') - TO_DATE(A.buy_date, 'YYYYMMDDHH24MISS') , 0) >= 2000 ]]>
+		</if>
+		<if test="possessionYn.equals('N'.toString())"> 
+						<![CDATA[	AND TRUNC(TO_DATE((CASE WHEN NVL(A.expired_date, '0') = '0' THEN '19900101000000' ELSE A.expired_date END), 'YYYYMMDDHH24MISS') - TO_DATE(A.buy_date, 'YYYYMMDDHH24MISS') , 0) < 2000 
+									and A.buy_date > TO_CHAR(ADD_MONTHS(SYSDATE,  - 12), 'YYYYMMDDHH24MISS')]]> 
+		</if>
+			 			<![CDATA[ 
+		                               AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') = 'N' 
+		                            GROUP BY A.BUY_DATE,  A.PRODUCT_ID, GENRE_NAME, A.PRODUCT_NAME, A.EXPIRED_DATE, AST.album_id
+		                ) BUY, 
+		             				IMCSUSER.PT_LA_ALBUM_INFO INF, 
+		             				IMCSUSER.PT_LA_ALBUM_SUB SUB, 
+		             				IMCSUSER.PT_LA_ASSET_INFO AST, 
+		             				IMCSUSER.PT_LA_ALBUM_PLATFORM APT, 
+		             				IMCSUSER.PT_PD_PACKAGE_DETAIL DTL, 
+		             				IMCSUSER.PT_PD_PACKAGE PKG,
+		             				IMCSUSER.PT_LA_ALBUM_POSTER PST
+		             WHERE 	BUY.product_id = INF.album_id 
+		               AND 	BUY.product_id = SUB.album_id 
+		               AND 	BUY.product_id = AST.album_id AND AST.screen_type = 'N' 
+		               AND BUY.product_id = APT.album_id AND APT.screen_type = 'N' 
+		               AND		AST.asset_id = DTL.contents_id 
+		               AND		DTL.product_id = PKG.product_id AND PKG.product_type in ('0', '1') 
+		             	AND	BUY.product_id = PST.album_id
+	]]>	
+	            <choose>
+					<when test='requestFlag.equals("K")'>
+						AND	PST.poster_type = 'P'
+					</when>
+					<when test='requestFlag.equals("B")'>
+						AND	PST.poster_type = 'P'
+					</when>
+					<otherwise>
+						AND	PST.poster_type = 'T' 
+					</otherwise>
+				</choose>
+	<![CDATA[ 		             	  
+		             	AND	PST.screen_type = 'N' 
+		             	AND PST.service_yn = 'Y' 
+		               AND ( 
+		            		    (TRUNC(TO_DATE((CASE WHEN NVL(BUY.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE BUY.EXPIRED_DATE END), 'YYYYMMDDHH24MISS') 
+		                        	- TO_DATE(BUY.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) >= 2000) 
+		            			OR 
+		            		    (TRUNC(TO_DATE((CASE WHEN NVL(BUY.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE BUY.EXPIRED_DATE END), 'YYYYMMDDHH24MISS') 
+		                        	- TO_DATE(BUY.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) < 2000 AND BUY.buy_date > TO_CHAR(ADD_MONTHS(SYSDATE,  - 12), 'YYYYMMDDHH24MISS') ) 
+		               ) 
+		             GROUP BY BUY.product_id, BUY.genre_name, BUY.buy_date, BUY.expired_date 
+		            UNION ALL 
+		             SELECT /*+ LEADING(BUY INF SUB AST PST APT DTL PKG) USE_NL(BUY INF SUB AST PST APT DTL PKG) */ 
+		             			 	MAX(PKG.product_type) AS CONTS_TYPE, 
+		             				BUY.TEMP_PRODUCT_ID AS CONTS_ID, 
+		             				BUY.PRODUCT_ID AS CONTS_ID_2, 
+		             			 	MAX(PKG.product_name) AS CONTS_NAME, 
+		             			 	MIN(( 
+											SELECT  
+													min(case when V.nsc_gb = 'KID' then case when V.actors_display = 'B' then '1' else '2' end else '3' end) || '^' || 
+													min(case when BUY.GENRE_NAME = V.CATEGORY_ID then BUY.GENRE_NAME else 'XXXXX' end) || '^' || 
+													'XXXXX' || '^' || 
+													'XXXXX'
+											FROM PT_VO_CATEGORY V, 
+												PT_VO_CATEGORY_MAP M 
+											WHERE BUY.product_id = M.contents_id 
+											AND NVL(M.viewing_flag, 'V') != 'N' 
+											and M.category_id = V.category_id 
+											and V.category_gb = 'NSC' 
+											AND V.series_yn = 'Y'
+					]]>	
+											<if test="requestFlag.equals('K'.toString())"> 
+																AND NVL(V.nsc_gb, 'LTE') = 'KID'
+											</if>
+											<if test="requestFlag.equals('B'.toString())"> 
+																AND NVL(V.nsc_gb, 'LTE') = 'KID' AND NVL(V.actors_display, 'N') = 'B'
+											</if>
+					<![CDATA[ 							
+											)) AS category_id_tmp, 
+		             			 	MAX(INF.series_no) AS SERIES_DESC, 
+		             			 	BUY.buy_date AS BUY_DATE, 
+		             			 	CASE WHEN MAX(BUY.refund_yn) = 'P' then '' ELSE MAX(BUY.expired_date) END AS EXPIRED_DATE, 
+		             			 	MAX(SUB.rating_cd) AS PR_INFO, 
+		             			 	MAX(PST.content_value) AS POSTER_IMG_FILE, 
+		            				(SELECT /*+ no_unnest */ min(main_img_file_name) from IMCSUSER.PT_LA_ALBUM_IMG IMG where IMG.adi_album_id = BUY.product_id and IMG.img_flag = 'N') AS STILL_IMG_FILE, 
+		             			 	MAX(BUY.buy_type) AS BUY_TYPE, 
+		             			 	MAX(case when BUY.REFUND_YN = 'P' then 'Y' else 'N' end) AS present_yn, 
+		             			 	MAX(BUY.datafree_buy_yn) AS DATAFREE_BUY_YN,	 
+		             			 	MAX(BUY.datafree_buy_type) AS DATAFREE_BUY_TYPE, 
+		             			 	MAX(BUY.buy_price) AS BUY_PRICE, 
+		             			 	MAX(BUY.DATAFREE_BUY_PRICE) AS DATAFREE_BUY_PRICE, 
+		            				MAX(BUY.BALACE) AS BALACE, 
+		            			 	MAX(BUY.DATAFREE_BALACE) AS DATAFREE_BALACE, 
+		             			 	MAX(BUY.REAL_BUYING_PRICE) AS REAL_BUYING_PRICE, 
+		             			 	MAX(BUY.REAL_DATAFREE_BUYING_PRICE) AS REAL_DATAFREE_BUYING_PRICE, 
+		             			 	MAX(BUY.NSCREEN_YN) as NSCREE_YN,
+		            				MAX(NVL(SUB.genre_small, ' ')) GENRE_SMALL,
+		            				MAX(SUB.vr_type) VR_TYPE,
+		            				MAX(BUY.appl_type) APP_TYPE,
+		            				MAX(nscreen_screen_type) as nscreen_screen_type,
+		            				MAX(BUY.book_flag) AS book_flag,
+		            				MAX(APT.LICENSING_WINDOW_END) as LICENSING_WINDOW_END,
+		            				]]>
+		            				MAX(case when (TRUNC(TO_DATE((CASE WHEN NVL(BUY.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE BUY.EXPIRED_DATE END), 'YYYYMMDDHH24MISS') 
+		                        	- TO_DATE(BUY.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) <![CDATA[>=]]> 2000) then 'Y' else 'N' end) as expired_day
+		                        	<![CDATA[
+		             FROM 		(SELECT  
+		             						A.product_id AS TEMP_PRODUCT_ID, 
+		             						MAX(C.album_id) AS PRODUCT_ID, 
+		             			 			A.genre_name, 
+		             			 			A.buy_date, 
+		             			 			A.expired_date, 
+		             			 			substr(A.appl_type,3,1) as appl_type,
+		             			 			MAX(refund_yn) AS REFUND_YN,  
+		             			 			MAX(cp_use_yn) AS BUY_TYPE, 
+		             			 			'N' AS DATAFREE_BUY_YN, 
+		             			 			'' AS DATAFREE_BUY_TYPE,  
+		             			 			MAX(NVL(buy_amt,0)) AS BUY_PRICE, 
+		                                    '0' AS DATAFREE_BUY_PRICE, 
+		                                    MAX(BALACE) AS BALACE, 
+		            						'' AS DATAFREE_BALACE, 
+		             			 			MAX(ERROR_MSG) AS REAL_BUYING_PRICE, 
+		                                    '' AS REAL_DATAFREE_BUYING_PRICE,
+		            			 			'N;' AS NSCREEN_YN,
+		                                     'N' as nscreen_screen_type,
+		                                     MAX(SUBSTR(NVL(A.error_msg, ''), 3, 1)) AS book_flag
+		             			 	FROM    PT_VO_BUY_NSC A, imcsuser.PT_PD_PACKAGE_DETAIL B, IMCSUSER.PT_LA_ASSET_INFO C 
+                                    WHERE   A.sa_id = #{saId} AND A.mac_addr = #{stbMac} AND A.pkg_yn = 'Y'  
+                                        AND A.product_id = B.product_id 
+                                        AND B.contents_id = C.asset_id
+                                  		AND C.screen_type = 'N'
+		                                AND   (case when A.expired_date > to_char(sysdate, 'YYYYMMDDHH24MISS') then 'Y' else 'N' end)  in ('Y', #{expiredFlag}) 
+		            					AND ((#{appFlag} = 'E' and substr(A.appl_type, 0, 1) = 'E') or (#{appFlag} != 'E' and substr(A.appl_type, 0, 1) != 'E'))	
+		            					AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') = 'N' 
+		            					]]>
+		<if test="possessionYn.equals('Y'.toString())"> 
+						<![CDATA[	AND TRUNC(TO_DATE((CASE WHEN NVL(A.expired_date, '0') = '0' THEN '19900101000000' ELSE A.expired_date END), 'YYYYMMDDHH24MISS') - TO_DATE(A.buy_date, 'YYYYMMDDHH24MISS') , 0) >= 2000 ]]>
+		</if>
+		<if test="possessionYn.equals('N'.toString())"> 
+						<![CDATA[	AND TRUNC(TO_DATE((CASE WHEN NVL(A.expired_date, '0') = '0' THEN '19900101000000' ELSE A.expired_date END), 'YYYYMMDDHH24MISS') - TO_DATE(A.buy_date, 'YYYYMMDDHH24MISS') , 0) < 2000 
+									and A.buy_date > TO_CHAR(ADD_MONTHS(SYSDATE,  - 12), 'YYYYMMDDHH24MISS')]]> 
+		</if>		
+		<if test="requestFlag.equals('M'.toString())"> 
+									AND A.ERROR_MSG like 'I%'
+		</if>
+		<if test="!requestFlag.equals('M'.toString())"> 
+									AND A.ERROR_MSG not like 'I%'
+		</if>
+									<![CDATA[
+		            					GROUP BY A.product_id, A.genre_name, A.buy_date, A.expired_date, A.appl_type
+		             				) BUY, 
+		             				IMCSUSER.PT_LA_ALBUM_INFO INF, 
+		             				IMCSUSER.PT_LA_ALBUM_SUB SUB, 
+		             				IMCSUSER.PT_LA_ASSET_INFO AST, 
+		             				IMCSUSER.PT_PD_PACKAGE_DETAIL DTL, 
+		             				IMCSUSER.PT_PD_PACKAGE PKG, 
+		             				IMCSUSER.PT_LA_ALBUM_POSTER PST,
+		             				IMCSUSER.PT_LA_ALBUM_PLATFORM APT 
+		             WHERE 	BUY.product_id = INF.album_id 
+		               AND		BUY.product_id = SUB.album_id 
+		               AND 	BUY.product_id = AST.album_id AND AST.screen_type = 'N' 
+		               AND		AST.asset_id = DTL.contents_id 
+		               AND		DTL.product_id = PKG.product_id AND PKG.product_type = '2' 
+		               AND		BUY.product_id = PST.album_id
+	]]>
+	            <choose>
+					<when test='requestFlag.equals("K")'>
+						AND	PST.poster_type = 'P'
+					</when>
+					<when test='requestFlag.equals("B")'>
+						AND	PST.poster_type = 'P'
+					</when>
+					<otherwise>
+						AND	PST.poster_type = 'T' 
+					</otherwise>
+				</choose>
+	<![CDATA[ 		                 
+		               AND	PST.screen_type = 'N' 
+		               AND PST.service_yn = 'Y' 
+		               AND PST.album_id = APT.album_id
+		               AND PST.screen_type = APT.screen_type
+		               AND ( 
+		            		    (TRUNC(TO_DATE((CASE WHEN NVL(BUY.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE BUY.EXPIRED_DATE END), 'YYYYMMDDHH24MISS') 
+		                        	- TO_DATE(BUY.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) >= 2000) 
+		            			OR 
+		            		    (TRUNC(TO_DATE((CASE WHEN NVL(BUY.EXPIRED_DATE, '0') = '0' THEN '19900101000000' ELSE BUY.EXPIRED_DATE END), 'YYYYMMDDHH24MISS') 
+		                        	- TO_DATE(BUY.BUY_DATE, 'YYYYMMDDHH24MISS') , 0) < 2000 AND BUY.buy_date > TO_CHAR(ADD_MONTHS(SYSDATE,  - 12), 'YYYYMMDDHH24MISS') ) 
+		               ) 
+		             GROUP BY BUY.TEMP_PRODUCT_ID, BUY.product_id, BUY.genre_name, BUY.buy_date, BUY.expired_date 
+		) 
+					]]>
+					 <!-- WHERE genre_small not in ( 
+					                             select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) >= '20190313' then 'SBS' else 'X' end 
+					                               from dual 
+					                             union 
+					                             select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) >= '20190317' then 'KBS' else 'X' end 
+					                               from dual 
+					                             union 
+					                             select case when substr(to_char(sysdate, 'YYYYMMDD'), 1, 8) >= '20190321' then 'MBC' else 'X' end 
+					                               from dual 
+					                            ) 
+		                and ( nscreen_screen_type = 'N' or (nscreen_screen_type = 'I' and substr(NSCREEN_YN,1,1) = 'Y') ) -->
+		                where ( nscreen_screen_type = 'N' or (nscreen_screen_type = 'I' and substr(NSCREEN_YN,1,1) = 'Y' and NSCREEN_YN not like '%M') )
+      				<if test="requestFlag.equals('K'.toString())"> 
+									AND regexp_substr(category_id_tmp, '[^^]+', 1,1,'i') IN ('1', '2')
+				</if>
+				<if test="requestFlag.equals('B'.toString())"> 
+									AND regexp_substr(category_id_tmp, '[^^]+', 1,1,'i') = '1'
+				</if>
+					<![CDATA[
+					  ) A 
+					  WHERE A.ORD_NUM >= ((TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt})) - (TO_NUMBER(#{pageCnt}) - 1)) 
+					   AND A.ORD_NUM <= (TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt}))
+	]]>
+	</select>	
+	
+	
+	<!-- 편성 및 상품 타입 정보 조회 -->
+	<select id="getTypeInfo" resultMap="mTypeInfo" >
+		SELECT MAX(CATE_GB1) AS CAT_GB1, MAX(CATE_GB2) AS CAT_GB2, MIN(IPTV_PRODUCT_TYPE) AS IPTV_PROD_CHK, MIN(NSC_PRODUCT_TYPE) AS NSC_PROD_CHK, MIN(NVL(IPTV_TEST_SBC,'N')) AS IPTV_TEST_SBC, MIN(NVL(NSC_TEST_SBC,'N')) AS NSC_TEST_SBC 
+                 FROM 
+                 ( 
+                 SELECT MAX(DECODE(B.CATEGORY_GB, 'NSC' ,B.CATEGORY_GB)) CATE_GB1, 
+                        MAX(DECODE(B.CATEGORY_GB, 'I30' ,B.CATEGORY_GB)) CATE_GB2, 
+                        B.CATEGORY_GB, 
+                        MIN(case when ADI_ALBUM_ID = #{contsId} and B.CATEGORY_GB = 'I30' then E.PRODUCT_TYPE else '99' end) as IPTV_PRODUCT_TYPE, 
+                        MIN(case when NSC_ALBUM_ID = #{contsId} and B.CATEGORY_GB = 'NSC' then E.PRODUCT_TYPE else '99' end) as NSC_PRODUCT_TYPE, 
+                         MIN(case when ADI_ALBUM_ID = #{contsId} and B.CATEGORY_GB = 'I30' then B.TEST_SBC else 'Y' end) as IPTV_TEST_SBC, 
+                         MIN(case when NSC_ALBUM_ID = #{contsId} and B.CATEGORY_GB = 'NSC' then B.TEST_SBC else 'Y' end) as NSC_TEST_SBC 
+                   FROM PT_VO_CATEGORY_MAP A , 
+                        PT_VO_CATEGORY B, 
+                        IMCSUSER.PT_LA_PACKAGE_ASSET C, 
+                        IMCSUSER.PT_PD_PACKAGE_DETAIL D, 
+                        IMCSUSER.PT_PD_PACKAGE E 
+                  WHERE A.CATEGORY_ID = B.CATEGORY_ID 
+                    AND A.CONTENTS_ID = #{contsId}
+                     AND NVL(A.viewing_flag, 'V') != 'N' 
+                    AND ( (A.CONTENTS_ID = C.NSC_ALBUM_ID) or (A.CONTENTS_ID = C.ADI_ALBUM_ID AND C.ALBUM_TYPE IN ('HD','SH')) ) 
+                    AND C.ASSET_ID = D.CONTENTS_ID 
+                    AND D.PRODUCT_ID = E.PRODUCT_ID 
+                    GROUP BY B.CATEGORY_GB 
+                 )
+	</select>
+</mapper>
+	
+	
+	

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getFXFavorGenre.GetFXFavorGenreDao">
+	
+	<!-- 관심장르 정보 조회 -->
+	<select id="getFavorGenre" resultType="GetFXFavorGenreResponseVO" >
+		SELECT NVL(A.FAV_IDX, '') IDX,
+		       SUBSTR(A.CATEGORY_ID, 1, 1)||#{catId2nd}||SUBSTR(A.CATEGORY_ID, 3, 3) CAT_ID,
+		       NVL(B.CATEGORY_NAME, '') CAT_NAME,
+		       NVL(A.REG_UPDATE, '') REG_DATE
+		  FROM PT_VO_FAVORITE_GENRE A,
+		       PT_VO_CATEGORY B 
+		 WHERE A.CATEGORY_ID = B.CATEGORY_ID
+		   AND A.SA_ID = #{saId}
+		 ORDER BY TO_NUMBER(A.FAV_IDX)
+	</select>
+	
+</mapper>
+	
+	
+	

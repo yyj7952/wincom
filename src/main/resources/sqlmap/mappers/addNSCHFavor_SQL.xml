@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.addNSCHFavor.AddNSCHFavorDao">
+
+	<!-- 선호채널 중복 체크 -->
+	<select id="getCHFavorDupCk" parameterType="AddNSCHFavorRequestVO" resultType="Integer">
+		SELECT 1 
+		  FROM DUAL 
+		 WHERE EXISTS (
+		        SELECT 'X' 
+		          FROM PT_VO_FAVORITE_CH A 
+		         WHERE A.SA_ID = #{saId}
+		           AND A.MAC_ADDR= #{stbMac}
+		           AND SERVICE_ID = #{serviceId}
+		       )
+	</select>
+	
+	<!-- 선호채널 인덱스 조회 -->
+	<select id="getCHFavorIndex" parameterType="AddNSCHFavorRequestVO" resultType="String">
+		SELECT NVL(TO_CHAR(MAX(TO_NUMBER(TRIM(fav_idx))) + 1), '1') 
+		  FROM PT_VO_FAVORITE_CH A 
+		 WHERE A.SA_ID = #{saId}
+		  AND A.MAC_ADDR= #{stbMac}
+	</select>
+	
+	<!-- 선호채널 등록 -->
+	<insert id="insertCHFavor" parameterType="AddNSCHFavorRequestVO">
+		INSERT INTO PT_VO_FAVORITE_CH                     
+			(SA_ID, MAC_ADDR, SERVICE_ID, FAV_IDX, REG_UPDATE)
+		VALUES 
+			(#{saId}, #{stbMac}, #{serviceId}, #{favIdx}, TO_CHAR(SYSDATE, 'YYYYMMDD'))  
+	</insert> 
+</mapper> 

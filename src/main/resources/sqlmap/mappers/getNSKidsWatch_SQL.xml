@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSKidsWatch.GetNSKidsWatchDao">
+
+	<resultMap type="HashMap" id="myNowDate">
+		<result property="TODAY" column="TODAY" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="WEEK" column="WEEK" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="MONTH" column="MONTH" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="myType_A_W">
+		<result property="WATCH_MON" column="WATCH_MON" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="WATCH_DAY" column="WATCH_DAY" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="WATCH_WEEK" column="WATCH_WEEK" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="TODAY_READ_COUNT" column="TODAY_READ_COUNT" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="myBookMngInfo">
+		<result property="ALBUM_ID" column="ALBUM_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="ALBUM_NAME" column="ALBUM_NAME" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="READ_COUNT" column="READ_COUNT" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="READ_RATE" column="READ_RATE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="FREQ_YN" column="FREQ_YN" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="TOTAL_COUNT" column="TOTAL_COUNT" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="READ_SUM_TIME" column="READ_SUM_TIME" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="myVer3BookNmReadCnt">
+		<result property="ALBUM_NAME" column="ALBUM_NAME" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="READ_COUNT" column="READ_COUNT" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<!-- 현재일자 가져오기 -->
+	<select id="getNowDate" resultMap="myNowDate">
+		SELECT
+			TO_CHAR(sysdate, 'yyyymmdd') AS today
+			, TO_CHAR(sysdate - 7, 'yyyymmdd') AS week
+			, TO_CHAR(sysdate - 30, 'yyyymmdd') AS month
+		FROM dual
+	</select>
+	
+	<!-- TYPE 전체 또는 시청관리 가져오기 -->
+	<select id="getType_A_W" resultMap="myType_A_W" parameterType="GetNSKidsWatchRequestVO">
+	<![CDATA[
+		SELECT
+			NVL(ROUND(SUM(case when watch_date < #{today} then watch_runtime else 0 end) / 30 / 60, 0), 0) AS watch_mon
+			, NVL(ROUND(SUM(case when watch_date = #{today} then watch_runtime else 0 end) / 60, 0), 0) AS watch_day
+			, NVL(ROUND(SUM(case when watch_date < #{today} AND watch_date >= #{week} then watch_runtime else 0 end) / 7 / 60, 0), 0) AS watch_week
+			, NVL(SUM(today_read_count), 0) AS today_read_count
+		FROM (
+			SELECT /*+ INDEX(Z PK_NPT_VO_WATCH_TIME) */
+				SUBSTR(watch_date,1,8) AS watch_date
+				, watch_runtime
+				, CASE WHEN SUBSTR(watch_date,1,8) = #{today} AND watch_type IN ('K', 'P') AND end_flag = 'Y' THEN 1 ELSE 0 END AS today_read_count
+			FROM MCUSTUSER.NPT_VO_WATCH_TIME Z
+			WHERE sa_id = #{saId}
+			AND p_idx_sa = mod(substr(#{saId}, -2),33)
+			AND p_idx_mm IN (to_char(add_months(sysdate, -1), 'MM'), to_char(sysdate, 'MM'))
+			AND watch_date >= #{month}
+			AND watch_date <= to_char(sysdate + 1, 'yyyymmdd')
+		)
+	]]>
+	</select>
+	
+	<!-- 북카운트 구하기 -->
+	<select id="getBookCount" resultType="int">
+		SELECT
+			COUNT(DISTINCT B.contents_id)
+		FROM PT_VO_CATEGORY A,
+			PT_VO_CATEGORY_MAP B
+		WHERE A.category_id = B.category_id
+		AND A.category_gb = 'NSC'
+		AND A.actors_display = 'B'
+	</select>
+	
+	<!-- 독서관리 정보 가져오기 -->
+	<select id="listBookManageInfo" resultMap="myBookMngInfo" parameterType="GetNSKidsWatchRequestVO">
+	<![CDATA[
+		SELECT
+			album_id
+			, adi_album_name AS album_name
+			, read_count
+			, ROUND(sum(book_count) over (partition by sa_id) / #{bookCount}, 2) * 100 AS read_rate
+			, case when read_count = max(read_count) over (partition by sa_id) then 'Y' else 'N' end AS freq_yn
+			, sum(book_count) over (partition by sa_id) AS total_count
+			, watch_runtime as read_sum_time
+		FROM (
+			SELECT
+				sa_id
+				, album_id
+				, adi_album_name
+				, read_count, watch_date
+				, book_count
+				, sum(watch_runtime) over() as watch_runtime
+				, end_flag
+			FROM
+			(
+				SELECT /*+ INDEX(W PK_NPT_VO_WATCH_TIME) */
+					W.sa_id
+					, W.album_id
+					, A.adi_album_name
+					, COUNT(*) read_count
+					, MAX(watch_date) watch_date
+					, 1 book_count
+					, sum(watch_runtime) as watch_runtime
+					, end_flag
+				FROM MCUSTUSER.NPT_VO_WATCH_TIME W,
+					IMCSUSER.PT_LA_ALBUM_MST A
+				WHERE W.p_idx_sa = #{p_idx_sa}
+				AND W.p_idx_mm in (to_char(add_months(sysdate, -3),'MM'), to_char(add_months(sysdate, -2),'MM'), to_char(add_months(sysdate, -1),'MM'), to_char(sysdate,'MM'))
+				AND W.sa_id = #{saId}
+				AND W.album_id = A.adi_album_id (+)
+				AND W.watch_date >= TO_CHAR(sysdate - 90, 'yyyymmdd')
+				AND W.watch_date <= TO_CHAR(sysdate + 1, 'yyyymmdd')
+				AND W.watch_type = 'B'
+				GROUP BY W.sa_id, W.album_id, A.adi_album_name, W.end_flag
+			)
+		)
+		WHERE end_flag = 'Y'
+		ORDER BY watch_date DESC
+	]]>
+	</select>
+	
+	<!-- VERSION 3.0 에서 앨범명, 읽은 갯수 가져오기 -->
+	<select id="listVer3AlbumNmReadCnt" resultMap="myVer3BookNmReadCnt" parameterType="GetNSKidsWatchRequestVO">
+	<![CDATA[		
+		SELECT
+			A.adi_album_name AS album_name
+			, A.read_count
+		FROM (
+			SELECT /*+ INDEX(W PK_NPT_VO_WATCH_TIME) */
+				W.album_id
+				, A.adi_album_name
+				, COUNT(*) read_count
+			FROM MCUSTUSER.NPT_VO_WATCH_TIME W,
+				IMCSUSER.PT_LA_ALBUM_MST A
+			WHERE W.album_id = A.adi_album_id (+)
+			AND W.sa_id = #{saId}
+			AND W.p_idx_sa = #{p_idx_sa}
+			AND W.watch_date >= TO_CHAR(sysdate - 90, 'yyyymmdd')
+			AND W.watch_date <= TO_CHAR(sysdate + 1, 'yyyymmdd')
+			AND W.watch_type = 'B'
+			AND W.end_flag = 'Y'
+			GROUP BY W.album_id, A.adi_album_name
+			ORDER BY read_count desc
+		) A
+		WHERE ROWNUM < 7
+	]]>
+	</select>
+	
+	<!-- VERSION 3.0 에서 독서량 가져오기 -->
+	<select id="getVer3BookReadRate" resultType="String" parameterType="GetNSKidsWatchRequestVO">
+	SELECT
+		CASE WHEN today_rank IS NOT NULL THEN today_rank ELSE yesterday_rank END AS read_rate
+	FROM (
+		SELECT
+			p_idx_dd
+			, TO_CHAR(ROUND(rank_info / tot_cnt * 100, 0)) AS sa_percent
+			, CASE WHEN TO_CHAR(SYSDATE,'D') = p_idx_dd THEN TO_CHAR(ROUND(rank_info / tot_cnt * 100, 0)) ELSE '' END today_rank
+			, CASE WHEN TO_CHAR(SYSDATE,'D') = p_idx_dd THEN '' ELSE TO_CHAR(ROUND(rank_info / tot_cnt * 100, 0)) END yesterday_rank
+		FROM (
+			SELECT * FROM MCUSTUSER.npt_vo_kids_statistics WHERE p_idx_sa = mod(substr(#{saId},-2),33) and kids_flag = 'B'
+		) X
+		WHERE X.statistics_id = #{saId}
+		ORDER BY today_rank, case when p_idx_dd <![CDATA[ < ]]> to_char(sysdate,'D') then 0 else 1 end, p_idx_dd desc
+	) X
+	WHERE ROWNUM = 1
+	</select>
+	
+</mapper> 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

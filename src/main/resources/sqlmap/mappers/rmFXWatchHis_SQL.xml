@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.rmFXWatchHis.RmFXWatchHisDao">
+
+	<update id="rmFXWatchHisUpdate" parameterType="RmFXWatchHisRequestVO" >
+		UPDATE PT_VO_WATCH_HISTORY_NSC A
+		   SET DEL_YN = 'Y'
+		 WHERE A.SA_ID         = #{saId}
+		   AND ( A.CONTENTS_ID = #{contsListId} OR A.CONTENTS_ID IN (
+		    SELECT ASSET_ID 
+		      FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+		     WHERE ADI_ALBUM_ID = #{contsListId} ) 
+		   )
+		   AND (A.DEL_YN = 'N' OR A.DEL_YN IS NULL OR A.DEL_YN = '')
+		   AND P_IDX_SA = MOD(#{pIdxSa}, 33)
+	</update>
+</mapper> 

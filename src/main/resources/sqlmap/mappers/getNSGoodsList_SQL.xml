@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSGoodsList.GetNSGoodsListDao">
+
+	<resultMap type="HashMap" id="myUserInfo">
+		<result property="test_sbc" column="TEST_SBC" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="view_flag" column="VIEW_FLAG" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<!-- 가입자 정보 가져오기 검수 여부 -->
+	<select id="getUserInfo" resultMap="myUserInfo" parameterType="GetNSGoodsListRequestVO">		
+		SELECT
+			DECODE(NVL(test_sbc, 'N'), 'Y', 'Y', 'N') AS test_sbc
+			, DECODE(NVL(test_sbc, 'N'), 'Y', 'T', 'V') AS view_flag
+		FROM PT_VO_CUSTOM_ID
+		WHERE sa_id = #{saId}
+		AND mac_addr = #{stbMac}
+	</select>
+	
+	<!-- 카테고리 ID를 받았을 경우 카테고리에 편성된 목록을 제공 (상품 + 앨범) -->
+	<select id="listReqTypeCategory" resultType="GoodsListReqTypeCat_VO" parameterType="GetNSGoodsListRequestVO">		
+		SELECT
+			DECODE(G.goods_type, 'P', 'RQS', 'EXP') AS result_type
+			, G.goods_id AS conts_id
+			, G.goods_nm AS conts_nm
+			, '' AS runtime
+			, '' AS event_info
+			, '' AS pr_info
+			, '' AS kids_grade
+			, '' AS service_icon
+			, '' AS onair_date
+			, '' AS release_date
+			, '' AS country
+			, '' AS director
+			, '' AS producer
+			, '' AS starring_actor
+			, '' AS actor
+			, '' AS voice_actor
+			, '' AS is_caption
+			, '' AS smi_language
+			, '' AS is_51_ch
+			, G.goods_info AS conts_info
+			, G.ref_url
+			, REPLACE(REPLACE(TRIM(NVL(G.goods_desc, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n') AS synopsis
+			, REPLACE(REPLACE(TRIM(NVL(G.goods_desc2, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n') AS synopsis2
+			, REPLACE(REPLACE(TRIM(NVL(G.goods_desc3, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n') AS synopsis3
+			, case when G.album_id is null OR Trim(G.album_id) = '' then 'N' else 'Y' end AS rela_album_yn
+			, M.rank_no
+		FROM PT_VO_CATEGORY R,
+			PT_VO_CATEGORY_MAP M,
+			IMCSUSER.PT_KD_GOODS_MST G
+		WHERE R.category_id = M.category_id
+		AND M.contents_id = G.goods_id
+		AND R.category_id = #{requestId}
+		AND NVL(R.nsc_gb, 'N') = 'KID'
+		AND NVL(R.test_sbc, 'N') IN ('N', #{testSbc})
+		AND NVL(M.viewing_flag, 'V') IN ('V', #{viewFlag})
+		AND NVL(G.viewing_flag, 'V') IN ('V', #{viewFlag})
+		UNION ALL
+		SELECT /*+LEADING(R) USE_NL(M L T I P C D G) */
+			'ALB' AS result_type
+			, M.contents_id AS conts_id
+			, L.album_name AS conts_nm
+			, SUBSTR(T.run_time, 1, 6) AS runtime
+			, P.event_info
+			, NVL(T.rating_cd, '') AS pr_info
+			, T.kids_grade
+			, P.service_icon
+			, L.onair_date
+			, L.release_date
+			, (SELECT CD.name FROM IMCSUSER.PT_CD_IMCS_CD CD WHERE CD.gid = 'COUNTRY' AND CD.code = T.country_of_origin_cd) AS country
+			, NVL(T.director_display, '') AS director
+			, NVL(T.producer, '') AS producer
+			, NVL(T.starring_actor, '') AS starring_actor
+			, NVL(T.actors_display, '') AS actor
+			, NVL(T.voice_actor, '') AS voice_actor
+			, NVL(P.smi_yn, 'N') AS is_caption
+			, I.smi_language
+			, MAX(case when SUBSTR(NVL(UPPER(C.audio_type), 'N'), 9) = 'DOLBY 5.1' then 'Y' else 'N' end) AS is_51_ch
+			, '' AS conts_info
+			, '' AS ref_url
+			, SUBSTRB(REPLACE(REPLACE(TRIM(NVL(P.summary_long, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n'), 1, 1024) AS synopsis
+			, '' AS synopsis2
+			, '' AS synopsis3
+			, '' AS rela_album_yn
+			, M.rank_no
+		FROM PT_VO_CATEGORY R,
+			PT_VO_CATEGORY_MAP M,
+			IMCSUSER.PT_LA_ALBUM_INFO L,
+			IMCSUSER.PT_LA_ALBUM_SUB T,
+			IMCSUSER.PT_LA_ALBUM_PLATFORM P,
+			IMCSUSER.PT_LA_ALBUM_SMI I,
+			IMCSUSER.PT_LA_ASSET_INFO C,
+			IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+			IMCSUSER.PT_PD_PACKAGE G
+		WHERE 1 = 1
+		AND R.category_id = M.category_id
+		AND R.category_gb = 'NSC'
+		AND M.contents_id = L.album_id
+		AND L.album_id = T.album_id
+		AND L.album_id = P.album_id
+		AND L.album_id = I.album_id
+		AND L.album_id = C.album_id
+		AND P.screen_type = 'N'
+		AND P.screen_type = C.screen_type
+		AND P.screen_type = I.screen_type
+		AND C.asset_id = D.contents_id
+		AND D.product_id = G.product_id
+		AND NVL(L.high_quality_type, 'N') != 'H'
+		AND R.category_id = #{requestId}
+		AND NVL(R.test_sbc, 'N') IN ('N', #{testSbc})
+		AND NVL(M.viewing_flag, 'V') IN ('V', #{viewFlag})
+		GROUP BY M.contents_id, L.album_name, T.run_time, P.event_info, T.rating_cd, T.kids_grade, P.service_icon,
+				L.onair_date,L.release_date, T.country_of_origin_cd, T.director_display, T.producer, T.starring_actor,
+				T.actors_display, T.voice_actor, P.smi_yn, I.smi_language, P.summary_long, M.rank_no
+		ORDER BY rank_no
+	</select>
+	
+	<!-- 요청 상품 정보 가져오기 -->
+	<select id="listReqTypeGoodsId" resultType="GoodsListReqTypeCat_VO" parameterType="GetNSGoodsListRequestVO">		
+		SELECT
+			DECODE(G.goods_type, 'P', 'RQS', 'EXP') AS result_type
+			, G.goods_id AS conts_id
+			, G.goods_nm AS conts_nm
+			, '' AS runtime
+			, '' AS event_info
+			, '' AS pr_info
+			, '' AS kids_grade
+			, '' AS service_icon
+			, '' AS onair_date
+			, '' AS release_date
+			, '' AS country
+			, '' AS director
+			, '' AS producer
+			, '' AS starring_actor
+			, '' AS actor
+			, '' AS voice_actor
+			, '' AS is_caption
+			, '' AS smi_language
+			, '' AS is_51_ch
+			, G.goods_info AS conts_info
+			, G.ref_url
+			, REPLACE(REPLACE(TRIM(NVL(G.goods_desc, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n') AS synopsis
+			, REPLACE(REPLACE(TRIM(NVL(G.goods_desc2, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n') AS synopsis2
+			, REPLACE(REPLACE(TRIM(NVL(G.goods_desc3, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n') AS synopsis3
+			, case when G.album_id is null OR Trim(G.album_id) = '' then 'N' else 'Y' end AS rela_album_yn
+			, 1 AS rank_no
+		FROM IMCSUSER.PT_KD_GOODS_MST G
+		WHERE G.goods_id = #{requestId}
+		AND NVL(G.viewing_flag, 'V') IN ('V', #{viewFlag})
+	</select>
+	
+	<!-- 체험상품 편성된 상품의 연관 앨범 가져오기 (목록) -->
+	<select id="listRelaAlbums" resultType="GoodsListReqTypeCat_VO" parameterType="GetNSGoodsListRequestVO">		
+		SELECT
+			G.goods_id AS conts_id
+			, G.album_id AS rela_album_id
+			, A.album_name AS rela_album_nm
+			, SUBSTR(T.run_time, 1, 6) AS runtime
+		FROM PT_VO_CATEGORY R,
+			PT_VO_CATEGORY_MAP M,
+			IMCSUSER.PT_KD_GOODS_MST G,
+			IMCSUSER.PT_LA_ALBUM_INFO A,
+			IMCSUSER.PT_LA_ALBUM_SUB T
+		WHERE R.category_id = M.category_id
+		AND M.contents_id = G.goods_id
+		AND G.album_id = A.album_id
+		AND A.album_id = T.album_id
+		AND NVL(R.nsc_gb, 'N') = 'KID'
+		AND R.category_id = #{requestId}
+		AND NVL(R.test_sbc, 'N') IN ('N', #{testSbc})
+		AND NVL(M.viewing_flag, 'V') IN ('V', #{viewFlag})
+		AND NVL(G.viewing_flag, 'V') IN ('V', #{viewFlag})
+	</select>
+	
+	<!-- 체험상품 편성된 상품의 이미지 가져오기 (목록) -->
+	<select id="listImagesRequestType_0" resultType="GoodsListReqTypeCat_VO" parameterType="GetNSGoodsListRequestVO">		
+		SELECT
+			G.goods_id AS conts_id
+			, K.image_type
+			, K.image_file_name
+			, M.rank_no
+			, K.image_seq
+		FROM PT_VO_CATEGORY R,
+			PT_VO_CATEGORY_MAP M,
+			IMCSUSER.PT_KD_GOODS_MST G,
+			IMCSUSER.PT_KD_GOODS_IMAGE K
+		WHERE R.category_id = M.category_id
+		AND M.contents_id = G.goods_id
+		AND G.goods_id = K.goods_id
+		AND R.category_gb = 'NSC'
+		AND R.category_id = #{requestId}
+		AND NVL(R.nsc_gb, 'N') = 'KID'
+		AND NVL(R.test_sbc, 'N') IN ('N', #{testSbc})
+		AND NVL(M.viewing_flag, 'V') IN ('V', #{viewFlag})
+		AND NVL(G.viewing_flag, 'V') IN ('V', #{viewFlag})
+		UNION ALL
+		SELECT
+			M.contents_id AS conts_id
+			, 'S' AS image_type
+			, MIN(K.main_img_file_name) AS image_file_name
+			, M.rank_no AS rank_no
+			, TO_NUMBER(K.adi_album_seq) AS image_seq
+		FROM PT_VO_CATEGORY R,
+			PT_VO_CATEGORY_MAP M,
+			IMCSUSER.PT_LA_ALBUM_IMG K
+		WHERE R.category_id = M.category_id
+		AND R.category_gb = 'NSC'
+		AND M.contents_id = K.adi_album_id
+		AND K.img_flag = 'N'
+		AND R.category_id = #{requestId}
+		AND NVL(R.test_sbc, 'N') IN ('N', #{testSbc})
+		AND NVL(M.viewing_flag, 'V') IN ('V', #{viewFlag})
+		GROUP BY M.contents_id, M.rank_no, K.adi_album_seq
+		ORDER BY rank_no, image_type, image_seq
+	</select>
+	
+	<!-- 단독 상품의 이미지 가져오기 (목록) -->
+	<select id="listImagesRequestType_1" resultType="GoodsListReqTypeCat_VO" parameterType="GetNSGoodsListRequestVO">
+		SELECT
+			G.goods_id AS conts_id
+			, K.image_type
+			, K.image_file_name
+		FROM IMCSUSER.PT_KD_GOODS_MST G,
+			IMCSUSER.PT_KD_GOODS_IMAGE K
+		WHERE G.goods_id = K.goods_id
+		AND G.goods_id = #{requestId}
+		AND NVL(G.viewing_flag, 'V') IN ('V', #{viewFlag})
+		ORDER BY image_type, image_seq
+	</select>
+	
+</mapper> 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

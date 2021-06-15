@@ -1,0 +1,372 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSVPSI.GetNSVPSIDao">
+	
+	<!-- 검수 STB 여부 조회 -->
+	<select id="getTestSbc" resultType="String" >
+		SELECT CASE WHEN TEST_SBC = 'Y' THEN TEST_SBC ELSE 'N' END TEST_SBC 
+		  FROM PT_VO_CUSTOM_ID 
+		 WHERE SA_ID = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	
+	<select id="selectPRGSCHEDULE" resultType="Integer">
+		SELECT count(*) as CNT
+		FROM IMCSUSER.PT_LP_PRGSCHEDULE_STD
+		WHERE ROWNUM = 1
+	</select>
+
+	
+	
+	<!-- Nscreen 가상채널 EPG전체 스케줄정보 조회 -->
+	<!-- EpgSdate, EpgEdate, TcIn, TcOut 모두 A인 케이스 -->
+	<select id="getNSVPSIList1" resultType="GetNSVPSIResponseVO" timeout="60">
+  SELECT * FROM (
+	   SELECT A.SERVICE_ID SERVICE_ID,
+		      A.PRO_CD PROGRAM_ID,
+		      A.EVENT_ID EVENT_ID,
+		      A.EVENT_NAME PROGRAM_TITLE,
+		      A.EVENT_DESC PROGRAM_SYNOPSIS,
+		      A.POSTER_IMG_NAME URL,
+		      DECODE(NVL(A.AUDIO_TYPE,''),'D','Y', 'S','N', 'M','N', '', 'N' ) DLB,
+		      DECODE(NVL(A.AUDIO_TYPE,''),'D','Y', 'S','Y', 'M','N', '', 'N' ) STE,
+		      DECODE(A.AV_RESOLUTION,'SD','N','HD','Y' ) RSL,
+		      DECODE(NVL(A.AUDIO_TYPE,''),'D','N', 'S','N', 'M','Y', '', 'N' ) MLG,
+		      A.DIRECTOR DIR,
+		      A.ACTOR ACT,
+		      A.PVR_YN PVR,
+		      B.SERIES_ID SID,
+		      B.FILTERING_CODE NSC,
+		      B.PRO_GENRE1 GENRE1,
+		      B.PRO_GENRE2 GENRE2,
+		      SUBSTR(A.START_TIME,1,4)||SUBSTR(A.START_TIME,6,2)||SUBSTR(A.START_TIME,9,2)||
+		      	SUBSTR(A.START_TIME,12,2)||SUBSTR(A.START_TIME,15,2)||SUBSTR(A.START_TIME,18,2) START_TIME,
+		      SUBSTR(A.END_TIME,1,4)||SUBSTR(A.END_TIME,6,2)||SUBSTR(A.END_TIME,9,2)||
+		      	SUBSTR(A.END_TIME,12,2)||SUBSTR(A.END_TIME,15,2)||SUBSTR(A.END_TIME,18,2) END_TIME,
+		      A.SERVICE_ID||'.jpg' IMG_FILE_NAME, C.IMAGE_YN IMAGE_YN, '' VIRTUAL_URL, '' VIRTUAL_ID,
+		      ROW_NUMBER() OVER(PARTITION BY A.SERVICE_ID ORDER BY A.SERVICE_ID, A.START_TIME) AS ORD_NUM
+		 FROM IMCSUSER.PT_LP_PRGSCHEDULE_STD A, IMCSUSER.PT_LE_AV_EPG B, IMCSUSER.PT_CD_PLAY_CHNL C
+		WHERE B.CHNL_CD = 'CH'||A.SERVICE_ID
+			  AND B.PRO_DATE = A.ONAIR_DATE
+			  AND B.PRO_CD = A.PRO_CD
+			  AND B.EVENT_ID = A.EVENT_ID
+			  AND A.SERVICE_ID = C.SERVICE_ID
+			  AND (NVL(C.YOUTH_YN, '2') = '2' OR NVL(C.YOUTH_YN, '2') = #{youthYnCom})
+			 <![CDATA[
+			  AND (B.PRO_DATE >=  TO_CHAR(SYSDATE-1 , 'YYYYMMDD' ) AND B.PRO_DATE <= TO_CHAR(SYSDATE + 5/24, 'YYYYMMDD' ))
+			  AND A.END_TIME >=  TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI:SS' )
+			  AND ((A.START_TIME <= TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI:SS' )) 
+			  	OR (A.START_TIME <= TO_CHAR(SYSDATE+5/24, 'YYYY-MM-DD HH24:MI:SS' )))
+			 ]]>
+			  AND C.FILTERING_CODE IN <if test='nscType == "PAD" and testSbc == "Y"'> ('8','9','10','11','12','13','14','15') </if>  
+			  						  <if test='nscType != "PAD" and testSbc == "Y"'> ('1','3','5','7','9','11','15') </if>
+			  						  <if test='nscType == "LTE" and testSbc == "N"'> ('8','9','10','11','12','13','14','15') </if>
+			  						  <if test='nscType != "LTE" and testSbc == "N"'> ('1','3','5','7','9','11','15') </if>
+			<if test='testSbc == "N"'>
+			  AND C.SORT_NO <![CDATA[<>]]> '999' 
+			</if>
+			<if test='serviceId != "A"'>
+			  AND A.SERVICE_ID = #{serviceId}
+			</if>
+			<if test='hdtvViewGb == "H"'>
+			  AND NVL(C.HDTV_VIEW_GB, '0') IN ('1', '2', '3', '4')
+			  AND SUBSTR(NVL(C.ARS_NO1, '0'), 1, 1) <![CDATA[<>]]> '1'
+			</if>
+			<if test='hdtvViewGb == "R"'>
+			  AND NVL(C.HDTV_VIEW_GB, '0') IN ('2', '4', '5', '6')
+			</if>
+			<if test='hdtvViewGb == "P"'>
+			  AND NVL(C.HDTV_VIEW_GB, '0') IN ('3', '4', '6', '7')
+			  AND SUBSTR(NVL(C.ARS_NO1, '00'), 1, 1) = '00'
+			</if>
+			<if test='hdtvViewGb == "G"'>
+			  AND SUBSTR(NVL(C.ARS_NO1, '0'), 1, 1) = '1'
+			</if>
+			  
+			<if test='pooqYn == "Y" or pooqYn == "N"'>
+				<if test='pooqYn == "N"'>
+		  			AND NVL(C.POOQ_YN , 'N') = 'Y'
+				</if>
+				UNION ALL
+				SELECT B.CHNL_CD AS SERVICE_ID, B.PRO_CD AS PROGRAM_ID, '' AS EVENT_ID, B.PRO_NAME AS PROGRAM_TITLE, B.REMARK AS PROGRAM_SYNOPSIS,
+				       '' AS URL, '' AS DLB, '' AS STE, '' AS RSL, '' AS MLG, '' AS DIR, '' AS ACT, '' AS PVR, B.SERIES_ID AS SID,
+				       '0' AS NSC, B.PRO_GENRE1 AS GENRE1, B.PRO_GENRE2 AS GENRE2,
+				       B.PRO_DATE||B.PRO_TIME AS START_TIME,
+				       B.PRO_DATE||B.PRO_ENDTIME AS END_TIME,
+				       C.SERVICE_ID||'.jpg' IMG_FILE_NAME, 'Y' IMAGE_YN, B.VIRTUAL_URL VIRTUAL_URL, B.VIRTUAL_ID AS VIRTUAL_ID,
+				       ROW_NUMBER() OVER(PARTITION BY C.SERVICE_ID ORDER BY C.SERVICE_ID, B.PRO_DATE||B.PRO_TIME) AS ORD_NUM 
+				  FROM IMCSUSER.PT_LE_AV_EPG_VIRTUAL B, IMCSUSER.PT_CD_VIRTUAL_CHNL C
+				 WHERE 
+			 		<if test='!(virtualChFlag == "0") or hdtvViewGb == "P" or hdtvViewGb == "G"'>  
+					   1 = 2 AND
+					</if>
+			 	C.VIRTUAL_TYPE != 'MSC' AND B.CHNL_CD = C.SERVICE_ID
+			 	<![CDATA[
+				  AND (B.PRO_DATE >=  TO_CHAR(SYSDATE-1 , 'YYYYMMDD' ) AND B.PRO_DATE <= TO_CHAR(SYSDATE + 5/24 , 'YYYYMMDD' ))
+				  AND B.PRO_DATE||B.PRO_ENDTIME >=  TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS' )
+				  AND ((B.PRO_DATE||B.PRO_TIME <= TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS' )) 
+				  OR  (B.PRO_DATE||B.PRO_TIME <= TO_CHAR(SYSDATE+5/24, 'YYYYMMDDHH24MISS' )))
+			 	]]>			 	
+					<if test='testSbc == "N"'>
+			 	 		AND C.SORT_NO  <![CDATA[<>]]> '999' 
+					</if>
+					<if test='serviceId != "A"'>
+				 		<if test='!(testSbc == "N" and nscType == "LTE" and pooqYn == "N")'>
+			  				AND C.SERVICE_ID = #{serviceId}
+			  			</if>
+			  		</if>  
+				</if>
+			
+				<if test='pooqYn == "P"'>
+			  AND NVL(C.POOQ_YN , 'N') = 'N'			  
+				</if>
+			ORDER BY SERVICE_ID, START_TIME
+		 ) WHERE ORD_NUM <![CDATA[<=]]> 2
+	</select>
+	
+	
+	
+	<!-- Nscreen 가상채널 EPG전체 스케줄정보 조회 -->
+	<!-- EpgSdate, EpgEdate가 A이고 TcIn, TcOut이 A이 아닌 케이스 -->
+	<select id="getNSVPSIList2" resultType="GetNSVPSIResponseVO" timeout="60">
+	   SELECT A.SERVICE_ID SERVICE_ID,
+		      A.PRO_CD PROGRAM_ID,
+		      A.EVENT_ID EVENT_ID,
+		      A.EVENT_NAME PROGRAM_TITLE,
+		      A.EVENT_DESC PROGRAM_SYNOPSIS,
+		      A.POSTER_IMG_NAME URL,
+		      DECODE(NVL(A.AUDIO_TYPE,''),'D','Y', 'S','N', 'M','N', '', 'N' ) DLB,
+		      DECODE(NVL(A.AUDIO_TYPE,''),'D','Y', 'S','Y', 'M','N', '', 'N' ) STE,
+		      DECODE(A.AV_RESOLUTION,'SD','N','HD','Y' ) RSL,
+		      DECODE(NVL(A.AUDIO_TYPE,''),'D','N', 'S','N', 'M','Y', '', 'N' ) MLG,
+		      A.DIRECTOR DIR,
+		      A.ACTOR ACT,
+		      A.PVR_YN PVR,
+		      B.SERIES_ID SID,
+		      B.FILTERING_CODE NSC,
+		      B.PRO_GENRE1 GENRE1,
+		      B.PRO_GENRE2 GENRE2,
+		      SUBSTR(A.START_TIME,1,4)||SUBSTR(A.START_TIME,6,2)||SUBSTR(A.START_TIME,9,2)||
+		      SUBSTR(A.START_TIME,12,2)||SUBSTR(A.START_TIME,15,2)||SUBSTR(A.START_TIME,18,2) START_TIME   ,
+		      SUBSTR(A.END_TIME,1,4)||SUBSTR(A.END_TIME,6,2)||SUBSTR(A.END_TIME,9,2)||
+		      SUBSTR(A.END_TIME,12,2)||SUBSTR(A.END_TIME,15,2)||SUBSTR(A.END_TIME,18,2) END_TIME,
+		      A.SERVICE_ID||'.jpg' IMG_FILE_NAME, C.IMAGE_YN IMAGE_YN, '' VIRTUAL_URL, '' VIRTUAL_ID
+		 FROM IMCSUSER.PT_LP_PRGSCHEDULE_STD A, IMCSUSER.PT_LE_AV_EPG B, IMCSUSER.PT_CD_PLAY_CHNL C
+		WHERE B.CHNL_CD = 'CH'||A.SERVICE_ID
+			  AND B.PRO_DATE = A.ONAIR_DATE
+			  AND B.PRO_CD = A.PRO_CD
+			  AND B.EVENT_ID = A.EVENT_ID
+			  AND A.SERVICE_ID = C.SERVICE_ID
+			  AND (NVL(C.YOUTH_YN, '2') = '2' OR NVL(C.YOUTH_YN, '2') = #{youthYnCom})
+			 <![CDATA[
+			  AND (B.PRO_DATE >= TO_CHAR(SYSDATE-1, 'YYYYMMDD' ) AND B.PRO_DATE <= TO_CHAR(SYSDATE + ${tcOut}${outGbn}, 'YYYYMMDD' ))
+			  AND A.END_TIME >= TO_CHAR(SYSDATE + ${tcIn}${inGbn}, 'YYYY-MM-DD HH24:MI:SS' )
+			  AND A.START_TIME <= TO_CHAR(SYSDATE + ${tcOut}${outGbn}, 'YYYY-MM-DD HH24:MI:SS' )
+			 ]]>
+			  AND C.FILTERING_CODE IN <if test='nscType == "PAD" and testSbc == "Y"'> ('8','9','10','11','12','13','14','15') </if>  
+			  						  <if test='nscType != "PAD" and testSbc == "Y"'> ('1','3','5','7','9','11','15') </if>
+			  						  <if test='nscType == "LTE" and testSbc == "N"'> ('8','9','10','11','12','13','14','15') </if>
+			  						  <if test='nscType != "LTE" and testSbc == "N"'> ('1','3','5','7','9','11','15') </if>
+			  <if test='testSbc == "N"'>
+			  	AND C.SORT_NO <![CDATA[<>]]> '999' 
+			  </if>
+			  <if test='serviceId != "A"'>
+			  	AND A.SERVICE_ID = #{serviceId}
+			  </if>
+			  <if test='hdtvViewGb == "H"'>
+			  	AND NVL(C.HDTV_VIEW_GB, '0') IN ('1', '2', '3', '4')
+			  	AND SUBSTR(NVL(C.ARS_NO1, '0'), 1, 1) <![CDATA[<>]]> '1'
+			  </if>
+			  <if test='hdtvViewGb == "R"'>
+			 	AND NVL(C.HDTV_VIEW_GB, '0') IN ('2', '4', '5', '6')
+			  </if>
+			  <if test='hdtvViewGb == "P"'>
+			  	AND NVL(C.HDTV_VIEW_GB, '0') IN ('3', '4', '6', '7')
+			  	AND SUBSTR(NVL(C.ARS_NO1, '0'), 1, 1) <![CDATA[<>]]> '1'
+			  </if>			
+			  <if test='hdtvViewGb == "G"'>
+			  	AND SUBSTR(NVL(C.ARS_NO1, '0'), 1, 1) = '1'
+			  </if>
+			    
+			  	<if test='pooqYn == "Y" or pooqYn == "N"'>
+					<if test='pooqYn == "N"'>
+			  AND NVL(C.POOQ_YN , 'N') = 'Y'
+					</if>
+			UNION ALL
+	 	   SELECT B.CHNL_CD AS SERVICE_ID, B.PRO_CD AS PROGRAM_ID, '' AS EVENT_ID, B.PRO_NAME AS PROGRAM_TITLE, B.REMARK AS PROGRAM_SYNOPSIS,
+			      '' AS URL, '' AS DLB, '' AS STE, '' AS RSL, '' AS MLG, '' AS DIR, '' AS ACT, '' AS PVR, B.SERIES_ID AS SID,
+			      '0' AS NSC, B.PRO_GENRE1 AS GENRE1, B.PRO_GENRE2 AS GENRE2,
+			      B.PRO_DATE||B.PRO_TIME AS START_TIME,
+			      B.PRO_DATE||B.PRO_ENDTIME AS END_TIME,
+			      C.SERVICE_ID||'.jpg' IMG_FILE_NAME, 'Y' IMAGE_YN, B.VIRTUAL_URL VIRTUAL_URL, B.VIRTUAL_ID AS VIRTUAL_ID
+			 FROM IMCSUSER.PT_LE_AV_EPG_VIRTUAL B, IMCSUSER.PT_CD_VIRTUAL_CHNL C
+			WHERE 
+				<if test='!(virtualChFlag == "0") or hdtvViewGb == "P" or hdtvViewGb == "G"'>  
+					   1 = 2 AND
+				</if>
+				C.VIRTUAL_TYPE != 'MSC' AND B.CHNL_CD = C.SERVICE_ID
+			 	<![CDATA[
+			  AND (B.PRO_DATE >= TO_CHAR(SYSDATE -1, 'YYYYMMDD' ) AND B.PRO_DATE <= TO_CHAR(SYSDATE + ${tcOut}${outGbn}, 'YYYYMMDD'))
+			  AND B.PRO_DATE||B.PRO_ENDTIME >= TO_CHAR(SYSDATE + ${tcIn}${inGbn}, 'YYYYMMDDHH24MISS')
+			  AND B.PRO_DATE||B.PRO_TIME <= TO_CHAR(SYSDATE + ${tcOut}${outGbn}, 'YYYYMMDDHH24MISS')
+			 	]]>
+			 	
+				<if test='testSbc == "N"'>
+		  			AND C.SORT_NO <![CDATA[<>]]> '999' 
+				</if>  
+				<if test='serviceId != "A"'>
+			 		<if test='!(testSbc == "N" and nscType == "LTE" and pooqYn == "N")'>
+		  				AND C.SERVICE_ID = #{serviceId}
+		  			</if>
+		  		</if>
+				
+		 	</if>
+		 	<if test='pooqYn == "P"'>
+		  		AND NVL(C.POOQ_YN, 'N') = 'N'
+		 	</if>
+			ORDER BY SERVICE_ID, START_TIME
+	</select>
+	
+	
+	<!-- Nscreen 가상채널 EPG전체 스케줄정보 조회 -->
+	<!-- EpgSdate, EpgEdate가 A가 아닌 케이스 -->
+	<select id="getNSVPSIList3" resultType="GetNSVPSIResponseVO" timeout="60">
+	   SELECT A.SERVICE_ID SERVICE_ID,
+		      A.PRO_CD PROGRAM_ID,
+		      A.EVENT_ID EVENT_ID,
+		      A.EVENT_NAME PROGRAM_TITLE,
+		      A.EVENT_DESC PROGRAM_SYNOPSIS,
+		      A.POSTER_IMG_NAME URL,
+		      DECODE(NVL(A.AUDIO_TYPE,''),'D','Y', 'S','N', 'M','N', '', 'N' ) DLB,
+		      DECODE(NVL(A.AUDIO_TYPE,''),'D','Y', 'S','Y', 'M','N', '', 'N' ) STE,
+		      DECODE(A.AV_RESOLUTION,'SD','N','HD','Y' ) RSL,
+		      DECODE(NVL(A.AUDIO_TYPE,''),'D','N', 'S','N', 'M','Y', '', 'N' ) MLG,
+		      A.DIRECTOR DIR,
+		      A.ACTOR ACT,
+		      A.PVR_YN PVR,
+		      B.SERIES_ID SID,
+		      B.FILTERING_CODE NSC,
+		      B.PRO_GENRE1 GENRE1,
+		      B.PRO_GENRE2 GENRE2,
+		      SUBSTR(A.START_TIME,1,4)||SUBSTR(A.START_TIME,6,2)||SUBSTR(A.START_TIME,9,2)||
+		      	SUBSTR(A.START_TIME,12,2)||SUBSTR(A.START_TIME,15,2)||SUBSTR(A.START_TIME,18,2) START_TIME,
+		      SUBSTR(A.END_TIME,1,4)||SUBSTR(A.END_TIME,6,2)||SUBSTR(A.END_TIME,9,2)||
+		      	SUBSTR(A.END_TIME,12,2)||SUBSTR(A.END_TIME,15,2)||SUBSTR(A.END_TIME,18,2) END_TIME,
+		      A.SERVICE_ID||'.jpg' IMG_FILE_NAME, C.IMAGE_YN IMAGE_YN, '' VIRTUAL_URL, '' VIRTUAL_ID
+	     FROM IMCSUSER.PT_LP_PRGSCHEDULE_STD A, IMCSUSER.PT_LE_AV_EPG B, IMCSUSER.PT_CD_PLAY_CHNL C
+		WHERE B.CHNL_CD = 'CH'||A.SERVICE_ID
+			  AND B.PRO_DATE = A.ONAIR_DATE
+			  AND B.PRO_CD = A.PRO_CD
+			  AND B.EVENT_ID = A.EVENT_ID
+			  AND A.SERVICE_ID = C.SERVICE_ID
+			  AND (NVL(C.YOUTH_YN, '2') = '2' OR NVL(C.YOUTH_YN, '2') = #{youthYnCom})
+			 <![CDATA[
+			  AND (B.PRO_DATE >= SUBSTR(#{epgSdate}, 1, 8) AND B.PRO_DATE <= SUBSTR(#{epgEdate}, 1, 8))
+			  AND (((A.END_TIME > TO_CHAR(TO_DATE('${epgSdate}0000', 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS'))
+			        AND (A.END_TIME <= TO_CHAR(TO_DATE('${epgEdate}5959', 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS')))
+			     OR ((A.START_TIME >= TO_CHAR(TO_DATE('${epgSdate}0000', 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS'))
+			     AND (A.START_TIME < TO_CHAR(TO_DATE('${epgEdate}5959', 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS'))))
+			 ]]>
+			  AND C.FILTERING_CODE IN <if test='nscType == "PAD" and testSbc == "Y"'> ('8','9','10','11','12','13','14','15') </if>  
+			  						  <if test='nscType != "PAD" and testSbc == "Y"'> ('1','3','5','7','9','11','15') </if>
+			  						  <if test='nscType == "LTE" and testSbc == "N"'> ('8','9','10','11','12','13','14','15') </if>
+			  						  <if test='nscType != "LTE" and testSbc == "N"'> ('1','3','5','7','9','11','15') </if>
+			  <if test='testSbc == "N"'>
+			  	AND C.SORT_NO <![CDATA[<>]]> '999' 
+			  </if>
+			  <if test='serviceId != "A"'>
+			  	AND A.SERVICE_ID = #{serviceId}
+			  </if>
+			  <if test='hdtvViewGb == "H"'>
+			  	AND NVL(C.HDTV_VIEW_GB, '0') IN ('1', '2', '3', '4')
+			  	AND SUBSTR(NVL(C.ARS_NO1, '0'), 1, 1) <![CDATA[<>]]> '1'
+			  </if>
+			  <if test='hdtvViewGb == "R"'>
+			  	AND NVL(C.HDTV_VIEW_GB, '0') IN ('2', '4', '5', '6')
+			  </if>
+			  <if test='hdtvViewGb == "P"'>
+			  	AND NVL(C.HDTV_VIEW_GB, '0') IN ('3', '4', '6', '7')
+			  	AND SUBSTR(NVL(C.ARS_NO1, '0'), 1, 1) <![CDATA[<>]]> '1'
+			  </if>
+			  <if test='hdtvViewGb == "G"'>
+			  	AND SUBSTR(NVL(C.ARS_NO1, '0'), 1, 1) = '1'
+			  </if>
+			  			  
+			  	<if test='pooqYn == "Y" or pooqYn == "N"'>
+					<if test='pooqYn == "N"'>
+			  AND NVL(C.POOQ_YN , 'N') = 'Y'
+					</if>			
+			UNION ALL			
+	 	   SELECT B.CHNL_CD AS SERVICE_ID, B.PRO_CD AS PROGRAM_ID, '' AS EVENT_ID, B.PRO_NAME AS PROGRAM_TITLE, B.REMARK AS PROGRAM_SYNOPSIS,
+			      '' AS URL, '' AS DLB, '' AS STE, '' AS RSL, '' AS MLG, '' AS DIR, '' AS ACT, '' AS PVR, B.SERIES_ID AS SID,
+			      '0' AS NSC, B.PRO_GENRE1 AS GENRE1, B.PRO_GENRE2 AS GENRE2,
+			      B.PRO_DATE||B.PRO_TIME AS START_TIME,
+			      B.PRO_DATE||B.PRO_ENDTIME AS END_TIME,
+			      C.SERVICE_ID||'.jpg' IMG_FILE_NAME, 'Y' IMAGE_YN, B.VIRTUAL_URL VIRTUAL_URL, B.VIRTUAL_ID AS VIRTUAL_ID
+			 FROM IMCSUSER.PT_LE_AV_EPG_VIRTUAL B, IMCSUSER.PT_CD_VIRTUAL_CHNL C
+			WHERE 
+				<if test='!(virtualChFlag == "0") or hdtvViewGb == "P" or hdtvViewGb == "G"'>  
+					   1 = 2 AND
+				</if>
+				B.CHNL_CD = C.SERVICE_ID
+			 		<![CDATA[
+			  AND (B.PRO_DATE >= substr(#{epgSdate}, 1, 8) AND B.PRO_DATE <= substr(#{epgEdate}, 1, 8))
+			  AND B.PRO_DATE||B.PRO_TIME >= '${epgSdate}0000'
+			  AND B.PRO_DATE||B.PRO_ENDTIME <=  '${epgEdate}5959'
+			 		]]>
+				 	<if test='testSbc == "N"'>
+			 	 		AND C.SORT_NO  <![CDATA[<>]]> '999' 
+					</if>
+					<if test='serviceId != "A"'>
+				 		<if test='!(testSbc == "N" and nscType == "LTE" and pooqYn == "N")'>
+			  				AND C.SERVICE_ID = #{serviceId}
+			  			</if>
+			  		</if>  
+				</if>				
+				
+				<if test='pooqYn == "P"'>
+			 AND NVL(C.POOQ_YN , 'N') = 'N'
+				</if>
+			ORDER BY SERVICE_ID, START_TIME
+	</select>
+
+
+	
+	<!-- 이미지 경로 조회 -->
+	<!-- SELECT 'http:'||REPLACE(NVL(A.MAIN_IMG_URL, ''), '\\', '/') IMG_URL, -->
+	<select id="getImgUrl" resultType="StillImageVO" >
+		SELECT 'http:'||REPLACE(REPLACE(NVL(A.MAIN_IMG_URL, ''), '\\', '//'), '\', '/') IMG_URL,
+		       A.MAIN_IMG_FILE_NAME IMG_FILE_NAME 
+		  FROM IMCSUSER.PT_LA_ALBUM_IMG A 
+		 WHERE A.ADI_ALBUM_ID = #{virtualId}
+		   AND A.IMG_FLAG = 'N'
+		 ORDER BY TO_NUMBER(ADI_ALBUM_SEQ)
+	</select>		
+	
+	<!-- 이미지 파일명 조회 -->
+	<select id="getImgFileName" resultType="String" >
+		SELECT A.CONTENT_VALUE IMG_FILE_NAME 
+		  FROM IMCSUSER.PT_LA_POSTER_ASSET A,
+		       IMCSUSER.PT_LA_PACKAGE_ASSET B 
+		 WHERE B.NSC_ALBUM_ID = #{virtualId}
+		   AND A.ADI_PRODUCT_ID = B.ADI_PRODUCT_ID
+		   AND A.POSTER_TYPE = 'W'
+		   AND ROWNUM = 1
+	</select>
+	
+	<!-- 연령제한 조회 -->
+	<select id="getPrInfo" resultType="GetNSVPSIResponseVO" >
+		SELECT NVL(A.RATING, '') PR_INFO,
+		       DECODE(TO_CHAR(TO_NUMBER(SUBSTR(A.DISPLAY_RUN_TIME, 1, 2)) * 60 + TO_NUMBER(SUBSTR(A.DISPLAY_RUN_TIME, 3, 2))), '0', '1', 
+		       TO_CHAR(TO_NUMBER(SUBSTR(A.DISPLAY_RUN_TIME, 1, 2)) * 60 + TO_NUMBER(SUBSTR(A.DISPLAY_RUN_TIME, 3, 2)))) RUNTIME
+		  FROM IMCSUSER.PT_LA_TITLE_ASSET A,
+		       IMCSUSER.PT_LA_PACKAGE_ASSET B 
+		 WHERE B.NSC_ALBUM_ID = #{virtualId}
+		   AND A.ADI_PRODUCT_ID = B.ADI_PRODUCT_ID
+		   AND ROWNUM = 1
+	</select>
+</mapper>
+	
+	
+	

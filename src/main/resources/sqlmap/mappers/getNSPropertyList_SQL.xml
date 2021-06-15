@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSPropertyList.GetNSPropertyListDao">
+	
+	<!-- 컨텐츠 상세정보 조회 -->
+	<select id="getNSPropertyListInfo" resultType="GetNSPropertyListResponseVO">
+		SELECT M.prop_grp_id AS PROP_GRP_ID, M.prop_grp_nm AS PROP_GRP_NM, M.prop_grp_type AS PROP_GRP_TYPE,
+		      M.logo_file_name1 AS LOGO_FILE_NAME1, M.logo_file_name2 AS LOGO_FILE_NAME2, M.tag_info AS TAG,
+		      substr(R.prop_id,1,9) AS PROP_ID, R.prop_nm AS PROP_NM, R.tag_info AS PROP_TAG, R.viewing_flag AS VIEWING_FLAG,
+		      DECODE(R.control_flag,'A','10','B','11','C','12','D','13','E','14','F','15','G','16','H','17','I','18','J','19','K','20','L','21', R.control_flag) AS CONTROL_FLAG,
+		      R.info1 AS INFO1
+		 FROM ( SELECT A.prop_grp_id, A.prop_grp_nm, A.prop_grp_type, A.tag_info,
+		               A.logo_file_name1, A.logo_file_name2, A.grp_order_no
+		          FROM MCONUSER.PT_CD_PROP_GROUP A
+		         WHERE NVL(A.use_yn, 'Y') = 'Y' ) M,
+		      	( 
+		      	SELECT B.prop_grp_id, B.prop_id,
+		               C.prop_nm, B.tag_info, B.order_no, B.viewing_flag, B.control_flag, C.info1
+		          FROM MCONUSER.PT_CD_PROP_MAP B,
+		               MCONUSER.PT_CD_PROP_MST C
+		         WHERE 
+		         <if test="!propGrpId.equals('N'.toString())"> 
+				  B.prop_grp_id = #{propGrpId} AND
+				</if>
+		          B.prop_id = C.prop_id 
+		         ) R
+		WHERE M.prop_grp_id = R.prop_grp_id (+)
+		<if test="!propGrpId.equals('N'.toString())"> 
+		  AND M.prop_grp_id = #{propGrpId}
+		</if>
+		ORDER BY M.prop_grp_type DESC, M.grp_order_no, R.order_no
+		 
+	</select>
+</mapper>

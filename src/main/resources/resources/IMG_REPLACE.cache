@@ -1,0 +1,26 @@
+IMG_NAS_CACHE REPLACE
+img_cuesheet_server|ASIS=http://123.141.15.150:88/image/cuesheet/|TOBE=http://123.141.15.150:88/image/cuesheet/|
+img_poster_cloud|ASIS=http://d3c5s6bottxrkq.cloudfront.net/poster/|TOBE=http://123.141.15.150:88/poster/|
+img_still_cloud|ASIS=http://d3c5s6bottxrkq.cloudfront.net/still/|TOBE=http://123.141.15.150:88/still/|
+img_create_server|ASIS=http://123.141.15.150:88/poster/|TOBE=http://resize_test/poster/|
+snap_server|ASIS=http://123.141.15.150:88/image/|TOBE=http://snap_test/image/|
+img_chnl_server|ASIS=http://123.141.15.150:88/image/|TOBE=http://chnl_test/image/|
+img_ppm_server|ASIS=http://123.141.15.150:88/image/|TOBE=http://ppm_test/image/|
+img_cat_server|ASIS=http://123.141.15.150:88/image/|TOBE=http://123.140.17.220/image/|
+img_still_server|ASIS=http://123.141.15.150:88/still/|TOBE=http://still_test/still/|
+img_server|ASIS=http://123.141.15.150:88/poster/|TOBE=http://123.141.15.150:88/poster/|
+live_cap_server|ASIS=http://123.141.15.150:88/image/|TOBE=http://123.141.15.150:88/image/|
+cap_server|ASIS=http://123.141.15.150:88/smi/|TOBE=http://cap_server/smi/|
+vod_zip_server|ASIS=http://123.141.15.150:88/poster/smartux/|TOBE=http://vod_zip_server/poster/smartux/|
+img_resize_server|ASIS=http://123.141.15.150:88/|TOBE=http://123.141.15.150:88/|
+img_cache_server|ASIS=http://123.141.15.150:88/poster/|TOBE=http:///poster/|
+img_resizei20_server|ASIS=http://123.141.15.150:88/poster/|TOBE=http://123.141.15.150:88/poster/|
+img_cachei20_server|ASIS=http://123.141.15.150:88/poster/|TOBE=http://123.141.15.150:88/poster/|
+img_cachemmi_server|ASIS=http://123.141.15.150:88/poster/|TOBE=http:///poster/|
+img_cachensc_server|ASIS=http://123.141.15.150:88/poster/|TOBE=http://123.141.15.150:88/poster/|
+img_main_1|ASIS=http://123.141.15.150:88/image/|TOBE=http:///image/|
+img_ctv_server|ASIS=http://123.141.15.150:88/image/ctv_ch/|TOBE=http:///image/ctv_ch/|
+img_ppmprod_server|ASIS=http://123.141.15.150:88/svcimg/ppm/|TOBE=http://123.141.15.150:88/svcimg/ppm/|
+aws_still_server|ASIS=http://123.141.15.150:88/still_cf/|TOBE=http://123.141.15.150:88/still_cf/|
+aws_poster_server|ASIS=http://123.141.15.150:88/poster_cf/|TOBE=http://123.141.15.150:88/poster_cf/|
+img_people_server|ASIS=http://123.141.15.150:88/smartux/musicshow/people_img/|TOBE=http://123.140.15.150:88/smartux/musicshow/people_img/|

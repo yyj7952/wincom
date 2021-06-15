@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.authorizeVView.AuthorizeVViewDao">
+	
+	<!-- PPV 여부 조회 -->
+	<select id="getPpvYn" resultType="Integer">
+		SELECT CASE WHEN MIN_PROD_TYPE = 1 AND MAX_PROD_TYPE = 1 THEN 1 ELSE 0 END PPV_YN
+		 FROM (
+		       SELECT MIN(B.PRODUCT_TYPE) MIN_PROD_TYPE, MAX(B.PRODUCT_TYPE) MAX_PROD_TYPE
+		         FROM IMCSUSER.PT_PD_PACKAGE_DETAIL A,
+		              IMCSUSER.PT_PD_PACKAGE B ,
+		              IMCSUSER.PT_LA_PACKAGE_ASSET C
+		        WHERE C.NSC_ALBUM_ID = #{albumId}
+		          AND B.PRODUCT_ID = A.PRODUCT_ID
+		          AND A.CONTENTS_ID = C.ASSET_ID
+		      )
+		WHERE ROWNUM = 1
+	</select>
+	
+	<!-- 워터마크 조회 -->
+	<select id="getWatermarkCk" resultType="String">
+		SELECT 'Y' CAT_WATERMARK 
+		  FROM DUAL 
+		 WHERE EXISTS (
+		        SELECT WATERMARK_YN 
+		          FROM PT_VO_CATEGORY 
+		         WHERE WATERMARK_YN = 'Y' START WITH CATEGORY_ID IN (
+		                SELECT CATEGORY_ID 
+		                  FROM PT_VO_CATEGORY_MAP 
+		                 WHERE CONTENTS_ID = #{albumId}
+		               ) CONNECT BY PRIOR PARENT_CATEGORY_ID = CATEGORY_ID
+		       )
+	</select>
+	
+	
+	<!-- 자막정보 조회 -->
+	<select id="getSmiInfo" resultType="AuthorizeVViewResponseVO">
+		SELECT DISTINCT 1 AS CAP_YN, MAX(E.SMI_FILE_NAME) CAP_FILE_NAME, E.SMI_FILE_SIZE AS CAP_FILE_SIZE, D.SMI_YN, D.SMI_YN SMI_IMP_YN, C.WATERMARK_YN,
+				MAX(E.SMI_FILE_NAME_ENC) CAP_FILE_NAME2, E.SMI_FILE_SIZE_ENC CAP_FILE_SIZE2, SMI_ENCRYPT_YN  CAP_FILE_ENCRYPT_YN,
+				DECODE(B.MUSIC_CONT_TYPE, 'C', 'Y', 'B', 'Y', 'D', 'Y', 'T', 'Y', 'N') AS MUSIC_YN, case when B.VR_TYPE is not null then 'Y' else 'N' end AS VR_YN
+		  FROM IMCSUSER.PT_LA_ALBUM_INFO A,
+		       IMCSUSER.PT_LA_ALBUM_SUB B,
+			   IMCSUSER.PT_LA_ASSET_INFO C,
+			   IMCSUSER.PT_LA_ALBUM_PLATFORM D,
+			   IMCSUSER.PT_LA_ALBUM_SMI E
+	     WHERE A.ALBUM_ID = #{albumId}
+		   AND A.ALBUM_ID = B.ALBUM_ID
+		   AND B.ALBUM_ID = C.ALBUM_ID
+		   AND C.ALBUM_ID = D.ALBUM_ID
+		   AND D.ALBUM_ID = E.ALBUM_ID
+		   AND C.SCREEN_TYPE = 'N'
+		   AND C.SCREEN_TYPE = D.SCREEN_TYPE
+		   AND D.SCREEN_TYPE = E.SCREEN_TYPE
+		   GROUP BY E.SMI_FILE_SIZE, D.SMI_YN, C.WATERMARK_YN,
+			        E.SMI_FILE_SIZE_ENC, E.SMI_ENCRYPT_YN, B.MUSIC_CONT_TYPE, B.VR_TYPE
+	</select>
+	
+	
+	<!-- 노드 정보 조회 -->
+	<select id="getNodeCd" resultType="String">
+		SELECT SUB_NODE_CD AS NODE_CD
+		 FROM IMCSUSER.PT_LV_RANGE_IP_INFO 
+		WHERE RANGE_IP_CD = #{baseCondi}
+		  AND NVL(USE_YN, 'Y') = 'Y'
+	</select>
+	
+	
+	
+	<!-- VOD 서버 조회 -->
+	<select id="getVodServer1" parameterType="AuthorizePlayIpVO" resultType="AuthorizePlayIpVO">		   
+		SELECT DISTINCT 'http://'||B.STB_PLAY_IP1||CASE WHEN #{nodeGroup} = 'Z' THEN '' ELSE ':' || B.SUB_NODE_PORT1 END || '/' AS SERVER_PLAY_IP1, 
+		       'http://'||B.STB_PLAY_IP2||CASE WHEN #{nodeGroup} = 'Z' THEN '' ELSE ':' || B.SUB_NODE_PORT1 END || '/' AS SERVER_PLAY_IP2, 
+		       'http://'||B.STB_PLAY_IP3||CASE WHEN #{nodeGroup} = 'Z' THEN '' ELSE ':' || B.SUB_NODE_PORT1 END || '/' AS SERVER_PLAY_IP3, 
+		       B.CDN_LOCAL_TYP AS SERVER_TYPE1 , B.CDN_NEAR_TYP AS SERVER_TYPE2 , B.CDN_CENTER_TYP AS SERVER_TYPE3, 
+		       NVL(B.IPV6_FLAG1,'I') AS SERVER_IPV6_NODE1, NVL(B.IPV6_FLAG2,'I') AS SERVER_IPV6_NODE2, NVL(B.IPV6_FLAG3, 'I') AS SERVER_IPV6_NODE3,
+		       B.IPV6_PLAY_IP1 AS SERVER_IPV6_PLAY_IP1, B.IPV6_PLAY_IP2 AS SERVER_IPV6_PLAY_IP2, B.IPV6_PLAY_IP3 AS SERVER_IPV6_PLAY_IP3, B.SUB_NODE_PORT1 AS SERVER_IPV6_PORT,
+		   	   B.CDN_LOCAL_TYP AS SERVER_IPV6_TYPE1, B.CDN_NEAR_TYP AS SERVER_IPV6_TYPE2, B.CDN_CENTER_TYP AS SERVER_IPV6_TYPE3 
+		  FROM IMCSUSER.PT_LV_NODE_INFO B,                                                        
+		       IMCSUSER.PT_LV_RANGE_IP_INFO C 
+		 WHERE C.SUB_NODE_CD  = #{nodeCd}                                                        
+		   AND B.SUB_NODE_CD  = C.SUB_NODE_CD
+	</select>
+	
+	<!-- VOD 서버 조회2 -->
+	<select id="getVodServer2" parameterType="AuthorizePlayIpVO" resultType="AuthorizePlayIpVO">		   
+		SELECT DISTINCT 'http://'||B.STB_PLAY_IP1||CASE WHEN #{nodeGroup} = 'Z' THEN '' ELSE ':' || B.SUB_NODE_PORT1 END || '/' AS SERVER_PLAY_IP1,
+		       'http://'||B.STB_PLAY_IP2||CASE WHEN #{nodeGroup} = 'Z' THEN '' ELSE ':' || B.SUB_NODE_PORT1 END || '/' AS SERVER_PLAY_IP2,
+		       'http://'||B.STB_PLAY_IP3||CASE WHEN #{nodeGroup} = 'Z' THEN '' ELSE ':' || B.SUB_NODE_PORT1 END || '/' AS SERVER_PLAY_IP3,
+		      B.CDN_LOCAL_TYP AS SERVER_TYPE1, B.CDN_NEAR_TYP AS SERVER_TYPE2, B.CDN_CENTER_TYP AS SERVER_TYPE3,
+		       NVL(B.IPV6_FLAG1,'I') AS SERVER_IPV6_NODE1, NVL(B.IPV6_FLAG2,'I') AS SERVER_IPV6_NODE2, NVL(B.IPV6_FLAG3, 'I') AS SERVER_IPV6_NODE3,
+		       B.IPV6_PLAY_IP1 AS SERVER_IPV6_PLAY_IP1, B.IPV6_PLAY_IP2 AS SERVER_IPV6_PLAY_IP2, B.IPV6_PLAY_IP3 AS SERVER_IPV6_PLAY_IP3, B.SUB_NODE_PORT1 AS SERVER_IPV6_PORT,
+		   	   B.CDN_LOCAL_TYP AS SERVER_IPV6_TYPE1, B.CDN_NEAR_TYP AS SERVER_IPV6_TYPE2, B.CDN_CENTER_TYP AS SERVER_IPV6_TYPE3
+		FROM  PT_VO_CUSTOM_ID A,
+		      IMCSUSER.PT_LV_NODE_INFO B,
+		      IMCSUSER.PT_LV_DONG_INFO C
+		WHERE A.SA_ID        = #{saId}
+		  AND A.MAC_ADDR     = #{stbMac}
+		  AND C.DONG_CD      = A.HJDONG_NO
+		  AND B.SUB_NODE_CD  = C.NSC_SUB_NODE_CD
+	</select>
+	
+	
+	<!-- VOD 서버 조회3 -->
+	<select id="getVodServer3" parameterType="AuthorizePlayIpVO" resultType="AuthorizePlayIpVO">
+		SELECT DISTINCT 'http://'||B.STB_PLAY_IP1||CASE WHEN #{nodeGroup} = 'Z' THEN '' ELSE ':' || B.SUB_NODE_PORT1 END || '/' AS SERVER_PLAY_IP1,
+				        'http://'||B.STB_PLAY_IP2||CASE WHEN #{nodeGroup} = 'Z' THEN '' ELSE ':' || B.SUB_NODE_PORT1 END || '/' AS SERVER_PLAY_IP2,
+				        'http://'||B.STB_PLAY_IP3||CASE WHEN #{nodeGroup} = 'Z' THEN '' ELSE ':' || B.SUB_NODE_PORT1 END || '/' AS SERVER_PLAY_IP3,
+				        B.CDN_LOCAL_TYP AS SERVER_TYPE1, B.CDN_NEAR_TYP AS SERVER_TYPE2, B.CDN_CENTER_TYP AS SERVER_TYPE3,
+				        NVL(B.IPV6_FLAG1,'I') AS SERVER_IPV6_NODE1, NVL(B.IPV6_FLAG2,'I') AS SERVER_IPV6_NODE3, NVL(B.IPV6_FLAG3, 'I') AS SERVER_IPV6_NODE3,
+				        B.IPV6_PLAY_IP1 AS SERVER_IPV6_PLAY_IP1, B.IPV6_PLAY_IP2 AS SERVER_IPV6_PLAY_IP2, B.IPV6_PLAY_IP3 AS SERVER_IPV6_PLAY_IP3, B.SUB_NODE_PORT1 AS SERVER_IPV6_PORT,
+		   	   			B.CDN_LOCAL_TYP AS SERVER_IPV6_TYPE1, B.CDN_NEAR_TYP AS SERVER_IPV6_TYPE2, B.CDN_CENTER_TYP AS SERVER_IPV6_TYPE3
+		   FROM IMCSUSER.PT_LV_NODE_INFO B,
+		       IMCSUSER.PT_LV_BASE_INFO C
+		 WHERE C.BASE_CD      = '1234567890'
+		   AND B.SUB_NODE_CD  = C.NSC_SUB_NODE_CD
+	</select>
+	
+	
+	<!-- VOD 서버 조회4 -->
+	<select id="getVodServer4" parameterType="AuthorizePlayIpVO" resultType="AuthorizePlayIpVO">
+		 SELECT DISTINCT 'http://'||B.STB_PLAY_IP1||CASE WHEN #{nodeGroup} = 'Z' THEN '' ELSE ':' || B.SUB_NODE_PORT1 END || '/' AS SERVER_PLAY_IP1,
+				         'http://'||B.STB_PLAY_IP2||CASE WHEN #{nodeGroup} = 'Z' THEN '' ELSE ':' || B.SUB_NODE_PORT1 END || '/' AS SERVER_PLAY_IP2,
+				         'http://'||B.STB_PLAY_IP3||CASE WHEN #{nodeGroup} = 'Z' THEN '' ELSE ':' || B.SUB_NODE_PORT1 END || '/' AS SERVER_PLAY_IP3,
+				         B.CDN_LOCAL_TYP AS SERVER_TYPE1, B.CDN_NEAR_TYP AS SERVER_TYPE2, B.CDN_CENTER_TYP AS SERVER_TYPE3,
+				         NVL(B.IPV6_FLAG1,'I') AS SERVER_IPV6_NODE1, NVL(B.IPV6_FLAG2,'I') AS SERVER_IPV6_NODE2, NVL(B.IPV6_FLAG3, 'I') AS SERVER_IPV6_NODE3,
+				         B.IPV6_PLAY_IP1 AS SERVER_IPV6_PLAY_IP1, B.IPV6_PLAY_IP2 AS SERVER_IPV6_PLAY_IP2, B.IPV6_PLAY_IP3 AS SERVER_IPV6_PLAY_IP3, B.SUB_NODE_PORT1 AS SERVER_IPV6_PORT,
+		   	   			 B.CDN_LOCAL_TYP AS SERVER_IPV6_TYPE1, B.CDN_NEAR_TYP AS SERVER_IPV6_TYPE2, B.CDN_CENTER_TYP AS SERVER_IPV6_TYPE3
+		  FROM IMCSUSER.PT_LV_DONG_INFO A ,
+		      IMCSUSER.PT_LV_NODE_INFO B
+		WHERE A.DONG_CD         = '1234567890'
+		  AND A.NSC_SUB_NODE_CD = B.SUB_NODE_CD
+	</select>
+	
+	
+	
+	<!-- 구간정보 이미지 조회 -->
+	<select id="getThumnailInfo" parameterType="AuthorizeVViewRequestVO" resultType="StillImageVO">
+	SELECT A.CONTENT_VALUE AS IMG_FILE_NAME, A.SECOND_VALUE AS TIME_INFO, A.POSTER_TYPE
+	  FROM IMCSUSER.PT_LA_ALBUM_POSTER A
+	 WHERE A.ALBUM_ID = #{albumId}
+	   AND A.SCREEN_TYPE = 'N'	   
+	   AND A.POSTER_TYPE IN ('Z', 'X')
+	   AND A.SERVICE_YN = 'Y'
+	   
+	</select>
+	
+	<!-- 노드 정보 조회 (와이파이) -->
+	<select id="getNodeCdLoadBalancing1" parameterType="AuthorizePlayIpVO" resultType="String">
+		SELECT SUB_NODE_CD AS NODE_CD
+		 FROM IMCSUSER.PT_LV_RANGE_IP_INFO 
+		WHERE RANGE_IP_CD LIKE #{tmpNodeGroup} || '%'
+		  AND LENGTH(RANGE_IP_CD) >= 2
+		  AND LENGTH(RANGE_IP_CD) <![CDATA[ <= ]]> 3
+		  AND NVL(USE_YN, 'Y') = 'Y'
+		ORDER BY RANGE_IP_CD
+	</select>
+	
+	<!-- 노드 정보 조회 (와이파이) -->
+	<select id="getNodeCdLoadBalancing2" parameterType="AuthorizePlayIpVO" resultType="String">
+		SELECT SUB_NODE_CD AS NODE_CD
+		 FROM IMCSUSER.PT_LV_RANGE_IP_INFO 
+		WHERE RANGE_IP_CD LIKE #{tmpNodeGroup} || '%'
+		  AND LENGTH(RANGE_IP_CD) >= 3
+		  AND LENGTH(RANGE_IP_CD)  <![CDATA[ <= ]]> 4
+		  AND NVL(USE_YN, 'Y') = 'Y'
+		ORDER BY RANGE_IP_CD
+	</select>
+	
+	
+	<select id="getVodProfile" parameterType="AuthorizeVViewRequestVO" resultType="M3u8ProfileVO">
+	SELECT /*+ INDEX(A PT_LA_M3U8_INFO_IDX01) */
+	       A.M3U8_TYPE, A.M3U8_FILE_1 AS CASTIS_M3U8, A.M3U8_FILE_2 AS ONNURI_M3U8, NVL(A.NODE_GROUP,'N') AS NODE_GROUP
+	  FROM IMCSUSER.PT_LA_M3U8_INFO A
+	 WHERE A.M3U8_ID = #{albumId}
+	   AND NVL(A.service_yn, 'Y') = 'Y'	
+	</select>
+	
+</mapper> 

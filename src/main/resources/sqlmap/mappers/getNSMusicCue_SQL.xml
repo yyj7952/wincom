@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSMusicCue.GetNSMusicCueDao">
+
+	<resultMap type="HashMap" id="mCatInfo">
+		<result property="CATE_LEVEL" column="CATE_LEVEL" javaType="String"/>
+		<result property="NSC_GB" column="NSC_GB" javaType="String"/>
+		<result property="CATE_NAME" column="CATE_NAME" javaType="String"/>
+	</resultMap>
+	
+	<!--  검수 STB여부 조회 -->
+	<select id="getTestSbc" parameterType="GetNSMusicCueRequestVO" resultType="String">
+        SELECT DECODE(NVL(A.test_sbc, 'N'), 'Y', 'Y', 'N') TEST_SBC
+          FROM PT_VO_CUSTOM_ID A
+         WHERE A.sa_id    = #{saId}
+           AND A.mac_addr = #{stbMac}
+	</select>
+	
+	<select id="getAlbumGb" parameterType="GetNSMusicCueRequestVO" resultType="String">
+	    SELECT case when NVL(music_cont_type, '') in ('T','D') then '1'
+	                when NVL(music_cont_type, '') in ('C','B') then '0'
+	                else 'X' end AS ALBUM_GB
+	      FROM IMCSUSER.PT_LA_ALBUM_SUB
+	     WHERE album_id = #{eventId}
+	</select>
+	
+	<select id="getCueSheetMst1" parameterType="GetNSMusicCueRequestVO" resultType="ComCueSheetMstVO">
+			SELECT /*+LEADING(A C) USE_NL(M R)*/ 
+                   DISTINCT C.cuesheet_id, '000' item_no, NVL(A.omniview_yn, 'N') omniview_yn, NVL(C.status, '0') status,                   
+                   NVL(C.vod_only_yn, 'N') vod_only_yn, NVL(C.angle_svc_flag, 'Y') angle_svc_flag, NVL(C.member_svc_flag, 'Y') member_svc_flag, C.service_id,       
+                   NVL((SELECT H.icon_file_name FROM IMCSUSER.PT_CD_PLAY_CHNL H WHERE H.service_id = C.channel_id), '') chnl_Img_File, 
+                   C.cuesheet_img_url image_folder, C.main_img_file_name main_img_file, C.omni_img_file_name omni_img_file, C.logo_img_file_name logo_img_file
+              FROM IMCSUSER.PT_LA_ALBUM_SUB A,    
+                   IMCSUSER.PT_LB_CUESHEET_MST C, 
+                   PT_VO_CATEGORY R,              
+                   PT_VO_CATEGORY_MAP M           
+             WHERE A.album_id = #{eventId}
+               AND A.album_id = C.album_id        
+               AND A.album_id = M.contents_id     
+               AND R.category_id = M.category_id  
+               AND C.confirm_yn = 'Y' 
+            AND R.category_gb = 'NSC'              
+	</select>
+	
+	<select id="getCueSheetMst2" parameterType="GetNSMusicCueRequestVO" resultType="ComCueSheetMstVO">
+            SELECT DISTINCT C.cuesheet_id, T.item_no, NVL(A.omniview_yn, 'N') omniview_yn, '2' status, 'N' vod_only_yn, 'Y' angle_svc_flag, 
+            'Y' member_svc_flag, C.service_id, NVL((SELECT H.icon_file_name FROM IMCSUSER.PT_CD_PLAY_CHNL H WHERE H.service_id = C.channel_id), '') chnl_Img_File,
+            C.cuesheet_img_url image_folder, C.main_img_file_name main_img_file, C.omni_img_file_name omni_img_file, C.logo_img_file_name logo_img_file
+              FROM IMCSUSER.PT_LA_ALBUM_SUB A,
+                   IMCSUSER.PT_LB_CUESHEET_ITEM T,
+                   IMCSUSER.PT_LB_CUESHEET_MST C,
+                   PT_VO_CATEGORY R,
+                   PT_VO_CATEGORY_MAP M
+             WHERE A.album_id = #{eventId}
+               AND A.album_id = T.album_id
+               AND A.album_id = M.contents_id
+               AND T.cuesheet_id = C.cuesheet_id
+               AND R.category_gb = 'NSC'
+               AND R.category_id = M.category_id
+	</select>
+	
+	<select id="getCueSheetItem1" parameterType="ComCueSheetMstVO" resultType="ComCueSheetItemVO">
+			SELECT A.item_no, A.time_tag, A.duration, A.item_type, Trim(A.album_id) album_id, A.album_name,
+			       A.actor_id, A.actor_name, A.actor_img_file_name actor_img_file, A.place_audio_yn,
+			       A.add_message, NVL(A.vr_album_type,'') vr_Type, A.vr_album_id, NVL(A.status,'0') status,
+			       TO_CHAR(NVL(A.vote_id, '')) vote_id, A.vote_flag, B.vote_status
+			  FROM IMCSUSER.PT_LB_CUESHEET_ITEM A,
+			       IMCSUSER.PT_LB_VOTE B
+			 WHERE A.cuesheet_id = #{cuesheetId}
+			   AND NVL(A.item_no, '000') <![CDATA[<>]]> #{itemNo}
+			   AND NVL(A.edit_flag, '0') = '1'
+			   AND A.vote_id = B.vote_id(+)
+			 ORDER BY A.sort_no, A.time_tag
+	</select>
+	
+	<select id="getCueSheetItem2" parameterType="ComCueSheetMstVO" resultType="ComCueSheetItemVO">
+			SELECT A.item_no, A.time_tag, A.duration, A.item_type, Trim(A.album_id) album_id, A.album_name,
+			       A.actor_id, A.actor_name, A.actor_img_file_name actor_img_file, A.place_audio_yn,
+			       A.add_message, NVL(A.vr_album_type,'') vr_Type, A.vr_album_id, NVL(A.status,'0') status,
+			       TO_CHAR(NVL(A.vote_id, '')) vote_id, A.vote_flag, B.vote_status
+			  FROM IMCSUSER.PT_LB_CUESHEET_ITEM A,
+			       IMCSUSER.PT_LB_VOTE B
+			 WHERE A.cuesheet_id = #{cuesheetId}
+			   AND A.item_no = #{itemNo}
+			   AND NVL(A.edit_flag, '0') = '1'
+			   AND A.vote_id = B.vote_id(+)
+			 ORDER BY A.sort_no, A.time_tag
+	</select>
+	
+	<select id="getItemInfo" parameterType="ComCueSheetItemVO" resultType="ComCueSheetItemVO">
+	    SELECT A.omniv_type, A.actor_id, A.actor_name, A.actor_img_file_name actor_img_file,
+               case when B.actor_id is not null then 'N' else NVL(A.viewing_flag, 'Y') end view_flag
+          FROM IMCSUSER.PT_LB_CUESHEET_ITEM_DETAIL A,
+               IMCSUSER.PT_CD_MEMBER_EXCEPT B
+         WHERE A.cuesheet_id = #{cuesheetId}
+           AND A.item_no = #{itemNo}
+           AND A.actor_id = B.actor_id (+)
+         ORDER BY A.cam_no
+	</select>
+	
+	<select id="getCueAddInfo" parameterType="GetNSMusicCueRequestVO" resultType="ComCueSheetItemVO">
+		SELECT P.pr_album_id, A.album_name,
+		       (SELECT I.main_img_file_name
+		          FROM IMCSUSER.PT_LA_ALBUM_IMG I
+		         WHERE I.adi_album_id = P.pr_album_id
+		           AND I.img_flag = 'N' AND rownum= 1 ) actor_img_file,
+		       TRIM(TO_CHAR(TO_NUMBER(SUBSTR(T.run_time, 1, 2)) * 60 + TO_NUMBER(SUBSTR(T.run_time, 3, 2)), '00') || SUBSTR(T.run_time, 5, 2)) duration
+		  FROM IMCSUSER.PT_LA_ALBUM_PR P,
+               IMCSUSER.PT_LA_ALBUM_INFO A,
+               IMCSUSER.PT_LA_ALBUM_SUB T
+         WHERE P.pr_album_id = A.album_id
+           AND P.pr_album_id = T.album_id
+           AND P.adi_album_id = #{eventId}
+           AND P.svc_type = 'NSC'
+           AND P.pr_type = 'A'
+	</select>
+
+	<select id="getCueOmniVInfo1" parameterType="ComCueSheetItemVO" resultType="ComCueSheetItemVO">
+		SELECT A.omniv_type, A.cam_no, Trim(A.album_id) album_id, C.service_id chnlId,
+             case when B.actor_id is not null then 'N' else NVL(A.viewing_flag, 'Y') end view_flag
+		  FROM IMCSUSER.PT_LB_CUESHEET_ITEM_DETAIL A,
+             IMCSUSER.PT_CD_MEMBER_EXCEPT B,
+		       IMCSUSER.PT_CD_PLAY_CHNL C
+		 WHERE A.cuesheet_id = #{cuesheetId}
+		   AND A.item_no = #{itemNo}
+		   AND A.actor_id = B.actor_id(+)
+		   AND A.cam_no = C.chnl_type(+)
+         ORDER BY A.cam_no
+	</select>
+
+	<select id="getCueOmniVInfo2" parameterType="ComCueSheetItemVO" resultType="ComCueSheetItemVO">
+		SELECT A.omniv_type, A.cam_no, Trim(A.album_id) album_id, C.service_id chnlId, NVL(A.viewing_flag, 'Y') view_flag
+		  FROM IMCSUSER.PT_LB_CUESHEET_ITEM_DETAIL A,
+		       IMCSUSER.PT_CD_PLAY_CHNL C
+		 WHERE A.cuesheet_id = #{cuesheetId}
+		   AND A.item_no = #{itemNo}
+		   AND A.cam_no = C.chnl_type(+)
+         ORDER BY A.cam_no
+	</select>
+
+	<select id="getM3U8Info" parameterType="GetNSMusicCueRequestVO" resultType="ComCueSheetItemVO">
+		SELECT B.m3u8_file_1 M3u8_Castis, B.m3u8_file_2 M3u8_Onnet
+		  FROM
+		       (SELECT com_cd, TO_NUMBER(min_value) order_no
+		          FROM IMCSUSER.PT_CD_COM_CD
+		         WHERE grp_id = 'NSCCOPF') A,
+		       (SELECT m3u8_id, m3u8_type, m3u8_file_1, m3u8_file_2
+		          FROM IMCSUSER.PT_LA_M3U8_INFO
+		         WHERE m3u8_id = #{albumId} ) B
+		 WHERE A.com_cd = B.m3u8_type (+)
+		 ORDER BY DECODE(A.order_no, 3, 0, A.order_no)
+	</select>	
+	
+	<select id="getNSMusicCueList" parameterType="GetNSMusicCueRequestVO" resultType="GetNSMusicCueResponseVO">
+		SELECT *
+		FROM(
+		     SELECT ROWNUM AS RNUM, Z.*
+	   		        FROM (SELECT A.STATUS AS SCHE_TYPE,
+	   		                     A.ALBUM_ID,
+	   		                     A.CUESHEET_ID AS QSHEET_ID,
+	   		                     A.CUESHEET_TITLE AS CONCERT_NAME,
+	   		                     (A.PERFORM_DATE || A.PERFORM_TIME) AS CONCERT_DATE,
+	   		                     A.PERFORM_PLACE AS PLACE,
+	   		                     NVL(B.OMNIVIEW_YN, 'N') AS OMNIVIEW_YN,
+	   		                     '' AS IMAGE_URL,
+	   		                     (SELECT MAIN_IMG_FILE_NAME FROM IMCSUSER.PT_LA_ALBUM_IMG WHERE ADI_ALBUM_ID = A.ALBUM_ID AND IMG_FLAG = 'M' AND ROWNUM = 1) AS IMAGE_FILE_NAME,
+	   		                     MAX(R.CATEGORY_ID) AS CATEGORY_ID,
+	   		                     SERVICE_ID AS SERVICE_ID
+	   		                FROM IMCSUSER.PT_LB_CUESHEET_MST A, PT_LA_ALBUM_SUB B,
+	   		                     PT_VO_CATEGORY R, PT_VO_CATEGORY_MAP M
+	   		               WHERE A.ALBUM_ID = B.ALBUM_ID
+	   		                 AND A.CUESHEET_TYPE = 'C'
+	   		                 AND A.VIEWING_FLAG = 'Y'
+	   		                 AND R.CATEGORY_ID = M.CATEGORY_ID
+	   		                 AND B.ALBUM_ID = M.CONTENTS_ID
+	   		                 AND R.CATEGORY_GB = 'NSC'
+				    		<if test="nRqsType.equals('2'.toString())">
+				    		 AND NVL(M.VIEWING_FLAG, 'V') IN ('V', #{viewFlag})
+				    		</if>  
+	    		           GROUP BY A.STATUS, A.ALBUM_ID, A.CUESHEET_ID, A.CUESHEET_TITLE, A.PERFORM_DATE, A.PERFORM_TIME, A.PERFORM_PLACE, NVL(B.OMNIVIEW_YN, 'N'), SERVICE_ID
+	    		           ORDER BY CONCERT_DATE DESC
+	    		         ) Z
+		      WHERE SCHE_TYPE = #{nRqsType}
+		    )
+		<if test="!pageCnt.equals('0'.toString())">
+		WHERE  RNUM <![CDATA[>=]]> #{startNum}
+          AND  RNUM <![CDATA[<=]]> #{endNum}
+        </if>
+	</select>
+		
+</mapper> 

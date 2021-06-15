@@ -1,0 +1,748 @@
+﻿Sub word()
+Dim cell As Range, word As String, startIndex As Integer, i As Integer
+    
+    word = "개통된 가입자"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "패키지 상품"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+        
+    word = "맞으며"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 176, 80)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+        
+    word = "아니며"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(255, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "앨범 아이디"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+    
+    word = "MTD16BF004PPV00"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "MTD16BF005PPV00"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "MTD16BF006PPV00"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "MTD16BF001PPV00"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "MTD16BF002PPV00"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "MTD16BF003PPV00"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "MTD16BE008PPV00"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "MTD16BE009PPV00"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "MTD16BE010PPV00"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "MTD16BF008PPV00"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "MTD16BF009PPV00"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "MTD16BF010PPV00"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+    word = "MTD16BF011PPV00"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "MTD16BF012PPV00"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "MTD16BF013PPV00"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "MTD16BE011PPV00"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "MTD16BE012PPV00"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "MTD16BE013PPV00"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "MTD16BE014PPV00"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "MTD16BF007PPV00"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "앨범명"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "SHOWBOX"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "SONY"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "할인용"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "일반구매 "
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(255, 192, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "인앱구매 "
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(146, 208, 80)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+   
+    word = "예약구매 "
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(112, 48, 160)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "일반구매이며"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word) - 2).Font.Color = RGB(255, 192, 0)
+                cell.Characters(startIndex, Len(word) - 2).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "인앱구매이며"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word) - 2).Font.Color = RGB(146, 208, 80)
+                cell.Characters(startIndex, Len(word) - 2).Font.Bold = True
+            End If
+        Next cell
+    End If
+   
+    word = "예약구매이며"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word) - 2).Font.Color = RGB(112, 48, 160)
+                cell.Characters(startIndex, Len(word) - 2).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "일반구매인"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word) - 1).Font.Color = RGB(255, 192, 0)
+                cell.Characters(startIndex, Len(word) - 1).Font.Bold = True
+            End If
+        Next cell
+    End If
+   
+    word = "예약구매인"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word) - 1).Font.Color = RGB(112, 48, 160)
+                cell.Characters(startIndex, Len(word) - 1).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = " PPV"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "PPS"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "FOD"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+    word = "카테고리 아이디"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "TD00K"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(51, 102, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "TD00L"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(102, 102, 153)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+    
+    word = "TD00J"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(204, 102, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "구매타입"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "할인용"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    
+    
+    word = "구매금액"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "2000"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(51, 102, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = " 0"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(102, 102, 153)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+    
+    word = "1000"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(204, 102, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "950"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 176, 80)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+        
+    word = "2.19"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(255, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "구매타입"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+
+    word = "페이먼트 아이디"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "TDD00001"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 112, 192)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+
+    word = "구매 상세 구분"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+            startIndex = InStr(1, cell, word, vbTextCompare)
+    
+            If startIndex > 0 Then
+                cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                cell.Characters(startIndex, Len(word)).Font.Bold = True
+            End If
+        Next cell
+    End If
+    
+    word = "케이스"
+
+    If Len(word) > 0 Then
+        For Each cell In Selection
+                startIndex = InStr(1, cell, word, vbTextCompare)
+        
+                If startIndex > 0 Then
+                    cell.Characters(startIndex, Len(word)).Font.Color = RGB(0, 0, 0)
+                    cell.Characters(startIndex, Len(word)).Font.Bold = True
+                End If
+        Next cell
+    End If
+    
+End Sub
+
+

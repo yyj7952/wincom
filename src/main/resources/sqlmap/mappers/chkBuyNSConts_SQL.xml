@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.chkBuyNSConts.ChkBuyNSContsDao">
+
+	<resultMap type="HashMap" id="mDataChk">
+		<result property="DATA_CHK" column="DATA_CHK" javaType="Integer"/>
+		<result property="BUY_DATE" column="BUY_DATE" javaType="String"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mNscreenFairing">
+		<result property="CNT" column="CNT" javaType="String"/>
+		<result property="N_SA_ID" column="N_SA_ID" javaType="String"/>
+		<result property="N_STB_MAC" column="N_STB_MAC" javaType="String"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mNscreenFairingBuy">
+		<result property="BUY_CNT" column="BUY_CNT" javaType="String"/>
+		<result property="BUYING_DATE" column="BUYING_DATE" javaType="String"/>
+	</resultMap>
+
+	<!-- 상품타입 조회 -->
+	<select id="chkBuyContsProdType" parameterType="ChkBuyNSContsRequestVO" resultType="Integer">
+		SELECT
+			COUNT(CCC.PRODUCTCD)
+		FROM (
+			SELECT 
+				DISTINCT B.PRODUCT_ID AS PROD_ID
+			FROM IMCSUSER.PT_LA_PACKAGE_ASSET A,
+				IMCSUSER.PT_PD_PACKAGE_DETAIL B,
+				IMCSUSER.PT_PD_PACKAGE_UNITED C
+			WHERE A.NSC_ALBUM_ID = TRIM(#{albumId})
+			AND B.CONTENTS_ID = A.ASSET_ID
+			AND  B.PRODUCT_ID = C.IMCS_PRODUCT_ID
+			AND  C.IMCS_PRODUCT_TYPE IN ('0','3','4')
+			UNION
+			SELECT
+				BB.IMCS_P_PRODUCT_ID
+			FROM (
+				SELECT  DISTINCT B.PRODUCT_ID AS PROD_ID
+				FROM  IMCSUSER.PT_LA_PACKAGE_ASSET A,
+					IMCSUSER.PT_PD_PACKAGE_DETAIL B,
+					IMCSUSER.PT_PD_PACKAGE_UNITED C
+				WHERE A.NSC_ALBUM_ID = TRIM(#{albumId})
+				AND B.CONTENTS_ID = A.ASSET_ID
+				AND B.PRODUCT_ID = C.IMCS_PRODUCT_ID
+				AND C.IMCS_PRODUCT_TYPE IN ('0','3','4')
+			) AA, IMCSUSER.PT_PD_PACKAGE_RELATION_UNITED BB
+			WHERE BB.IMCS_PRODUCT_ID = AA.PROD_ID
+		) AAA, PT_VO_CUSTOM_PRODUCT CCC
+		WHERE CCC.SA_ID = #{saId}
+		AND CCC.MAC_ADDR = #{stbMac}
+		AND AAA.PROD_ID = CCC.PRODUCTCD
+	</select>
+	
+	<!-- PPV/PPS 구매 여부 확인 -->
+	<select id="chkBuyContsContsBuy" parameterType="ChkBuyNSContsRequestVO" resultType="String">
+		SELECT /*+ INDEX(CC PT_VO_BUY_DETAIL_NSC_IDX_00) INDEX(BB IDX_PT_VO_BUY_02_N) */ 
+			BB.BUY_DATE
+		FROM PT_VO_BUY_NSC BB,
+		PT_VO_BUY_DETAIL_NSC CC
+		WHERE BB.SA_ID = #{saId}
+		AND BB.MAC_ADDR = #{stbMac}
+		AND CC.SA_ID = BB.SA_ID
+		AND CC.MAC_ADDR = BB.MAC_ADDR
+		AND CC.PRODUCT_ID = BB.PRODUCT_ID
+		AND CC.CONTENTS_ID = trim(#{albumId})
+		AND (BB.EXPIRED_DATE <![CDATA[ > ]]> TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS') OR BB.EXPIRED_DATE = '0')
+		AND NVL(regexp_substr(replace(replace(BB.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+		AND ROWNUM <![CDATA[ <= ]]> 1
+	</select>
+	
+	<!-- 구매형 상품 존재 여부 -->
+	<select id="getBuyConts" parameterType="ChkBuyNSContsRequestVO" resultType="Integer">
+		SELECT /*+ leading(A D B E C) */
+			COUNT(A.PROD_CD)
+		FROM PT_VO_NSC_PRODUCT A,
+		IMCSUSER.PT_PD_PACKAGE B,
+		IMCSUSER.PT_PD_PACKAGE_DETAIL C,
+		IMCSUSER.PT_PD_PACKAGE_RELATION D,
+		IMCSUSER.PT_LA_PACKAGE_ASSET E
+		WHERE A.SBC_CONT_NO = #{saId}
+		AND A.MAC_ADDR    = #{stbMac}
+		AND A.BUY_DATE <![CDATA[ <= ]]> TO_CHAR(SYSDATE , 'YYYYMMDDHH24MISS')
+		AND A.EXPIRED_DATE <![CDATA[ >= ]]> TO_CHAR(SYSDATE , 'YYYYMMDDHH24MISS')     
+		AND A.PROD_CD    = D.P_PRODUCT_ID
+		AND D.PRODUCT_ID = B.PRODUCT_ID    
+		AND B.PRODUCT_TYPE = '3'   
+		AND B.PRODUCT_ID = C.PRODUCT_ID
+		AND C.CONTENTS_ID  = E.ASSET_ID 
+		AND E.NSC_ALBUM_ID = #{albumId}
+		AND ROWNUM <![CDATA[ <= ]]> 1
+	</select>
+	
+	<!-- 데이터 프리 구매 여부 확인 -->
+	<select id="getDataFreeBuy" parameterType="ChkBuyNSContsRequestVO" resultType="String">
+		SELECT
+			BUY_DATE
+		FROM PT_VO_BUY_NSC
+		WHERE SA_ID = #{saId}
+		AND MAC_ADDR = #{stbMac}
+		AND EXPIRED_DATE <![CDATA[ > ]]> TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS')
+		AND PRODUCT_ID = #{albumId} || '_D'
+		AND NVL(REFUND_YN,'N') <![CDATA[ <> ]]> 'P'
+		AND NVL(regexp_substr(replace(replace(ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+		AND ROWNUM <![CDATA[ <= ]]> 1
+	</select>
+	
+	<!-- 엔스크린(NSCREEN) 페어링 여부 확인 -->
+	<select id="getNscreenFairing" parameterType="ChkBuyNSContsRequestVO" resultMap="mNscreenFairing">
+		SELECT
+			'1' AS CNT
+			, STB_SA_ID AS N_SA_ID
+			, STB_MAC AS N_STB_MAC
+		FROM PT_VO_SBC_PAIRING_TBL
+		WHERE M_SA_ID = #{saId}
+		AND M_MAC = #{stbMac}
+		AND FLAG = 'Y'
+	</select>
+	
+	<!-- 엔스크린(NSCREEN) 페어링 가입자로 구매 여부 확인 -->
+	<select id="getNscreenFairingBuy" parameterType="ChkBuyNSContsRequestVO" resultMap="mNscreenFairingBuy">
+		SELECT MAX(X.buy_cnt) AS BUY_CNT
+			, MAX(X.BUY_DATE) AS BUYING_DATE
+        FROM (
+            SELECT 
+                COUNT(*) buy_cnt
+                , MAX(A.buy_date) buy_date
+                , MAX(expired_date) as expired_date
+            FROM PT_VO_BUY A,
+                (SELECT K.asset_id FROM IMCSUSER.PT_LA_PACKAGE_ASSET K
+                    WHERE K.adi_album_id = #{albumId}
+                    AND album_type IN ('HD','SH')
+                ) P
+            WHERE A.sa_id = #{nSaId}
+            AND A.expired_date   <![CDATA[ > ]]>   to_char(sysdate, 'yyyymmddhh24miss')
+            AND A.product_id LIKE SUBSTR(P.asset_id, 1, 17) || '%'
+            AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+            UNION
+            SELECT 
+                COUNT(*) buy_cnt
+                , MAX(A.buy_date) buy_date
+                , MAX(A.expired_date) as expired_date
+            FROM PT_VO_BUY A,
+               (SELECT /*+ USE_NL(P D G) */ G.product_id, P.asset_id, NVl(G.pre_sale_yn, 'N') pre_sale_yn,
+                        case when Trim(G.close_date) is null                                      
+                                    then TO_CHAR(sysdate + 1, 'yyyymmddhh24miss')                        
+                                    else TO_CHAR(TO_DATE(SUBSTR(G.close_date, 1, 12), 'yyyymmddhh24mi')  
+                                                         + to_number(G.expired_date), 'yyyymmddhh24mi')  
+                                                         || substr(G.close_date, 13, 2) end expired_date 
+                        FROM IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+                                IMCSUSER.PT_PD_PACKAGE G,
+                                (SELECT K.asset_id FROM IMCSUSER.PT_LA_PACKAGE_ASSET K
+                                    WHERE K.adi_album_id = #{albumId}
+                                    AND album_type IN ('HD','SH')
+                                ) P
+                        WHERE D.contents_id LIKE SUBSTR(P.asset_id, 1, 17) || '%'
+                        AND D.product_id = G.product_id
+                        AND G.product_type = '2')Z
+            WHERE A.sa_id = #{nSaId}
+            AND ((A.expired_date <![CDATA[ > ]]> to_char(sysdate, 'yyyymmddhh24miss') ) or (A.expired_date = '0' AND Z.expired_date <![CDATA[ > ]]> to_char(sysdate, 'yyyymmddhh24miss'))) 
+            AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+            AND A.product_id = Z.product_id
+        ) X
+	</select>
+	
+	<!-- 엔스크린(NSCREEN) 페어링 가입자로 가입 여부 확인 -->
+	<select id="getNscreenFairingJoin" parameterType="ChkBuyNSContsRequestVO" resultType="Integer">
+		SELECT
+			1 AS CNT
+		FROM (
+			SELECT
+				C.PRODUCT_ID
+			FROM IMCSUSER.PT_PD_PACKAGE_DETAIL B,
+				IMCSUSER.PT_PD_PACKAGE C
+			WHERE  B.CONTENTS_ID IN (
+						SELECT ASSET_ID
+						FROM IMCSUSER.PT_LA_PACKAGE_ASSET
+						WHERE ADI_ALBUM_ID = #{albumId}
+						AND ALBUM_TYPE IN('HD','SH')
+					)
+			AND  B.PRODUCT_ID = C.PRODUCT_ID
+			AND  C.PRODUCT_TYPE = '3'
+			UNION
+			SELECT  BB.P_PRODUCT_ID AS PRODUCT_ID
+			FROM  (
+				SELECT  C.PRODUCT_ID
+				FROM  IMCSUSER.PT_PD_PACKAGE_DETAIL B,
+					IMCSUSER.PT_PD_PACKAGE C
+				WHERE  B.CONTENTS_ID IN (
+								SELECT ASSET_ID
+								FROM IMCSUSER.PT_LA_PACKAGE_ASSET
+								WHERE ADI_ALBUM_ID = #{albumId}
+								AND ALBUM_TYPE IN('HD','SH')
+						)
+				AND  B.PRODUCT_ID = C.PRODUCT_ID
+				AND  C.PRODUCT_TYPE = '3'
+			) AA, IMCSUSER.PT_PD_PACKAGE_RELATION BB
+			WHERE AA.PRODUCT_ID = BB.PRODUCT_ID
+		) X, (SELECT  PRODUCTCD
+				FROM  PT_VO_CUSTOM_PRODUCT
+				WHERE  SA_ID = #{nSaId}
+				AND  MAC_ADDR = #{nStbMac}
+			) Y
+		WHERE X.PRODUCT_ID = Y.PRODUCTCD
+	</select>
+	
+	
+	<select id="chkCategory" parameterType="ChkBuyNSContsRequestVO" resultType="String">
+		SELECT '1' 
+		  FROM PT_VO_CATEGORY A ,
+               PT_VO_CATEGORY_MAP B
+         WHERE A.category_id = B.category_id 
+           AND CATEGORY_GB = 'NSC' 
+           AND NSC_GB = 'KID' 
+           AND ACTORS_DISPLAY = 'H'
+           AND B.CONTENTS_ID = #{albumId}
+	</select>
+	
+	
+	<select id="kidProductCd" parameterType="ChkBuyNSContsRequestVO" resultType="Integer">
+		SELECT
+			1 AS CNT
+		  FROM PVSUSER.XCION_VOD_BOOK_TRF_TBL A,    
+		       PVSUSER.PV_PROD_PRODUCT_TBL B, 
+		       IMCSUSER.PT_LA_ASSET_INFO C,
+		       IMCSUSER.PT_PD_PACKAGE_DETAIL D
+		 WHERE A.pvs_sbc_cont_no = #{nSaId}   
+		   AND A.tbdv_prod_divs_cd IN ('B', 'C', 'D')    
+		   AND A.tbdv_prod_rqst_dt >= TO_CHAR(add_months(sysdate, -24), 'YYYYMMDD')    
+		   AND A.tbdv_prod_cd = B.prod_cd    
+		   AND B.product_cd = D.product_id    
+		   AND C.album_id = #{albumId}
+		   AND C.screen_type = 'I'
+		   AND C.asset_id = D.contents_id
+	</select>
+	
+
+</mapper> 
+
+
+
+
+
+
+
+
+
+
+
+
+
+

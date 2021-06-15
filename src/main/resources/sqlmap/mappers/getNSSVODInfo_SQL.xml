@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSSVODInfo.GetNSSVODInfoDao">
+	
+	<!-- 유치채널(어디서 가입한 가입자인지) 정보 조회 -->		
+	<select id="getChnlInfo" resultType="String" >
+		<![CDATA[
+			SELECT PVS_ATRT_CHNL_DV_CD AS CHNL_DV_CD
+		      FROM NSCN_SBC_TBL
+		     WHERE PVS_SBC_CONT_NO = #{saId}
+		       AND PVS_MAC_ADDR = #{stbMac}
+		       AND ROWNUM = 1
+		  ]]>
+	</select>		
+	
+	<!-- SVOD 상품 정보 조회 -->	
+	<select id="getNSSVODInfoList" resultType="GetNSSVODInfoResponseVO" >
+		<![CDATA[
+			SELECT B.IMCS_PRODUCT_ID AS SUB_PROD_ID, B.IMCS_PRODUCT_NAME SUB_PROD_NAME, B.IMCS_PRICE AS SUB_PROD_PRICE, 
+					C.PROD_CD AS UCUBE_PROD_ID, B.IMCS_PRODUCT_DESC AS SUB_PROD_DESC, E.CATEGORY_NAME AS CAT_NAME, B.IMCS_CREATE_DATE IMCS_CREATE_DATE
+		      FROM PT_VO_CATEGORY_SVOD A, IMCSUSER.PT_PD_PACKAGE_UNITED B, PVSUSER.PV_PROD_PRODUCT_TBL C, IMCSUSER.PT_PD_PACKAGE_RELATION D,
+		           ( SELECT CATEGORY_ID, CATEGORY_NAME
+		               FROM PT_VO_CATEGORY
+		              START WITH CATEGORY_ID = #{catId}
+		             CONNECT BY PRIOR PARENT_CATEGORY_ID = CATEGORY_ID
+		           ) E,
+		           ( SELECT COM_NAME , MIN_VALUE
+		               FROM IMCSUSER.PT_CD_COM_CD
+		              WHERE GRP_ID = 'HDTVPROD'
+		                AND COM_NAME IN (SELECT A.PRODUCT_ID
+		                                   FROM IMCSUSER.PT_PD_PACKAGE A , PT_VO_CUSTOM_PRODUCT B
+		                                  WHERE A.PRODUCT_ID = B.PRODUCTCD
+		                                    AND A.PRODUCT_KIND = '1'
+		                                    AND B.SA_ID     = #{saId}
+		                                    AND B.MAC_ADDR  = #{stbMac})
+		                AND NVL(MAX_VALUE, 'N') = 'N' ) P
+		     WHERE E.CATEGORY_ID = A.CATEGORY_ID
+		       AND A.PRODUCT_ID = D.PRODUCT_ID
+		       AND D.P_PRODUCT_ID = B.IMCS_PRODUCT_ID
+		       AND B.IMCS_PRODUCT_KIND = '2'
+		       AND B.IMCS_AMOUNT_GB    = 'F'
+		       AND B.IMCS_PRODUCT_TYPE  = '4'
+		       AND B.IMCS_PRICE > 0
+		       AND TO_CHAR(SYSDATE  , 'YYYYMMDD' )  BETWEEN  B.IMCS_PRODUCT_START_DATETIME AND B.IMCS_PRODUCT_EXPIRY_DATETIME
+		       AND C.PRODUCT_CD = B.IMCS_PRODUCT_ID
+		       AND C.PROD_CD = P.MIN_VALUE
+		       AND NVL(B.IMCS_NSC_PROD_GB, 'N') = 'N'
+		       AND (NVL(B.IMCS_UFLIX_PROD_YN, 'N') = 'N' OR (NVL(B.IMCS_UFLIX_PROD_YN, 'N') = 'Y' AND NVL(B.IMCS_VIEW_CTRL, '0') IN ('0', '3')))
+		    UNION ALL
+		    SELECT B.IMCS_PRODUCT_ID AS SUB_PROD_ID, B.IMCS_PRODUCT_NAME SUB_PROD_NAME, B.IMCS_PRICE AS SUB_PROD_PRICE, 
+				   C.PROD_CD AS UCUBE_PROD_ID, B.IMCS_PRODUCT_DESC AS SUB_PROD_DESC, E.CATEGORY_NAME AS CAT_NAME, B.IMCS_CREATE_DATE IMCS_CREATE_DATE
+		      FROM PT_VO_CATEGORY_SVOD A, IMCSUSER.PT_PD_PACKAGE_UNITED B, PVSUSER.PV_PROD_PRODUCT_TBL C, IMCSUSER.PT_PD_PACKAGE_RELATION D,
+		           ( SELECT CATEGORY_ID, CATEGORY_NAME
+		               FROM PT_VO_CATEGORY
+		              START WITH CATEGORY_ID = #{catId}
+		             CONNECT BY PRIOR PARENT_CATEGORY_ID = CATEGORY_ID
+		           ) E
+		     WHERE E.CATEGORY_ID = A.CATEGORY_ID
+		       AND A.PRODUCT_ID = D.PRODUCT_ID
+		       AND D.P_PRODUCT_ID = B.IMCS_PRODUCT_ID
+		       AND B.IMCS_PRODUCT_KIND = '2'
+		       AND B.IMCS_AMOUNT_GB    = 'F'
+		       AND B.IMCS_PRODUCT_TYPE  = '4'
+		       AND B.IMCS_PRICE > 0
+		       AND TO_CHAR(SYSDATE  , 'YYYYMMDD' )  BETWEEN  B.IMCS_PRODUCT_START_DATETIME  AND  B.IMCS_PRODUCT_EXPIRY_DATETIME
+		       AND NVL(B.IMCS_UFLIX_PROD_YN, 'N') = 'Y'
+		       AND C.PRODUCT_CD = B.IMCS_PRODUCT_ID
+		       AND NVL(C.ATRCT_CHNL_DV_CD, 'N') = #{chnlDvCd}
+		       AND NVL(C.PROD_SUB_YN, 'N') = 'N'
+		       AND NVL(B.IMCS_NSC_PROD_GB, 'N') = 'N'
+		       AND (NVL(B.IMCS_UFLIX_PROD_YN, 'N') = 'N' OR (NVL(B.IMCS_UFLIX_PROD_YN, 'N') = 'Y' AND NVL(B.IMCS_VIEW_CTRL, '0') IN ('0', '3')))
+		     ORDER BY IMCS_CREATE_DATE
+		  ]]>
+	</select>	
+	
+	<!-- 상품 유무 조회 -->
+	<select id="chkProdInfo" resultType="Integer" >
+		SELECT 1 AS DATA_CNT 
+		  FROM (SELECT B.PRODUCT_ID PRODUCTCD 
+		          FROM PT_VO_CUSTOM_PRODUCT A,
+		               IMCSUSER.PT_PD_PACKAGE B 
+		         WHERE A.SA_ID = #{saId}
+		           AND A.MAC_ADDR = #{stbMac}
+		           AND A.PRODUCTCD = B.PRODUCT_ID
+		           AND B.PRODUCT_ID = #{subProdId}
+		           AND B.PRODUCT_TYPE = '3'
+		       ) X
+	</select>	
+	
+	
+	<!-- 상품 유무 조회2 -->
+	<select id="chkProdInfo2" resultType="Integer" >
+		SELECT 1 AS DATA_CNT 
+		  FROM (SELECT B.PRODUCT_ID PRODUCTCD 
+		          FROM PT_VO_CUSTOM_PRODUCT A,
+		               IMCSUSER.PT_PD_PACKAGE B,
+		               IMCSUSER.PT_PD_PACKAGE_RELATION D 
+		         WHERE A.SA_ID = #{saId}
+		           AND A.MAC_ADDR = #{stbMac}
+		           AND A.PRODUCTCD = D.P_PRODUCT_ID
+		           AND B.PRODUCT_ID = D.PRODUCT_ID
+		           AND B.PRODUCT_ID = #{subProdId}
+		           AND B.PRODUCT_TYPE = '3'
+		       ) X
+	</select>
+		
+</mapper>
+	
+	
+	

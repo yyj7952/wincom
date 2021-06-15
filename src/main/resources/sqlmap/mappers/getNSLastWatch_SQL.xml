@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSLastWatch.GetNSLastWatchDao">
+
+	<resultMap type="HashMap" id="mTestSbc">
+		<result property="TEST_SBC1" column="TEST_SBC1" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="watchInfoMap">
+		<result property="ADI_ALBUM_ID" column="ADI_ALBUM_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="WATCH_DATE" column="WATCH_DATE" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<!-- 가입자 정보 가져오기 검수 여부 -->
+	<select id="getTestSbc" resultMap="mTestSbc" parameterType="GetNSLastWatchRequestVO">
+		SELECT DECODE(NVL(test_sbc, 'N'), 'Y', 'T', 'V') AS test_sbc1
+		FROM PT_VO_CUSTOM_ID
+		WHERE sa_id = #{saId}
+		AND mac_addr = #{stbMac}
+	</select>
+	
+	<!-- 마지막 시청 기록 조회 -->
+	<select id="getLastWathcInfo" resultMap="watchInfoMap" parameterType="GetNSLastWatchRequestVO">
+		SELECT adi_album_id, watch_date 
+		FROM 
+		(
+			SELECT A.adi_album_id, A.watch_date 
+			FROM PT_VO_SET_TIME_PTT_NSC A, 
+			(
+				SELECT contents_id 
+				FROM PT_VO_CATEGORY_MAP 
+				WHERE category_id = #{catId}
+				AND NVL(viewing_flag, 'V') IN ('V', #{testSbc})
+			) B, 
+			IMCSUSER.PT_LA_ALBUM_PLATFORM C 
+			WHERE A.sa_id = #{saId}
+			AND A.p_idx_sa = mod(substr(#{saId}, -2), 33) 
+			AND A.adi_album_id = B.contents_id 
+			AND A.adi_album_id = C.album_id 
+			AND C.SCREEN_TYPE = 'N' 
+			AND A.nscn_cust_no = 'M'
+			ORDER BY watch_date DESC
+		) 
+		WHERE ROWNUM = 1
+	</select>
+	
+</mapper> 

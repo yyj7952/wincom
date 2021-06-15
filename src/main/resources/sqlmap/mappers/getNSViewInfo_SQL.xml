@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSViewInfo.GetNSViewInfoDao">
+	
+	<resultMap type="java.util.HashMap" id="mTestSbcPairing">
+		<result property="CON_SA_ID" column="CON_SA_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="CON_STB_MAC" column="CON_STB_MAC" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="TEST_SBC" column="TEST_SBC" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="java.util.HashMap" id="mChkBuyInfo">
+		<result property="DUPLIC_CHK" column="DUPLIC_CHK" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="BUY_DATE" column="BUY_DATE" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<!-- 오늘날짜/시간 조회 (YYYYMMDDHH24MISS) -->
+	<select id="getSysdate" resultType="String">
+		<![CDATA[
+			SELECT /* CTIS.Common */
+			TO_CHAR(SYSDATE,'YYYYMMDDHH24MISS') AS DB_DATE
+			FROM DUAL 
+		]]>
+	</select>
+	
+	<!-- 사용자 조회 -->	
+	<select id="getTestSbc" resultType="String" >
+		SELECT NVL(TEST_SBC, 'N') TEST_SBC
+		  FROM PT_VO_CUSTOM_ID 
+		 WHERE SA_ID = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	
+	<!-- 사용자 페어링 조회 -->	
+	<select id="getTestSbcPairing" parameterType="GetNSViewInfoResponseVO" resultMap="mTestSbcPairing">
+		SELECT A.STB_SA_ID AS CON_SA_ID, A.STB_MAC AS CON_STB_MAC, NVL(B.TEST_SBC, 'N') TEST_SBC
+	      FROM PT_VO_SBC_PAIRING_TBL A, 
+	           PT_VO_CUSTOM_ID B 
+	     WHERE A.M_SA_ID = #{saId}
+	       AND A.M_MAC = #{stbMac}
+	       AND A.FLAG = 'Y' 
+	       AND A.M_SA_ID = B.SA_ID 
+	       AND A.M_MAC = B.MAC_ADDR 
+	</select>
+	
+	
+	
+	<!-- 유치채널(어디서 가입한 가입자인지) 정보 조회 -->		
+	<select id="getChnlInfo" resultType="String" >
+		<![CDATA[
+			SELECT PVS_ATRT_CHNL_DV_CD AS CHNL_DV_CD
+		      FROM NSCN_SBC_TBL
+		     WHERE PVS_SBC_CONT_NO = #{saId}
+		       AND PVS_MAC_ADDR = #{stbMac}
+		       AND ROWNUM = 1
+		  ]]>
+	</select>		
+	
+	<!-- 상품 정보 조회 -->	
+	<select id="getNSViewInfoList" resultType="getNSViewInfoResponseVO" >
+		SELECT XXX.ALBUM_ID AS CONTS_ID, 
+               XXX.ALBUM_NAME AS CONTS_NAME, 
+               XXX.RUN_TIME,  
+               regexp_substr(category_id, '[^^]+', 1,2,'i') cat_id, 
+               regexp_substr(category_id, '[^^]+', 1,3,'i') series_yn,
+               regexp_substr(category_id, '[^^]+', 1,4,'i') series_no
+               <if test="linkFlag.equals('S'.toString())"> 
+               ,MCUSTUSER.NUF_GET_NSCREEN_INFO(XXX.ALBUM_ID, #{testSbc}) AS NSCREEN_YN
+               </if>
+               ,book_yn
+         FROM 
+         ( 
+            SELECT XX.ALBUM_ID, 
+                   XX.ALBUM_NAME, 
+                   XX.RUN_TIME,
+                   MIN(case when XX.Y_category_id is not null then '1^' || XX.Y_category_id || '^' || 'Y' || '^' || XX.Y_category_id_no else '2^' || XX.N_category_id || '^' || 'N' end) category_id,
+                   min(book_yn) book_yn 
+            FROM 
+            ( 
+                SELECT  
+                       X.ALBUM_ID, 
+                       X.ALBUM_NAME, 
+                       X.RUN_TIME, 
+                       case when MIN(NVL(E.SERIES_YN,'N')) over (partition by E.category_id) = 'N' then E.CATEGORY_ID else '' end N_category_id,
+                       case when MIN(NVL(E.SERIES_YN,'N')) over (partition by E.category_id) = 'Y' then E.CATEGORY_ID else '' end Y_category_id,
+                       case when MIN(NVL(E.SERIES_YN,'N')) over (partition by E.category_id) = 'Y' then D.series_no else '' end Y_category_id_no,
+                       case when E.nsc_gb = 'KID' and E.actors_display = 'H' then 'Y' else 'N' end book_yn
+                  FROM ( 
+                    SELECT /*+ USE_NL(A B C) */ A.ALBUM_ID,    
+                           C.ASSET_ID,  
+                           A.ALBUM_NAME,  
+                           SUBSTR(B.RUN_TIME, 1, 6) AS RUN_TIME 
+                      FROM IMCSUSER.PT_LA_ALBUM_INFO A,  
+                           IMCSUSER.PT_LA_ALBUM_SUB B,  
+                           IMCSUSER.PT_LA_ASSET_INFO C 
+                     WHERE A.ALBUM_ID = #{albumId}
+                       AND A.ALBUM_ID = B.ALBUM_ID 
+                       AND B.ALBUM_ID = C.ALBUM_ID
+                       AND C.SCREEN_TYPE = 'N' 
+                       ) X, 
+                       PT_VO_CATEGORY_MAP D, 
+                       PT_VO_CATEGORY E 
+                 WHERE X.ALBUM_ID = D.CONTENTS_ID 
+                   AND D.CONTENTS_ID = #{albumId}
+                   AND D.CATEGORY_ID = E.CATEGORY_ID 
+                   AND E.CATEGORY_GB = 'NSC'
+                   
+                   <if test='testSbc == "N"'> AND NVL(E.TEST_SBC, 'N') = 'N' </if> 
+            ) XX 
+            GROUP BY XX.ALBUM_ID, XX.ALBUM_NAME, XX.RUN_TIME 
+         ) XXX 
+	</select>	
+	
+	<select id="chkBuyInfo" parameterType="GetNSViewInfoResponseVO" resultMap="mChkBuyInfo">
+		SELECT max(buy_cnt) as duplic_chk, max(buy_date) as buy_date
+        FROM (
+            SELECT 
+                COUNT(*) buy_cnt
+                , MAX(A.buy_date) buy_date
+            FROM PT_VO_BUY A,
+                (SELECT K.asset_id FROM IMCSUSER.PT_LA_PACKAGE_ASSET K
+                    WHERE K.adi_album_id = #{albumId}
+                    AND album_type IN ('HD','SH')
+                ) P
+            WHERE A.sa_id = #{conSaId}
+            AND A.expired_date <![CDATA[ > ]]> to_char(sysdate, 'yyyymmddhh24miss')
+            AND A.product_id LIKE SUBSTR(P.asset_id, 1, 17) || '%'
+            AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+            UNION
+            SELECT 
+                COUNT(*) buy_cnt
+                , MAX(A.buy_date) buy_date
+            FROM PT_VO_BUY A,
+               (SELECT /*+ USE_NL(P D G) */ G.product_id, P.asset_id, NVl(G.pre_sale_yn, 'N') pre_sale_yn,
+                        case when Trim(G.close_date) is null                                      
+                                    then TO_CHAR(sysdate + 1, 'yyyymmddhh24miss')                        
+                                    else TO_CHAR(TO_DATE(SUBSTR(G.close_date, 1, 12), 'yyyymmddhh24mi')  
+                                                         + to_number(G.expired_date), 'yyyymmddhh24mi')  
+                                                         || substr(G.close_date, 13, 2) end expired_date 
+                        FROM IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+                                IMCSUSER.PT_PD_PACKAGE G,
+                                (SELECT K.asset_id FROM IMCSUSER.PT_LA_PACKAGE_ASSET K
+                                    WHERE K.adi_album_id = #{albumId}
+                                    AND album_type IN ('HD','SH')
+                                ) P
+                        WHERE D.contents_id LIKE SUBSTR(P.asset_id, 1, 17) || '%'
+                        AND D.product_id = G.product_id
+                        AND G.product_type = '2')Z
+            WHERE A.sa_id = #{conSaId}
+            AND ((A.expired_date <![CDATA[ > ]]> to_char(sysdate, 'yyyymmddhh24miss') ) or (A.expired_date = '0' AND Z.expired_date <![CDATA[ > ]]> to_char(sysdate, 'yyyymmddhh24miss'))) 
+            AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+            AND A.product_id = Z.product_id
+        ) X
+	</select>
+
+	
+	<select id="chkBuyInfoNsc" parameterType="GetNSViewInfoResponseVO" resultMap="mChkBuyInfo">
+		SELECT max(i_duplic_chk) as duplic_chk, max(c_buy_date) as buy_date
+			  FROM (
+					SELECT COUNT(A.buy_date) i_duplic_chk,
+						   NVL(MAX(A.buy_date), '') c_buy_date
+					  FROM PT_VO_BUY_NSC A,
+						   PT_VO_BUY_DETAIL_NSC B
+					 WHERE A.sa_id  = #{saId}
+					   AND A.sa_id = B.sa_id
+					   AND A.mac_addr = B.mac_addr
+					   AND A.buy_date = B.buy_date
+					   AND B.contents_id = #{albumId}
+					   AND (A.expired_date > to_char(sysdate, 'YYYYMMDDHH24MISS'))
+					   AND nvl(A.REFUND_YN,'N') <![CDATA[<>]]> 'P'
+					   AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+			  	     UNION ALL
+					SELECT COUNT(*) buy_count, MIN(A.present_date) buy_date
+					  FROM PT_VO_PRESENT A
+					 WHERE A.rcv_sa_id = #{saId}
+					   AND A.contents_id = #{albumId}
+					   AND A.expired_date <![CDATA[>]]> to_char(sysdate, 'YYYYMMDDHH24MISS')
+					   AND NVL(A.del_flg,'N') = 'N'
+				   ) X
+	</select>
+	
+		
+	<select id="getProductCd" resultType="String" >
+		SELECT productcd FROM PT_VO_CUSTOM_PRODUCT 
+                WHERE sa_id = #{conSaId}
+                  AND mac_addr = #{conMac}
+	</select>
+	
+	<select id="getProductCdNsc" resultType="String" >
+		SELECT DISTINCT product_id 
+				  FROM (                   
+				        SELECT productcd product_id FROM PT_VO_CUSTOM_PRODUCT 
+				         WHERE sa_id = #{saId}                       
+				        UNION ALL                                             
+				        SELECT prod_cd product_id FROM PT_VO_NSC_PRODUCT      
+				         WHERE sbc_cont_no = #{saId}                     
+				           AND TO_CHAR(sysdate , 'yyyymmddhh24miss') between buy_date and expired_date 
+				        ) X 
+	</select>
+	
+	<select id="getProductInfo" resultType="String" >
+		SELECT C.PRODUCT_ID AS PRODUCT_ID
+          FROM IMCSUSER.PT_PD_PACKAGE_DETAIL B,  
+               IMCSUSER.PT_PD_PACKAGE C  
+         WHERE B.CONTENTS_ID IN (SELECT ASSET_ID FROM IMCSUSER.PT_LA_ASSET_INFO WHERE album_id = #{albumId} AND screen_type = 'I' AND asset_type IN('HD','SH')) 
+           AND B.PRODUCT_ID = C.PRODUCT_ID  
+           AND C.PRODUCT_TYPE = '3'  
+        UNION  
+        SELECT D.P_PRODUCT_ID AS PRODUCT_ID
+          FROM IMCSUSER.PT_PD_PACKAGE_DETAIL B,  
+               IMCSUSER.PT_PD_PACKAGE C, 
+               IMCSUSER.PT_PD_PACKAGE_RELATION D 
+         WHERE B.CONTENTS_ID IN (SELECT ASSET_ID FROM IMCSUSER.PT_LA_ASSET_INFO WHERE album_id = #{albumId} AND screen_type = 'I' AND asset_type IN('HD','SH')) 
+           AND B.PRODUCT_ID NOT IN ('10000','20000')  
+           AND B.PRODUCT_ID = C.PRODUCT_ID  
+           AND C.PRODUCT_ID = D.PRODUCT_ID 
+	</select>
+	
+	<select id="getProductInfoNsc" resultType="String" >
+		SELECT DISTINCT product_id                   
+              FROM                                       
+              ( SELECT B.product_id product_id           
+                  FROM IMCSUSER.PT_PD_PACKAGE B,         
+                       IMCSUSER.PT_PD_PACKAGE_DETAIL C   
+                 WHERE B.product_id = C.product_id       
+                   AND C.contents_id IN (SELECT asset_id FROM IMCSUSER.PT_LA_ASSET_INFO WHERE album_id = #{albumId} and screen_type = 'N') 
+                   AND B.product_type = '3'              
+                UNION ALL                                
+                SELECT D.p_product_id product_id         
+                  FROM IMCSUSER.PT_PD_PACKAGE B,         
+                       IMCSUSER.PT_PD_PACKAGE_DETAIL C,  
+                       IMCSUSER.PT_PD_PACKAGE_RELATION D 
+                 WHERE B.product_id = C.product_id       
+                   AND D.product_id = C.product_id       
+                   AND C.contents_id IN (SELECT asset_id FROM IMCSUSER.PT_LA_ASSET_INFO WHERE album_id = #{albumId} and screen_type = 'N') 
+                   AND B.product_type = '3' 
+               ) X 
+	</select>
+	
+	<select id="getSetTimeInfo" resultType="String" >
+	SELECT /*+ index(A IDX_PT_VO_SET_TIME_02_PTT) */	
+					       NVL(A.link_time, '')                            
+					  FROM PT_VO_SET_TIME_PTT A                            
+					 WHERE A.sa_id = #{conSaId}
+					   AND A.adi_album_id= #{albumId}
+					   AND A.p_idx_sa = mod(#{idxSa},33)            
+					   AND A.NSCN_CUST_NO = 'M'                      
+					 ORDER BY A.watch_date desc
+	</select>
+	
+	<select id="getSetTimeInfoNsc" resultType="String" >
+	SELECT /*+ index(A IDX_PT_VO_SET_TIME_02_PTT_N) */	
+					       NVL(A.link_time, '')                            
+					  FROM PT_VO_SET_TIME_PTT_NSC A                            
+					 WHERE A.sa_id = #{saId}		
+					   AND A.adi_album_id= #{albumId}        
+					   AND A.p_idx_sa = mod(#{idxSa},33)            
+					   AND A.NSCN_CUST_NO = 'M'                      
+					 ORDER BY A.watch_date desc   
+	</select>
+	
+	<select id="kidProductCd" resultType="Integer">
+		SELECT DISTINCT '1' 
+		  FROM PVSUSER.XCION_VOD_BOOK_TRF_TBL A,    
+		       PVSUSER.PV_PROD_PRODUCT_TBL B, 
+		       IMCSUSER.PT_LA_ASSET_INFO C,
+		       IMCSUSER.PT_PD_PACKAGE_DETAIL D
+		 WHERE A.pvs_sbc_cont_no = #{conSaId}   
+		   AND A.tbdv_prod_divs_cd IN ('B', 'C', 'D')    
+		   AND A.tbdv_prod_rqst_dt >= TO_CHAR(add_months(sysdate, -24), 'YYYYMMDD')    
+		   AND A.tbdv_prod_cd = B.prod_cd    
+		   AND B.product_cd = D.product_id    
+		   AND C.album_id = #{albumId}
+		   AND C.screen_type = 'I'
+		   AND C.asset_id = D.contents_id
+	</select>
+	
+	
+	
+</mapper>

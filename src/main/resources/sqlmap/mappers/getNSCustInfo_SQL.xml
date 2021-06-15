@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSCustInfo.GetNSCustInfoDao">
+
+	<select id="getCustomInfo" resultType="String">
+		SELECT case when test_sbc = 'Y' then test_sbc else 'N' end test_sbc
+		  FROM PT_VO_CUSTOM_ID 
+		 WHERE SA_ID = #{saId} 
+		   AND MAC_ADDR = #{stbMac}
+	</select>
+	
+</mapper> 

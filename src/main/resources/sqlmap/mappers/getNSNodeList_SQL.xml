@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSNodeList.GetNSNodeListDao">
+	
+	<!-- 테스트 계정 유무조회 -->
+	<select id="getTestSbc" parameterType="GetNSContListRequestVO" resultType="String" >
+		SELECT CASE WHEN TEST_SBC = 'Y' THEN TEST_SBC ELSE 'N' END AS TEST_SBC
+		  FROM PT_VO_CUSTOM_ID
+	 	 WHERE SA_ID = #{saId}
+  	 	   AND MAC_ADDR = #{stbMac}
+	</select>
+
+</mapper> 

@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSAlbumList.GetNSAlbumListDao">
+
+
+	<select id="getViewFlag2" parameterType="GetNSAlbumListRequestVO" resultType="String">
+		SELECT CASE WHEN TEST_SBC = 'Y' THEN 'T' ELSE 'V' END AS VIEW_FLAG2 
+		  FROM PT_VO_CUSTOM_ID 
+		 WHERE SA_ID = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+	</select>
+
+	
+	
+	<select id="getSubCateInfoN1" parameterType="GetNSAlbumListRequestVO" resultType="GetNSAlbumListResponseVO">
+		SELECT 'ALB' AS RESULT_TYPE,
+	       E.CONTENTS_ID AS CONTS_ID,
+	       A.ADI_ALBUM_NAME AS CONTS_NAME,
+	       J.CATEGORY_ID AS CAT_ID,
+	       J.NSC_GB AS CAT_TYPE,
+	       E.CHA_NUM AS CHA_NUM,
+	       TO_CHAR(TO_NUMBER(J.CATEGORY_LEVEL) + 1) AS CAT_LEVEL,
+	       E.CREATE_DATE AS IS_NEW,
+	       TO_CHAR(ROUND(TO_NUMBER(NVL(A.POINT_SUM, '0')) /(CASE WHEN NVL(A.POINT_CNT, '0')='0' THEN 1 ELSE TO_NUMBER(NVL(A.POINT_CNT, '0')) END), 0)) AS POINT,
+	       E.RANK_NO AS SORT_NO,
+	       DECODE(J.CATEGORY_GB, 'PCT', 'PCT', 'I20', 'I20' , 'NSC' , 'NSC' , '') AS CAT_GB,
+	       E.SAMPLE_YN AS SAMPLE_YN,
+	       E.TARGET_CAT_ID AS TARGET_CATE_ID,
+	       E.TARGET_ALBUM_ID AS TARGET_ALBUM_ID,
+		   (SELECT B.CATEGORY_ID 
+	          FROM PT_VO_CATEGORY_MAP A,
+	               PT_VO_CATEGORY B 
+	         WHERE A.CONTENTS_ID = E.CONTENTS_ID
+	           AND A.CATEGORY_ID = B.CATEGORY_ID
+	           AND B.SERIES_YN = 'Y'
+	           AND B.CATEGORY_GB = 'NSC'
+	           AND NVL(B.NSC_GB, 'LTE') = #{nscType}
+	           AND (B.TEST_SBC = 'N' OR B.TEST_SBC IS NULL OR B.TEST_SBC = '')
+	           AND ROWNUM = 1
+	       ) AS SER_CAT_ID,
+				CASE WHEN NVL(W.AVG_RATING, '')='' THEN '' ELSE TRIM(TO_CHAR(W.AVG_RATING, '0.0')) END AVG_RANK1,
+				CASE WHEN TO_NUMBER(W.AVG_RATING) * 20 <![CDATA[>=]]> TO_NUMBER(A.POINT_SUM_I30) / TO_NUMBER(
+				CASE WHEN A.POINT_CNT_I30= '0' THEN '1' ELSE A.POINT_CNT_I30 END) * 10 THEN TRIM(TO_CHAR(TO_NUMBER(W.AVG_RATING) * 20)) 
+					ELSE TRIM(TO_CHAR(TO_NUMBER(A.POINT_SUM_I30) / TO_NUMBER(CASE WHEN A.POINT_CNT_I30= '0' THEN '1' ELSE A.POINT_CNT_I30 END) * 10)) END AVG_RANK2
+		  FROM PT_VO_CATEGORY J,
+		       PT_VO_CATEGORY_MAP E,
+		       IMCSUSER.PT_WC_WATCHA_RATING W,
+		       IMCSUSER.PT_LA_ALBUM_MST A,
+		       (
+		        SELECT NSC_ALBUM_ID, MAX(ADI_PRODUCT_ID) ADI_PRODUCT_ID FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+		         WHERE NSC_ALBUM_ID IN (SELECT CONTENTS_ID FROM PT_VO_CATEGORY_MAP WHERE CATEGORY_ID = #{catId})
+		         GROUP BY NSC_ALBUM_ID
+		       ) P,
+		       IMCSUSER.PT_LA_CONTENT_ASSET C 
+		 WHERE E.CATEGORY_ID = #{catId}
+		   AND E.CATEGORY_ID = J.CATEGORY_ID
+		   AND E.CONTENTS_ID = A.ADI_ALBUM_ID
+		   AND E.CONTENTS_ID = W.ALBUM_ID(+)
+		   AND E.CONTENTS_ID = P.NSC_ALBUM_ID
+		   AND P.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID
+		   AND (NVL(C.PRE_MAPPING_YN, 'N') = 'N' OR (NVL(C.PRE_MAPPING_YN, 'N') = 'Y' AND NVL(E.VIEWING_FLAG, 'N') IN ('V', #{viewFlag1}, #{viewFlag2})))
+		
+		<if test="orderGb.equals('N'.toString())">	ORDER BY A.ONAIR_DATE, E.RANK_NO, E.CONTENTS_ID		</if>
+		<if test="orderGb.equals('H'.toString())">	ORDER BY POINT DESC, E.RANK_NO, E.CONTENTS_ID		</if>
+		<if test="orderGb.equals('D'.toString())">	ORDER BY E.RANK_NO DESC, E.CONTENTS_ID				</if>
+		<if test="orderGb.equals('A'.toString())">	
+			ORDER BY (CASE WHEN ASCII(SUBSTR(CONTS_NAME,0,1)) BETWEEN 45217 AND 51454 THEN 1 
+			   WHEN SUBSTR(CONTS_NAME,0,1) BETWEEN 'A' AND 'Z' THEN 2 
+			   WHEN SUBSTR(CONTS_NAME,0,1) BETWEEN 'a' AND 'z' THEN 2 
+			   WHEN SUBSTR(CONTS_NAME,0,1) BETWEEN '0' AND '9' THEN 3 
+			   ELSE 4 END),                  
+			UPPER(CONTS_NAME), E.RANK_NO, E.CONTENTS_ID	</if>
+		<if test="orderGb.equals('P'.toString())">	ORDER BY TO_NUMBER(AVG_RANK2) DESC, A.ONAIR_DATE, E.RANK_NO, E.CONTENTS_ID	</if>
+		<if test="orderGb.equals('W'.toString())">	ORDER BY TO_NUMBER(NVL(AVG_RANK1,'0')) DESC, TO_NUMBER(NVL(POINT,'0')) DESC, A.ONAIR_DATE, E.RANK_NO, E.CONTENTS_ID	</if>
+	</select>
+	
+	
+	
+	<select id="getSubCateInfoN2" parameterType="GetNSAlbumListRequestVO" resultType="GetNSAlbumListResponseVO">
+		SELECT 'ALB' AS RESULT_TYPE,
+	       E.CONTENTS_ID AS CONTS_ID,
+	       A.ADI_ALBUM_NAME AS CONTS_NAME,
+	       J.CATEGORY_ID AS CAT_ID,
+	       J.NSC_GB AS CAT_TYPE,
+	       E.CHA_NUM AS CHA_NUM,
+	       TO_CHAR(TO_NUMBER(J.CATEGORY_LEVEL) + 1) AS CAT_LEVEL,
+	       E.CREATE_DATE AS IS_NEW,
+	       TO_CHAR(ROUND(TO_NUMBER(NVL(A.POINT_SUM, '0')) /(CASE WHEN NVL(A.POINT_CNT, '0')='0' THEN 1 ELSE TO_NUMBER(NVL(A.POINT_CNT, '0')) END), 0)) AS POINT,
+	       E.RANK_NO AS SORT_NO,
+	       DECODE(J.CATEGORY_GB, 'PCT', 'PCT', 'I20', 'I20' , 'NSC' , 'NSC' , '') AS CAT_GB,
+	       E.SAMPLE_YN AS SAMPLE_YN,
+	       E.TARGET_CAT_ID AS TARGET_CATE_ID,
+	       E.TARGET_ALBUM_ID AS TARGET_ALBUM_ID,
+		   (SELECT B.CATEGORY_ID 
+	          FROM PT_VO_CATEGORY_MAP A,
+	               PT_VO_CATEGORY B 
+	         WHERE A.CONTENTS_ID = E.CONTENTS_ID
+	           AND A.CATEGORY_ID = B.CATEGORY_ID
+	           AND B.SERIES_YN = 'Y'
+	           AND B.CATEGORY_GB = 'NSC'
+	           AND NVL(B.NSC_GB, 'LTE') = #{nscType}
+	           AND (B.TEST_SBC = 'N' OR B.TEST_SBC IS NULL OR B.TEST_SBC = '')
+	           AND ROWNUM = 1
+	       ) AS SER_CAT_ID,
+				CASE WHEN NVL(W.AVG_RATING, '')='' THEN '' ELSE TRIM(TO_CHAR(W.AVG_RATING, '0.0')) END AVG_RANK1,
+				CASE WHEN TO_NUMBER(W.AVG_RATING) * 20 <![CDATA[>=]]> TO_NUMBER(A.POINT_SUM_I30) / TO_NUMBER(
+				CASE WHEN A.POINT_CNT_I30= '0' THEN '1' ELSE A.POINT_CNT_I30 END) * 10 THEN TRIM(TO_CHAR(TO_NUMBER(W.AVG_RATING) * 20)) 
+					ELSE TRIM(TO_CHAR(TO_NUMBER(A.POINT_SUM_I30) / TO_NUMBER(CASE WHEN A.POINT_CNT_I30= '0' THEN '1' ELSE A.POINT_CNT_I30 END) * 10)) END AVG_RANK2
+		FROM PT_VO_CATEGORY J, PT_VO_CATEGORY_MAP E, IMCSUSER.PT_LA_ALBUM_MST A, 
+			(SELECT NSC_ALBUM_ID, MAX(ADI_PRODUCT_ID) ADI_PRODUCT_ID FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+				WHERE NSC_ALBUM_ID IN (SELECT CONTENTS_ID FROM PT_VO_CATEGORY_MAP WHERE CATEGORY_ID = #{catId}) 
+				GROUP BY NSC_ALBUM_ID) P, 
+			IMCSUSER.PT_LA_CONTENT_ASSET C,
+			IMCSUSER.PT_WC_WATCHA_RATING W,     
+			<if test="orderGb.equals('S'.toString())">
+			(SELECT CONTENT_ID, MIN(RANKING) RANKING FROM AVBM_QBIC_TNSVOD_TB GROUP BY CONTENT_ID) F
+			</if>
+			<if test="orderGb.equals('B'.toString())">
+			(SELECT CONTENT_ID, MIN(RANKING) RANKING FROM AVBM_BUY_VOD_CNT_TB GROUP BY CONTENT_ID) F
+			</if> 
+		WHERE E.CATEGORY_ID = #{catId}          
+		  AND E.CATEGORY_ID = J.CATEGORY_ID       
+		  AND E.CONTENTS_ID = A.ADI_ALBUM_ID
+		  AND E.CONTENTS_ID = W.ALBUM_ID(+)      
+		  AND E.CONTENTS_ID = P.NSC_ALBUM_ID      
+		  AND P.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID 
+		  AND E.CONTENTS_ID = F.CONTENT_ID (+)    
+		  AND (NVL(C.PRE_MAPPING_YN, 'N') = 'N' OR (NVL(C.PRE_MAPPING_YN, 'N') = 'Y' AND NVL(E.VIEWING_FLAG, 'N') IN ('V', #{viewFlag1}, #{viewFlag2}))) 
+		ORDER BY F.RANKING, E.RANK_NO, E.CONTENTS_ID     
+	</select>
+	
+	
+	
+	
+	
+	
+	
+	<select id="getSubCateInfoE" parameterType="GetNSAlbumListRequestVO" resultType="GetNSAlbumListResponseVO">
+		SELECT 'ALB' AS RESULT_TYPE,
+		   E.CONTENTS_ID AS CONTS_ID,
+		   A.ADI_ALBUM_NAME AS CONTS_NAME,
+		   J.CATEGORY_ID AS CAT_ID,
+		   J.NSC_GB AS CAT_TYPE,
+		   E.CHA_NUM AS CHA_NUM,
+		   TO_CHAR(TO_NUMBER(J.CATEGORY_LEVEL) + 1) AS CAT_LEVEL,
+		   E.CREATE_DATE AS IS_NEW,
+		   TO_CHAR(ROUND(TO_NUMBER(NVL(A.POINT_SUM, '0')) /(CASE WHEN NVL(A.POINT_CNT, '0')='0' THEN 1 ELSE TO_NUMBER(NVL(A.POINT_CNT, '0')) END), 0)) AS POINT,
+		   E.RANK_NO AS SORT_NO,
+		   DECODE(J.CATEGORY_GB, 'PCT', 'PCT', 'I20', 'I20' , 'NSC' , 'NSC' , '') AS CAT_GB,
+		   E.SAMPLE_YN AS SAMPLE_YN,
+		   E.TARGET_CAT_ID AS TARGET_CATE_ID,
+		   E.TARGET_ALBUM_ID AS TARGET_ALBUM_ID,
+		   (SELECT B.CATEGORY_ID 
+		      FROM PT_VO_CATEGORY_MAP A,
+		           PT_VO_CATEGORY B 
+		     WHERE A.CONTENTS_ID = E.CONTENTS_ID
+		       AND A.CATEGORY_ID = B.CATEGORY_ID
+		       AND B.SERIES_YN = 'Y'
+		       AND B.CATEGORY_GB = 'NSC'
+		       AND NVL(B.NSC_GB, 'LTE') = #{nscType}
+		       AND (B.TEST_SBC = 'N' OR B.TEST_SBC IS NULL OR B.TEST_SBC = '')
+		       AND ROWNUM = 1
+		   ) AS SER_CAT_ID,
+				CASE WHEN NVL(W.AVG_RATING, '')='' THEN '' ELSE TRIM(TO_CHAR(W.AVG_RATING, '0.0')) END AVG_RANK1,
+				CASE WHEN TO_NUMBER(W.AVG_RATING) * 20 <![CDATA[>=]]> TO_NUMBER(A.POINT_SUM_I30) / TO_NUMBER(
+				CASE WHEN A.POINT_CNT_I30= '0' THEN '1' ELSE A.POINT_CNT_I30 END) * 10 THEN TRIM(TO_CHAR(TO_NUMBER(W.AVG_RATING) * 20)) 
+					ELSE TRIM(TO_CHAR(TO_NUMBER(A.POINT_SUM_I30) / TO_NUMBER(CASE WHEN A.POINT_CNT_I30= '0' THEN '1' ELSE A.POINT_CNT_I30 END) * 10)) END AVG_RANK2
+		  FROM (
+		        SELECT CONTENT_ID,
+		               MIN(CATEGORY_ID) CATEGORY_ID,
+		               MIN(RANKING) RANKING 
+		          FROM AVBM_QBIC_TNSVOD_TB 
+		         WHERE RANKING BETWEEN #{rankingStart} AND #{rankingEnd}
+		         GROUP BY CONTENT_ID
+		       ) F,
+		       PT_VO_CATEGORY J,
+		       PT_VO_CATEGORY_MAP E,
+		       IMCSUSER.PT_WC_WATCHA_RATING W,
+		       IMCSUSER.PT_LA_ALBUM_MST A,
+		       (
+		        SELECT NSC_ALBUM_ID,
+		               MAX(ADI_PRODUCT_ID) ADI_PRODUCT_ID 
+		          FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+		         WHERE NSC_ALBUM_ID IN (
+	                SELECT CONTENT_ID 
+	                  FROM AVBM_QBIC_TNSVOD_TB 
+	                 WHERE RANKING BETWEEN #{rankingStart} AND #{rankingEnd}
+	               )
+		         GROUP BY NSC_ALBUM_ID
+		       ) P,
+		       IMCSUSER.PT_LA_CONTENT_ASSET C 
+		 WHERE F.CATEGORY_ID = E.CATEGORY_ID
+		   AND F.CONTENT_ID = E.CONTENTS_ID
+		   AND E.CATEGORY_ID = J.CATEGORY_ID
+		   AND E.CONTENTS_ID = A.ADI_ALBUM_ID
+		   AND E.CONTENTS_ID = W.ALBUM_ID(+)
+		   AND E.CONTENTS_ID = P.NSC_ALBUM_ID
+		   AND P.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID
+		   AND (NVL(C.PRE_MAPPING_YN, 'N') = 'N' OR (NVL(C.PRE_MAPPING_YN, 'N') = 'Y' AND NVL(E.VIEWING_FLAG, 'N') IN ('V', #{viewFlag1}, #{viewFlag2})))
+		<if test="orderGb.equals('N'.toString())">	ORDER BY A.ONAIR_DATE, E.RANK_NO, E.CONTENTS_ID		</if>
+		<if test="orderGb.equals('A'.toString())">	
+			ORDER BY (CASE WHEN ASCII(SUBSTR(CONTS_NAME,0,1)) BETWEEN 45217 AND 51454 THEN 1 
+			   WHEN SUBSTR(CONTS_NAME,0,1) BETWEEN 'A' AND 'Z' THEN 2 
+			   WHEN SUBSTR(CONTS_NAME,0,1) BETWEEN 'a' AND 'z' THEN 2 
+			   WHEN SUBSTR(CONTS_NAME,0,1) BETWEEN '0' AND '9' THEN 3 
+			   ELSE 4 END),                  
+			UPPER(CONTS_NAME), E.RANK_NO, E.CONTENTS_ID	</if>
+		<if test="orderGb.equals('P'.toString())">	ORDER BY TO_NUMBER(AVG_RANK2) DESC, A.ONAIR_DATE, E.RANK_NO, E.CONTENTS_ID	</if>
+		<if test="orderGb.equals('W'.toString())">	ORDER BY TO_NUMBER(NVL(AVG_RANK1,'0')) DESC, TO_NUMBER(NVL(POINT,'0')) DESC, A.ONAIR_DATE, E.RANK_NO, E.CONTENTS_ID	</if>
+		<if test="!orderGb.equals('N'.toString()) and !orderGb.equals('A'.toString()) and !orderGb.equals('P'.toString()) and !orderGb.equals('W'.toString())">	
+			ORDER BY F.RANKING, E.RANK_NO, E.CONTENTS_ID		
+		</if>		
+	</select>
+	
+	
+	<!-- 앨범정보 조회 -->
+	<select id="getAlbumInfo" parameterType="GetNSAlbumListRequestVO" resultType="AlbumInfoVO">
+		SELECT A.ADI_ALBUM_NAME AS CONTS_NAME, A.RELEASE_DATE, A.SERIES_NO AS SERIES_DESC, NVL(A.IS_RH, 'N') AS REAL_HD, 
+		       TO_CHAR(ROUND(TO_NUMBER(NVL(A.POINT_SUM, '0'))
+		       /(CASE WHEN NVL(A.POINT_CNT, '0')= '0' THEN 1 ELSE TO_NUMBER(NVL(A.POINT_CNT, '0')) END), 0)) AS POINT, 
+		       CASE WHEN #{catType} = 'UFX' THEN A.SERVICE_ICON_UFLIX ELSE A.SERVICE_ICON_HDTV END AS SERVICE_ICON,          
+		       DECODE(B.ALBUM_TYPE, '3D', '1', 'HD', '2', 'SH', '3', 'SD', '4', 'PR', '5', '6') ALBUM_TYPE, 		<!-- 사용안함 -->
+		       NVL(C.SUGGESTED_PRICE, '0') AS SUGGESTED_PRICE,   
+		       NVL(C.RATING, '') AS PR_INFO,            
+		       DECODE(TO_CHAR(TO_NUMBER(SUBSTR(C.DISPLAY_RUN_TIME,1,2))*60 + TO_NUMBER(SUBSTR(C.DISPLAY_RUN_TIME,3,2))), '0', '1', 
+		              TO_CHAR(TO_NUMBER(SUBSTR(C.DISPLAY_RUN_TIME,1,2))*60 + TO_NUMBER(SUBSTR(C.DISPLAY_RUN_TIME,3,2)))) AS RUNTIME,  
+		       NVL(C.EVENT_VALUE, '0') AS EVENT_VALUE,				<!-- 사용안함 --> 
+		       C.DIRECTOR AS OVERSEER_NAME,                          
+		       C.ACTORS_DISPLAY AS ACTOR,                    
+		       CASE WHEN NVL(C.CATEGORY, '') = 'K' OR NVL(C.CATEGORY, '') = 'F' THEN NVL(C.CATEGORY, '') ELSE 'N' END FILTER_GB, 
+		       CASE WHEN NVL(C.GENRE_LARGE, '')= '방송' THEN 'T' ELSE 'V' END AS GENRE_GB, 
+		       UPPER(NVL(D.AUDIO_TYPE, '')) AS IS_51CH,                                    
+			   CASE WHEN NVL(C.DUBBING, 'N') = 'Y' THEN 'D' WHEN NVL(D.SMI_YN, 'N')='Y' AND NVL(D.SMI_IMP_YN, 'N') ='Y' THEN 'Y' ELSE 'N' END AS CAPTION_YN, 
+		       NVL(D.HDCONTENT, 'N') HDCONTENT, 
+		       NVL(D.IS_3D, 'N') AS IS_3D,         
+		       O.COM_CD AS TERR_CH,                 
+		       P.CONTENT_VALUE AS IMG_FILE_NAME,
+		       (SELECT MIN(H.PRODUCT_TYPE) FROM IMCSUSER.PT_PD_PACKAGE_DETAIL G, IMCSUSER.PT_PD_PACKAGE H 
+		         WHERE G.PRODUCT_ID = H.PRODUCT_ID                                                        
+		           AND G.CONTENTS_ID IN (SELECT ASSET_ID FROM IMCSUSER.PT_LA_PACKAGE_ASSET WHERE NSC_ALBUM_ID = #{contsId})) AS PROD_TYPE 
+		  FROM IMCSUSER.PT_LA_ALBUM_MST A,     
+		       IMCSUSER.PT_LA_PACKAGE_ASSET B, 
+		       IMCSUSER.PT_LA_TITLE_ASSET C,   
+		       IMCSUSER.PT_LA_CONTENT_ASSET D, 
+		       (SELECT #{contsId} ALBUM_ID, MIN(CONTENT_VALUE) CONTENT_VALUE FROM IMCSUSER.PT_LA_POSTER_ASSET 
+		         WHERE ADI_PRODUCT_ID IN (SELECT ADI_PRODUCT_ID FROM IMCSUSER.PT_LA_PACKAGE_ASSET WHERE NSC_ALBUM_ID = #{contsId}) AND POSTER_TYPE = #{posterType}) P,
+		       <if test="!genreGb.equals('N'.toString())">
+		       (SELECT #{contsId} AS CONTENTS_ID, MAX(NVL(VIEWING_FLAG, 'N')) AS VIEWING_FLAG FROM PT_VO_CATEGORY_MAP WHERE CATEGORY_ID = #{catId} AND CONTENTS_ID = #{contsId} ) M,
+		       </if>
+		       (SELECT COM_CD, COM_NAME FROM IMCSUSER.PT_CD_COM_CD WHERE GRP_ID = 'PUBLICCH') O   
+		 WHERE A.ADI_ALBUM_ID = #{contsId}        
+		   AND A.ADI_ALBUM_ID = B.NSC_ALBUM_ID     
+		   AND B.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID 
+		   AND B.ADI_PRODUCT_ID = D.ADI_PRODUCT_ID
+		   <if test="!genreGb.equals('N'.toString())">
+		   AND A.ADI_ALBUM_ID = M.CONTENTS_ID
+		   AND (NVL(D.PRE_MAPPING_YN, 'N') = 'N' OR (NVL(D.PRE_MAPPING_YN, 'N') = 'Y' and M.VIEWING_FLAG IN ('V', #{viewFlag1}, #{viewFlag2})))
+		   </if> 
+		   AND A.ADI_ALBUM_ID = P.ALBUM_ID (+)     
+		   AND C.CATEGORY = O.COM_NAME (+)         
+		   AND ROWNUM = 1    
+		 ORDER BY ALBUM_TYPE 
+	</select>
+	
+	
+	<select id="getSampleInfo" parameterType="GetNSAlbumListRequestVO" resultType="ComTrailerVO">
+		SELECT 'cirtspt://'||D.STB_PLAY_IP1||'/' AS TRAILER_URL1,
+		       'cirtspt://'||D.STB_PLAY_IP2||'/' AS TRAILER_URL2,
+		       'cirtspt://'||D.STB_PLAY_IP3||'/' AS TRAILER_URL3,
+		       B.CONTENT_VALUE AS TRAILER_FILE_NAME1,
+		       B.CONTENT_FILESIZE AS TRAILER_FILE_SIZE1,
+		       B.ADI_PRODUCT_ID || '00' AS CONTENTS_ID,
+		       B.ASSET_NAME AS CONTENTS_NAME
+		  FROM IMCSUSER.PT_LV_RANGE_IP_INFO A,
+		       IMCSUSER.PT_LA_CONTENT_ASSET B,
+		       IMCSUSER.PT_LV_NODE_INFO D,
+		       IMCSUSER.PT_LA_PACKAGE_ASSET F
+		 WHERE A.RANGE_IP_CD = '1234567890'
+		   AND A.SUB_NODE_CD = D.SUB_NODE_CD
+		   AND F.NSC_ALBUM_ID = #{contsId}
+		   AND B.ADI_PRODUCT_ID = F.ADI_PRODUCT_ID
+		   AND SUBSTR(F.ADI_PRODUCT_ID, 16, 2) = 'NT'
+		 ORDER BY B.ADI_PRODUCT_ID
+	</select>
+	
+	
+	<select id="getStillFileName" parameterType="GetNSAlbumListRequestVO" resultType="StillImageVO">
+		SELECT 'http:'||REPLACE(NVL(A.MAIN_IMG_URL, ''), '\', '/') AS IMG_URL, 
+		       A.MAIN_IMG_FILE_NAME AS IMG_FILE_NAME,         
+		       A.IMG_FLAG                    
+		  FROM IMCSUSER.PT_LA_ALBUM_IMG A    
+		 WHERE A.ADI_ALBUM_ID = #{contsId}  
+		   AND A.IMG_FLAG = 'N'              
+	 	 ORDER BY TO_NUMBER(ADI_ALBUM_SEQ) 
+	</select>
+</mapper> 

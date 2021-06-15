@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSMusicList.GetNSMusicListDao">
+
+	<resultMap type="HashMap" id="mCatInfo">
+		<result property="CATE_LEVEL" column="CATE_LEVEL" javaType="String"/>
+		<result property="NSC_GB" column="NSC_GB" javaType="String"/>
+		<result property="CATE_NAME" column="CATE_NAME" javaType="String"/>
+	</resultMap>
+	
+	<!--  검수 STB여부 조회 -->
+	<select id="getTestSbc" parameterType="GetNSMusicListRequestVO" resultType="String">
+        SELECT DECODE(NVL(A.test_sbc, 'N'), 'Y', 'Y', 'N') TEST_SBC
+          FROM PT_VO_CUSTOM_ID A
+         WHERE A.sa_id    = #{saId}
+           AND A.mac_addr = #{stbMac}
+	</select>
+	
+	<select id="getNSMusicCuesheetList" parameterType="GetNSMusicListRequestVO" resultType="GetNSMusicListResponseVO">
+		SELECT *
+		FROM(
+		     SELECT ROWNUM AS RNUM, Z.*
+	   		        FROM (SELECT A.STATUS AS SCHE_TYPE,
+	   		                     A.ALBUM_ID,
+	   		                     A.CUESHEET_ID AS QSHEET_ID,
+	   		                     A.CUESHEET_TITLE AS CONCERT_NAME,
+	   		                     (A.PERFORM_DATE || A.PERFORM_TIME) AS CONCERT_DATE,
+	   		                     A.PERFORM_PLACE AS PLACE,
+	   		                     NVL(B.OMNIVIEW_YN, 'N') AS OMNIVIEW_YN,
+	   		                     (SELECT MAIN_IMG_FILE_NAME FROM IMCSUSER.PT_LA_ALBUM_IMG WHERE ADI_ALBUM_ID = A.ALBUM_ID AND IMG_FLAG = 'C' AND ROWNUM = 1) AS BANNER_FILE_NAME,
+	   		                     (SELECT APT.CONTENT_VALUE FROM IMCSUSER.PT_LA_ALBUM_POSTER APT WHERE APT.ALBUM_ID = A.ALBUM_ID AND APT.screen_type = 'N' AND APT.POSTER_TYPE = 'P' and APT.service_yn = 'Y' and ROWNUM = 1) AS IMAGE_FILE_NAME,
+	   		                     MAX(R.CATEGORY_ID) AS CATEGORY_ID,
+	   		                     SERVICE_ID AS SERVICE_ID,
+	   		                     MCONUSER.UF_GET_ALBUM_PROPERTY(A.ALBUM_ID,'P') AS MAIN_PROPERTY,
+                                 MCONUSER.UF_GET_ALBUM_PROPERTY(A.ALBUM_ID,'C') AS SUB_PROPERTY
+	   		                FROM IMCSUSER.PT_LB_CUESHEET_MST A, PT_LA_ALBUM_SUB B,
+	   		                     PT_VO_CATEGORY R, PT_VO_CATEGORY_MAP M
+	   		               WHERE A.ALBUM_ID = B.ALBUM_ID
+	   		                 AND A.CUESHEET_TYPE = 'C'
+	   		                 AND A.VIEWING_FLAG = 'Y'
+	   		                 AND R.CATEGORY_ID = M.CATEGORY_ID
+	   		                 AND B.ALBUM_ID = M.CONTENTS_ID
+	   		                 AND R.CATEGORY_GB = 'NSC'
+				    		<if test="nRqsType.equals('2'.toString())">
+				    		 AND NVL(M.VIEWING_FLAG, 'V') IN ('V', #{viewFlag})
+				    		</if>  
+	    		           GROUP BY A.STATUS, A.ALBUM_ID, A.CUESHEET_ID, A.CUESHEET_TITLE, A.PERFORM_DATE, A.PERFORM_TIME, A.PERFORM_PLACE, NVL(B.OMNIVIEW_YN, 'N'), SERVICE_ID
+	    		           ORDER BY case when A.STATUS = 0 then CONCERT_DATE else '0' end,
+	    		           			case when A.STATUS != 0 then CONCERT_DATE else '0' end desc
+	    		         ) Z
+		      WHERE SCHE_TYPE = #{nRqsType}
+		    )
+		<if test="!endNum.equals('0'.toString())">
+		WHERE  RNUM <![CDATA[>=]]> #{startNum}
+          AND  RNUM <![CDATA[<=]]> #{endNum}
+        </if>
+	</select>
+		
+</mapper> 

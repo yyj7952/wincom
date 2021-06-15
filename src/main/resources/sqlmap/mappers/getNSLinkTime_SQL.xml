@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSLinkTime.GetNSLinkTimeDao">
+
+	<select id="getNSLinkTime" resultType="String" >
+		SELECT /*+ index(A IDX_PT_VO_SET_TIME_02_PTT_N) */  TO_NUMBER(A.link_time)
+		  FROM PT_VO_SET_TIME_PTT_NSC A
+		 WHERE A.sa_id =  #{mSaId}
+		   AND A.adi_album_id = #{albumId}
+		   AND A.P_IDX_SA = #{modIdxSa}
+		   AND A.nscn_cust_no = 'M'
+	</select>
+	
+</mapper> 

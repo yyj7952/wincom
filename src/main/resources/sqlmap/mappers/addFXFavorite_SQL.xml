@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.addFXFavorite.AddFXFavoriteDao">
+	
+	<!-- 1. 찜목록 중복 체크 -->
+	<select id="getFavorDupChk" resultType="Integer">
+		SELECT 1 FROM DUAL
+		 WHERE EXISTS (SELECT 'x' 
+				 		  FROM SMARTUX.PT_CM_FAVORITE A
+						 WHERE A.p_idx_sa = mod(substr(#{saId}, -2), 33)
+						   AND A.P_IDX_YEAR IN ( mod(to_number(to_char(sysdate,'YY'))-1,10), mod(to_number(to_char(sysdate,'YY')),10) )
+					 	   AND A.sa_id    = #{saId}
+					 	   AND contents_id = #{albumId}
+						   AND service_type IN ('U','V')
+			 	  	  	UNION
+					    SELECT 'x'
+						  FROM SMARTUX.PT_UX_FAVORITE A
+						 WHERE A.p_idx_sa = mod(substr(#{saId}, -2), 33)
+						   AND A.P_IDX_YEAR IN ( mod(to_number(to_char(sysdate,'YY'))-1,10), mod(to_number(to_char(sysdate,'YY')),10) )
+						   AND A.sa_id    = #{saId}
+						   AND contents_id = #{albumId}
+						   AND service_type IN ('I','K','B','S')
+				  	)
+	</select>
+	
+	
+	<!-- 2. 찜목록 인덱스 조회 -->
+	<select id="getFavorIdx" resultType="Integer">
+		SELECT COUNT(X.contents_id) 
+		  FROM (SELECT A.contents_id 
+		          FROM SMARTUX.PT_CM_FAVORITE A 
+		         WHERE A.p_idx_sa = mod(substr(#{saId}, -2), 33) 
+		    	   AND A.P_IDX_YEAR IN ( mod(to_number(to_char(sysdate,'YY'))-1,10), mod(to_number(to_char(sysdate,'YY')),10) ) 
+		           AND A.sa_id    = #{saId}
+				   AND A.service_type IN ('U','V') 
+		        GROUP BY A.contents_id 
+		 	  UNION 
+		 	   SELECT A.contents_id 
+		         FROM SMARTUX.PT_UX_FAVORITE A 
+		        WHERE A.p_idx_sa = mod(substr(#{saId}, -2), 33) 
+			 	  AND A.P_IDX_YEAR IN ( mod(to_number(to_char(sysdate,'YY'))-1,10), mod(to_number(to_char(sysdate,'YY')),10) ) 
+		          AND A.sa_id    = #{saId}
+			 	  AND A.service_type IN ('I','K','B','S') 
+		        GROUP BY A.contents_id 
+		      ) X, 
+		      (SELECT distinct A.adi_album_id 
+		         FROM PT_VO_CATEGORY_MAP E, 
+		              PT_VO_CATEGORY J, 
+		              IMCSUSER.PT_LA_PACKAGE_ASSET PA , 
+		              IMCSUSER.PT_LA_ALBUM_MST A 
+		        WHERE E.category_id = J.category_id 
+		          AND J.nsc_gb = 'UFX' 
+		          AND E.contents_id = PA.nsc_album_id 
+		          AND PA.nsc_album_id = A.adi_album_id 
+			 	  AND NVL(E.VIEWING_FLAG, 'V') = 'V' 
+		       ) G 
+		WHERE X.contents_id = G.adi_album_id  
+	</select>
+	
+	
+	<!-- 3. 찜목록 갯수 조회 -->
+	<select id="getFavorCnt" resultType="Integer">
+	SELECT COUNT(X.IDX) AS IDX
+	  FROM (SELECT MIN(NVL(A.FAV_IDX, ' ')) IDX                                              
+	          FROM PT_VO_FAVORITE A,                                                     
+	               (SELECT C.ASSET_ID CONTENTS_ID, A.CATEGORY_ID, A.CHA_NUM, C.ADI_ALBUM_ID 
+	                  FROM PT_VO_CATEGORY_MAP A,
+	                       PT_VO_CATEGORY B,
+	                       IMCSUSER.PT_LA_PACKAGE_ASSET C 
+	                 WHERE A.CATEGORY_ID = B.CATEGORY_ID
+	                   AND (B.TEST_SBC = 'N' OR B.TEST_SBC IS NULL OR B.TEST_SBC = '')
+	                   AND A.CONTENTS_ID = C.ADI_ALBUM_ID
+	                  ) G                                                                
+	         WHERE A.SA_ID = #{saId}
+	           AND (A.CONTENTS_ID = G.CONTENTS_ID OR A.CONTENTS_ID = G.ADI_ALBUM_ID)        
+	         GROUP BY A.FAV_IDX,  G.CONTENTS_ID                                         
+	       ) X   
+	</select>
+	
+	
+	<!-- 4. 찜목록 등록 -->
+	<insert id="addFavorInfo" parameterType="AddFXFavoriteRequestVO">
+		INSERT INTO SMARTUX.PT_CM_FAVORITE 
+		    ( 
+		     P_IDX_SA, 
+		     P_IDX_YEAR, 
+		     SA_ID, 
+		     MAC_ADDR, 
+		     CONTENTS_ID, 
+		     SERVICE_TYPE, 
+		     FAV_IDX , 
+		     CONTENTS_NAME, 
+		     CHA_NUM, 
+		     PRICE, 
+		     PR_INFO, 
+		     CATEGORY_ID, 
+		     REG_UPDATE 
+		    ) 
+		VALUES 
+		    ( 
+		     mod(substr(#{saId}, -2), 33), 
+		     mod(to_char(sysdate, 'YY'), 10), 
+		     #{saId}, 
+		     #{stbMac}, 
+		     #{albumId}, 
+		     'U', 
+		     '99', 
+		     replace(#{albumName},'    ', ' '), 
+		     #{chaNum}, 
+		     NVL(#{price}, '0'), 
+		     #{prInfo}, 
+		     #{catId}, 
+		     TO_CHAR(SYSDATE, 'YYYYMMDD') 
+		    )  
+	</insert> 
+</mapper> 

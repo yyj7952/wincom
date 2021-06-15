@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getFXRelation.GetFXRelationDao">
+	
+	<!-- 검수 STB 여부 조회 -->
+	<select id="getTestSbc" resultType="String" >
+		SELECT CASE WHEN TEST_SBC = 'Y' THEN 'T' ELSE 'V' END TEST_SBC
+		  FROM PT_VO_CUSTOM_ID
+		 WHERE SA_ID    = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	
+	<!-- 카테고리 ID조회 -->
+	<select id="getCatId" resultType="String" >
+		SELECT MAX(CATEGORY_ID) AS CAT_ID
+		  FROM PT_VO_CATEGORY 
+		 WHERE CATEGORY_LEVEL = '2' START WITH CATEGORY_ID = (
+		        SELECT MAX(B.CATEGORY_ID) 
+		          FROM PT_VO_CATEGORY_MAP A,
+		               PT_VO_CATEGORY B 
+		         WHERE A.CONTENTS_ID = #{albumId}
+		           AND A.CATEGORY_ID = B.CATEGORY_ID
+		           AND B.CATEGORY_GB = #{catGb}
+		           AND NVL(B.NSC_GB, 'LTE') = 'UFX'
+		           AND (B.TEST_SBC = 'N' OR B.TEST_SBC IS NULL OR B.TEST_SBC = '')
+		       ) CONNECT BY PRIOR PARENT_CATEGORY_ID = CATEGORY_ID
+	</select>
+
+
+	<!-- 연관컨텐츠 리스트 조회 -->
+	<select id="getRelationList" resultType="getFXRelationResponseVO" >
+		SELECT DISTINCT M.CONTENT_ID AS CONTS_ID, M.CATEGORY_GB AS CAT_GB,
+		       TO_CHAR(ROUND(TO_NUMBER(NVL(A.POINT_SUM,'0'))/(CASE WHEN NVL(A.POINT_CNT,'0')= '0' THEN 1 
+		        ELSE TO_NUMBER(NVL(A.POINT_CNT,'0')) END), 0)) POINT
+		  FROM AVBM_QBIC_TNSVOD_TB M,
+		       IMCSUSER.PT_LA_ALBUM_MST A
+		 WHERE M.CONTENT_ID = A.ADI_ALBUM_ID
+		   AND M.RANKING BETWEEN '50001' AND '59999'
+		   AND M.CATEGORY_ID = #{adiCatId}
+		 ORDER BY DBMS_RANDOM.VALUE
+	</select>     
+
+	
+	<!-- 연관컨텐츠 상세 정보 조회1 -->
+	<select id="getContsInfo1" resultType="getFXRelationSubVO" >
+		SELECT X.* 
+		  FROM (
+		        SELECT 'ALB' RESULT_TYPE,
+		               M.CONTENTS_ID AS CONTS_ID,
+		               A.ADI_ALBUM_NAME AS CONTS_NAME,
+		               M.CATEGORY_ID AS CAT_ID,
+		               V.CATEGORY_NAME AS CAT_NAME,
+		               M.CHA_NUM,
+		               TO_CHAR(TO_NUMBER(V.CATEGORY_LEVEL) + 1) AS CONTS_LEVEL,
+		               CASE WHEN TO_NUMBER(NVL(T.SUGGESTED_PRICE, '0')) <![CDATA[>]]> 0 THEN 'Y' ELSE 'N' END AS SUGGESTED_PRICE,
+		               NVL(T.RATING, '') PR_INFO,
+		               DECODE(TO_CHAR(TO_NUMBER(SUBSTR(T.DISPLAY_RUN_TIME, 1, 2))*60 + TO_NUMBER(SUBSTR(T.DISPLAY_RUN_TIME, 3, 2))), '0', '1' , TO_CHAR(TO_NUMBER(SUBSTR(T.DISPLAY_RUN_TIME, 1, 2))*60 + TO_NUMBER(SUBSTR(T.DISPLAY_RUN_TIME, 3, 2)))) RUN_TIME,
+		               UPPER(NVL(C.AUDIO_TYPE, '')) IS_51CH,
+		               M.CREATE_DATE AS IS_NEW,
+		               CASE WHEN NVL(T.DUBBING, 'N') = 'Y' THEN 'D' WHEN NVL(C.SMI_YN, 'N')='Y' AND NVL(C.SMI_IMP_YN, 'N') ='Y' THEN 'Y' ELSE 'N' END IS_CAPTION,
+		               NVL(C.HDCONTENT, 'N') IS_HD,
+		               TO_CHAR(ROUND(TO_NUMBER(NVL(A.POINT_SUM, '0'))/(CASE WHEN NVL(A.POINT_CNT, '0')= '0' THEN 1 ELSE TO_NUMBER(NVL(A.POINT_CNT, '0')) END), 0)) POINT,
+		               M.RANK_NO AS SORT_NO,
+		               '' PROD_TYPE,
+		               NVL(C.is_3d, 'N') IS_3D,
+		               NVL(T.SUGGESTED_PRICE, '0') TEMP_PRICE,
+		               NVL(T.EVENT_VALUE, '0') EVENT_VALUE,
+		               CASE WHEN NVL(T.CATEGORY, '') = 'K' OR NVL(T.CATEGORY, '') = 'F' THEN NVL(T.CATEGORY, '') ELSE 'N' END FILTER_GB,
+		               CASE WHEN NVL(V.NSC_GB, 'LTE') = 'UFX' THEN A.SERVICE_ICON_UFLIX ELSE A.SERVICE_ICON END SERVICE_ICON,
+		               D.COM_CD AS TERR_CH,
+		               T.DIRECTOR AS OVERSEE_NAME,
+		               T.ACTORS_DISPLAY AS ACTOR,
+		               A.RELEASE_DATE,
+		               DECODE(V.CATEGORY_GB, 'PCT', 'PCT', 'I20', 'I20' , 'NSC' , 'NSC' , '') AS CAT_GB,
+		               CASE WHEN NVL(T.GENRE_LARGE, '')= '방송' THEN 'T' ELSE 'V' END GENRE_GB,
+		               A.SERIES_NO AS SERIES_DESC,
+		               NVL(A.IS_RH, 'N') AS REAL_HD,
+		               A.ONAIR_DATE,
+		               CASE WHEN NVL(T.CATEGORY, '') = 'KBS' THEN '0' WHEN NVL(T.CATEGORY, '') = 'MBC' THEN '0' WHEN NVL(T.CATEGORY, '') = 'SBS' THEN '0' ELSE '1' END TERR_YN,
+		               M.ADI_PRODUCT_ID AS ADI_PROD_ID
+		          FROM (
+		                SELECT M.CONTENTS_ID,
+		                       MAX(R.CATEGORY_ID) CATEGORY_ID,
+		                       MIN(M.CHA_NUM) CHA_NUM,
+		                       MIN(M.RANK_NO) RANK_NO,
+		                       MAX(M.CREATE_DATE) CREATE_DATE,
+		                       MAX(NVL(M.VIEWING_FLAG, 'N')) VIEWING_FLAG,
+		                       MIN(P.ADI_PRODUCT_ID) ADI_PRODUCT_ID 
+		                  FROM PT_VO_CATEGORY_MAP M,
+		                       PT_VO_CATEGORY R,
+		                       IMCSUSER.PT_LA_PACKAGE_ASSET P 
+		                 WHERE M.CATEGORY_ID = R.CATEGORY_ID
+		                   AND M.CONTENTS_ID = P.NSC_ALBUM_ID
+		                   AND M.CONTENTS_ID = #{contsId}
+		                   AND R.CATEGORY_GB = #{tempCatGb}
+		                 GROUP BY M.CONTENTS_ID
+		               ) M,
+		               PT_VO_CATEGORY V,
+		               IMCSUSER.PT_LA_ALBUM_MST A,
+		               IMCSUSER.PT_LA_TITLE_ASSET T,
+		               IMCSUSER.PT_LA_CONTENT_ASSET C,
+		               (
+		                SELECT COM_CD,
+		                       COM_NAME 
+		                  FROM IMCSUSER.PT_CD_COM_CD 
+		                 WHERE GRP_ID = 'PUBLICCH'
+		               ) D 
+		         WHERE M.CATEGORY_ID = V.CATEGORY_ID
+		           AND M.CONTENTS_ID = A.ADI_ALBUM_ID
+		           AND M.ADI_PRODUCT_ID = T.ADI_PRODUCT_ID
+		           AND M.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID
+		           AND T.CATEGORY = D.COM_NAME(+)
+		           AND NVL(T.RATING, '01') <![CDATA[<]]> #{prInfo}
+		           AND (NVL(C.PRE_MAPPING_YN, 'N') = 'N' OR (NVL(C.PRE_MAPPING_YN, 'N') = 'Y' AND M.VIEWING_FLAG IN ('V', #{viewFlag1}, #{viewFlag2})))
+		       ) X 
+		 WHERE ROWNUM = 1
+	</select>
+	
+	
+	<!-- 연관컨텐츠 상세 정보 조회2 -->
+	<select id="getContsInfo2" resultType="getFXRelationSubVO" >
+		SELECT X.* 
+		  FROM (
+		        SELECT 'ALB' RESULT_TYPE,
+		               M.CONTENTS_ID AS CONTS_ID,
+		               A.ADI_ALBUM_NAME AS CONTS_NAME,
+		               M.CATEGORY_ID AS CAT_ID,
+		               V.CATEGORY_NAME AS CAT_NAME,
+		               M.CHA_NUM,
+		               TO_CHAR(TO_NUMBER(V.CATEGORY_LEVEL) + 1) AS CONTS_LEVEL,
+		               CASE WHEN TO_NUMBER(NVL(T.SUGGESTED_PRICE, '0'))<![CDATA[>]]> 0 AND SUBSTR(M.PRODUCT_TYPE, 1, 1) <![CDATA[<>]]> '0' THEN 'Y' ELSE 'N' END AS SUGGESTED_PRICE,
+		               NVL(T.RATING, '') PR_INFO,
+		               DECODE(TO_CHAR(TO_NUMBER(SUBSTR(T.DISPLAY_RUN_TIME, 1, 2))*60 + TO_NUMBER(SUBSTR(T.DISPLAY_RUN_TIME, 3, 2))), '0', '1', TO_CHAR(TO_NUMBER(SUBSTR(T.DISPLAY_RUN_TIME, 1, 2))*60 + TO_NUMBER(SUBSTR(T.DISPLAY_RUN_TIME, 3, 2)))) RUN_TIME,
+		               UPPER(NVL(C.AUDIO_TYPE, '')) IS_51CH,
+		               M.CREATE_DATE AS IS_NEW,
+		               CASE WHEN NVL(T.DUBBING, 'N') = 'Y' THEN 'D' WHEN NVL(C.SMI_YN, 'N')='Y' AND NVL(C.SMI_IMP_YN, 'N') ='Y' THEN 'Y' ELSE 'N' END IS_CAPTION,
+		               NVL(C.HDCONTENT, 'N') IS_HD,
+		               TO_CHAR(ROUND(TO_NUMBER(NVL(A.POINT_SUM, '0'))/(CASE WHEN NVL(A.POINT_CNT, '0')= '0' THEN 1 ELSE TO_NUMBER(NVL(A.POINT_CNT, '0')) END), 0)) POINT,
+		               M.RANK_NO AS SORT_NO,
+		               M.PRODUCT_TYPE AS PROD_TYPE,
+		               NVL(C.IS_3D, 'N') IS_3D,
+		               NVL(T.SUGGESTED_PRICE, '0') TEMP_PRICE,
+		               NVL(T.EVENT_VALUE, '0') EVENT_VALUE,
+		               CASE WHEN NVL(T.CATEGORY, '') = 'K' OR NVL(T.CATEGORY, '') = 'F' THEN NVL(T.CATEGORY, '') ELSE 'N' END FILTER_GB,
+		               CASE WHEN NVL(V.NSC_GB, 'N') = 'UFX' THEN A.SERVICE_ICON_UFLIX ELSE A.SERVICE_ICON END SERVICE_ICON,
+		               D.COM_CD AS TERR_CH,
+		               T.DIRECTOR AS OVERSEE_NAME,
+		               T.ACTORS_DISPLAY AS ACTOR,
+		               A.RELEASE_DATE,
+		               DECODE(V.CATEGORY_GB, 'PCT', 'PCT', 'I20', 'I20' , 'NSC' , 'NSC' , '') AS CAT_GB,
+		               CASE WHEN NVL(T.GENRE_LARGE, '')= '방송' THEN 'T' ELSE 'V' END GENRE_GB,
+		               A.SERIES_NO AS SERIES_DESC,
+		               NVL(A.IS_RH, 'N') AS REAL_HD,
+		               A.ONAIR_DATE,
+		               CASE WHEN NVL(T.CATEGORY, '') = 'KBS' THEN '0' WHEN NVL(T.CATEGORY, '') = 'MBC' THEN '0' WHEN NVL(T.CATEGORY, '') = 'SBS' THEN '0' ELSE '1' END TERR_YN,
+		               P.ADI_PRODUCT_ID AS ADI_PROD_ID 
+		          FROM (
+		                SELECT M.CONTENTS_ID,
+		                       MAX(R.CATEGORY_ID) CATEGORY_ID,
+		                       MIN(M.CHA_NUM) CHA_NUM,
+		                       MIN(M.RANK_NO) RANK_NO,
+		                       MAX(M.CREATE_DATE) CREATE_DATE,
+		                       MAX(NVL(M.VIEWING_FLAG, 'N')) VIEWING_FLAG,
+		                       MIN(G.PRODUCT_TYPE) PRODUCT_TYPE 
+		                  FROM PT_VO_CATEGORY_MAP M,
+		                       PT_VO_CATEGORY R,
+		                       IMCSUSER.PT_LA_PACKAGE_ASSET P,
+		                       IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+		                       IMCSUSER.PT_PD_PACKAGE G 
+		                 WHERE M.CATEGORY_ID = R.CATEGORY_ID
+		                   AND M.CONTENTS_ID = P.ADI_ALBUM_ID
+		                   AND M.CONTENTS_ID = #{contsId}
+		                   AND R.CATEGORY_GB = #{tempCatGb}
+		                   AND D.PRODUCT_ID = G.PRODUCT_ID
+		                   AND P.ASSET_ID = D.CONTENTS_ID
+		                 GROUP BY M.CONTENTS_ID
+		               ) M,
+		               PT_VO_CATEGORY V,
+		               IMCSUSER.PT_LA_ALBUM_MST A,
+		               IMCSUSER.PT_LA_TITLE_ASSET T,
+		               IMCSUSER.PT_LA_CONTENT_ASSET C,
+		               IMCSUSER.PT_LA_PACKAGE_ASSET P,
+		               (
+		                SELECT COM_CD,
+		                       COM_NAME 
+		                  FROM IMCSUSER.PT_CD_COM_CD 
+		                 WHERE GRP_ID = 'PUBLICCH'
+		               ) D 
+		         WHERE M.CATEGORY_ID = V.CATEGORY_ID
+		           AND M.CONTENTS_ID = A.ADI_ALBUM_ID
+		           AND M.CONTENTS_ID = P.ADI_ALBUM_ID
+		           AND P.ADI_PRODUCT_ID = T.ADI_PRODUCT_ID
+		           AND P.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID
+		           AND T.CATEGORY = D.COM_NAME(+)
+		           AND NVL(T.RATING, '01') <![CDATA[<]]> #{prInfo}
+		           AND (NVL(C.PRE_MAPPING_YN, 'N') = 'N' OR (NVL(C.PRE_MAPPING_YN, 'N') = 'Y' AND M.VIEWING_FLAG IN ('V', #{viewFlag1}, #{viewFlag2})))
+		         ORDER BY DECODE(P.ALBUM_TYPE, '3D', '1', 'HD', '2', 'SH', '3', 'SD', '4', 'PR', '5', '6'),
+		               C.HDCONTENT
+		       ) X 
+		 WHERE ROWNUM = 1
+	</select>
+
+
+	<!-- 이미지 파일명 조회 -->
+	<select id="getImgFileName" resultType="String" >
+		SELECT MAX(TRIM(NVL(CONTENT_VALUE, ''))) AS CONTS_VALUE 
+		  FROM IMCSUSER.PT_LA_POSTER_ASSET 
+		 WHERE ADI_PRODUCT_ID IN (
+		        SELECT ADI_PRODUCT_ID 
+		          FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+		          <if test="fxType.equals('P'.toString()) or fxType.equals('T'.toString())"> 		           				
+		         WHERE NSC_ALBUM_ID = #{contsId} 
+				</if> 
+				<if test="!fxType.equals('P'.toString()) and !fxType.equals('T'.toString())">
+		         WHERE ADI_PRODUCT_ID = #{adiProdId} 
+				</if>
+		       )
+		   AND POSTER_TYPE = #{posterType}
+	</select> 
+
+
+	<!-- 상품타입정보 조회 -->
+	<select id="getProdType" resultType="String" >
+		SELECT MIN(AA.PRODUCT_TYPE) AS PROD_TYPE
+		  FROM IMCSUSER.PT_PD_PACKAGE AA,
+		       IMCSUSER.PT_PD_PACKAGE_DETAIL BB,
+		       IMCSUSER.PT_LA_PACKAGE_ASSET A 
+		 WHERE AA.PRODUCT_ID = BB.PRODUCT_ID
+		   AND BB.CONTENTS_ID = A.ASSET_ID
+		   AND A.NSC_ALBUM_ID = #{contsId}
+	</select> 
+
+
+	<!-- 시리즈 카테고리 정보 조회 -->
+	<!-- 기존 SeriesYN도 Y로 가져오기는 하나 무의미 하여 serCatId만 조회 -->
+	<select id="getSerCatId" resultType="String" >
+		SELECT B.CATEGORY_ID AS SER_CAT_ID
+		  FROM PT_VO_CATEGORY_MAP A,
+		       PT_VO_CATEGORY B 
+		 WHERE A.CONTENTS_ID = #{contsId}
+		   AND A.CATEGORY_ID = B.CATEGORY_ID
+		   AND B.SERIES_YN = 'Y'
+		   AND B.CATEGORY_GB = #{catGb}
+		   AND NVL(B.NSC_GB, 'LTE') = 'UFX'
+		   AND (B.TEST_SBC = 'N' OR B.TEST_SBC IS NULL OR B.TEST_SBC = '')
+		   AND ROWNUM = 1
+	</select>
+
+
+	<!-- 왓챠 정보 조회 -->
+	<select id="getWatchaInfo" resultType="ComWatchaVO">
+		SELECT TO_CHAR(RATING01) AS RATING01,
+		       TO_CHAR(RATING02) AS RATING02,
+		       TO_CHAR(RATING03) AS RATING03,
+		       TO_CHAR(RATING04) AS RATING04,
+		       TO_CHAR(RATING05) AS RATING05,
+		       TO_CHAR(RATING06) AS RATING06,
+		       TO_CHAR(RATING07) AS RATING07,
+		       TO_CHAR(RATING08) AS RATING08,
+		       TO_CHAR(RATING09) AS RATING09,
+		       TO_CHAR(RATING10) AS RATING10,
+		       TO_CHAR(TOT_RATING_COUNT) AS TOT_RATING_COUNT,
+		       TO_CHAR(COMMENT_CNT) AS COMMENT_CNT,
+		       CASE WHEN NVL(AVG_RATING, '') IS NOT NULL THEN TRIM(TO_CHAR(AVG_RATING, '0.0')) ELSE '' END AS POINT_WATCHA,
+		       WATCHA_URL 
+		  FROM IMCSUSER.PT_WC_WATCHA_RATING 
+		 WHERE ALBUM_ID = #{albumId}
+		   AND USE_YN = 'Y'
+		   AND ROWNUM = 1
+	</select>
+
+
+
+</mapper>
+	
+	
+	

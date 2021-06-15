@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSChPGM.GetNSChPGMDao">
+
+	<resultMap type="HashMap" id="mImgFileInfo">
+		<result property="IMG_FILE_NAME" column="IMG_FILE_NAME" javaType="String"/>
+		<result property="PR_INFO" column="PR_INFO" javaType="String"/>
+		<result property="RUNTIME" column="RUNTIME" javaType="String"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mVirtualIdInfo">
+		<result property="VIRTUAL_ID" column="VIRTUAL_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="OMNIVIEW_CNT" column="OMNIVIEW_CNT" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="MAIN_PROPERTY" column="MAIN_PROPERTY" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="SUB_PROPERTY" column="SUB_PROPERTY" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<!-- 검수 STB 여부 조회 -->
+	<select id="getTestSbc" resultType="String" >
+		SELECT CASE WHEN TEST_SBC = 'Y' THEN TEST_SBC ELSE 'N' END TEST_SBC 
+		  FROM PT_VO_CUSTOM_ID 
+		 WHERE SA_ID = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	
+	<select id="selectPRGSCHEDULE" resultType="Integer">
+		SELECT count(*) as CNT
+		FROM IMCSUSER.PT_LP_PRGSCHEDULE_STD
+		WHERE ROWNUM = 1
+	</select>	
+	
+	<!-- Nscreen 가상채널 EPG전체 스케줄정보 조회 -->
+	<select id="getNSChPGMList" resultType="GetNSChPGMResponseVO" timeout="60">
+		 SELECT '0' AS EPG_TYPE, 
+		        A.SERVICE_ID ,                                                                                    
+		  	    C.CHNL_NAME CHNL_NM, 
+		        A.PRO_CD PROGRAM_ID,                                                                                            
+		        A.EVENT_ID ,                                                                                          
+		        A.EVENT_NAME PROGRAM_TITLE,                                                                                        
+		  	    B.DUP_GB DUPL_GB, 
+		        '' AS CATEGORY_ID, 
+		        B.PRO_GENRE1 GENRE1,                                                                                        
+		        B.PRO_GENRE2 GENRE2,                                                                                        
+		        substr(A.START_TIME,1,4)||substr(A.START_TIME,6,2)||substr(A.START_TIME,9,2)||
+		        substr(A.START_TIME,12,2)||substr(A.START_TIME,15,2)||substr(A.START_TIME,18,2) START_TIME,
+		        substr(A.END_TIME,1,4)||substr(A.END_TIME,6,2)||substr(A.END_TIME,9,2)||
+		        substr(A.END_TIME,12,2)||substr(A.END_TIME,15,2)||substr(A.END_TIME,18,2) END_TIME
+		        ,A.SERVICE_ID||'.jpg' IMG_FILE_NAME, C.IMAGE_YN, '' VIRTUAL_ID, '' SUB_CHNL_YN, B.FILTERING_CODE,
+		        '' AS MAIN_PROPERTY,
+                '' AS SUB_PROPERTY
+		   FROM IMCSUSER.PT_LP_PRGSCHEDULE_STD A , IMCSUSER.PT_LE_AV_EPG B  , IMCSUSER.PT_CD_PLAY_CHNL C
+		  WHERE B.CHNL_CD = 'CH'||A.SERVICE_ID
+		    AND B.PRO_DATE = A.ONAIR_DATE
+		    AND B.PRO_CD = A.PRO_CD
+		    AND B.EVENT_ID = A.EVENT_ID
+		    AND A.SERVICE_ID = C.SERVICE_ID
+		    and (B.PRO_DATE  <![CDATA[>=]]> substr(TO_CHAR(TO_DATE(#{requestTime},'YYYYMMDDHH24MISS')-1, 'YYYYMMDDHH24MISS'), 1,8) and B.PRO_DATE <![CDATA[<=]]> substr(TO_CHAR(TO_DATE(#{requestTime},'YYYYMMDDHH24MISS')+1, 'YYYYMMDDHH24MISS'), 1,8))                                    
+		    and (((A.END_TIME   <![CDATA[>]]>  to_char(to_date(#{requestTime} || '0000', 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS'))        
+		        and (A.END_TIME   <![CDATA[<=]]> to_char(to_date(#{requestTime} || '0000', 'YYYY-MM-DD HH24:MI:SS') + (#{callFlag} / 24), 'YYYY-MM-DD HH24:MI:SS')))  
+		        OR ((A.START_TIME <![CDATA[>=]]>  to_char(to_date(#{requestTime} || '0000', 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS'))     
+		        and (A.START_TIME <![CDATA[<]]> to_char(to_date(#{requestTime} || '0000', 'YYYY-MM-DD HH24:MI:SS') + (#{callFlag} / 24), 'YYYY-MM-DD HH24:MI:SS'))))     
+		    and C.FILTERING_CODE  in ('1', '3', '5', '7', '8', '9', '10', '11', '12', '13', '14', '15') 
+		    and C.SORT_NO <![CDATA[<>]]> #{testSbcQuery} 
+		  	  AND NVL(C.POOQ_YN , 'N') IN (#{pooqQuery1}, #{pooqQuery2})
+			<if test='(hdtvViewGb == "R")'> 
+				 AND NVL(C.HDTV_VIEW_GB , '0') in ('2', '4', '5', '6')
+			</if>
+			<if test='(hdtvViewGb == "P")'> 
+			     AND NVL(C.HDTV_VIEW_GB , '0') in ('3', '4', '6', '7')
+			     AND SUBSTR(NVL(C.ARS_NO1, '00'), 1, 2) = '00'
+			</if>
+			<if test='(hdtvViewGb == "G")'> 
+				AND SUBSTR(NVL(C.ARS_NO1, '00'), 1, 1) = '1'
+			</if>
+			<if test='(hdtvViewGb == "M")'> 
+				AND SUBSTR(NVL(C.ARS_NO1, '00'), 2, 1) = '1'
+			</if>
+			<if test='(hdtvViewGb == "K")'>
+				AND SUBSTR(NVL(C.ARS_NO1, '0000'), 3, 1) = '1'
+			</if>
+			<if test='(hdtvViewGb == "C")'>
+				AND SUBSTR(NVL(C.ARS_NO1, '0000'), 4, 1) = '1'
+			</if>
+			<if test='(hdtvViewGb == "M")'>
+			union all                                                                                             
+			 SELECT '1' AS EPG_TYPE,  
+			         B.SERVICE_ID,  
+			         A.CHNL_NAME CHNL_NM,  
+			         '' AS PROGRAM_ID,  
+			         '' AS EVENT_ID,  
+			         B.CUESHEET_TITLE PROGRAM_TITLE,  
+			         '001' AS DUPL_GB,  
+			         MIN(D.CATEGORY_ID) AS CATEGORY_ID,  
+			         '' AS PRO_GENRE1,  
+			         '' AS PRO_GENRE2,  
+			         B.PERFORM_DATE||B.PERFORM_TIME||'00' AS START_TIME,  
+			         '' AS END_TIME,  
+			         '' AS IMG_FILE_NAME,  
+			         'Y' AS IMAGE_YN,  
+			         B.ALBUM_ID AS VIRTUAL_ID, 
+			         CASE WHEN(SUM(CASE WHEN E.OMNIVIEW_YN = 'Y' THEN 1 ELSE 0 END)) <![CDATA[>]]> 0 THEN 'Y' ELSE '' END SUB_CHNL_YN, '0' FILTERING_CODE,
+			         MCONUSER.UF_GET_ALBUM_PROPERTY(B.ALBUM_ID,'P') AS MAIN_PROPERTY,
+                     MCONUSER.UF_GET_ALBUM_PROPERTY(B.ALBUM_ID,'C') AS SUB_PROPERTY
+			    FROM IMCSUSER.PT_CD_PLAY_CHNL A, IMCSUSER.PT_LB_CUESHEET_MST B, PT_VO_CATEGORY_MAP C, PT_VO_CATEGORY D, IMCSUSER.PT_LB_CUESHEET_ITEM E 
+			   WHERE A.FILTERING_CODE IN ('1', '3', '5', '7', '8', '9', '10', '11', '12', '13', '14', '15')  
+			     AND SUBSTR(A.ARS_NO1,2,1) = '1'  
+			     AND A.SERVICE_ID = B.SERVICE_ID  
+			     AND B.PERFORM_DATE||B.PERFORM_TIME||'00' <![CDATA[>=]]> TO_CHAR(TO_DATE(#{requestTime} || '0000', 'YYYYMMDDHH24MISS') + (#{callFlag} / 24), 'YYYYMMDDHH24MISS')  
+			     AND B.STATUS = '0'  
+			     AND B.VIEWING_FLAG = 'Y'  
+			     AND B.ALBUM_ID = C.CONTENTS_ID  
+			     AND C.CATEGORY_ID = D.CATEGORY_ID  
+			     AND D.CATEGORY_GB = 'NSC'  
+			     --AND D.SERIES_YN = 'Y'  
+			     AND D.ACTORS_DISPLAY = 'M'  
+			     AND B.CUESHEET_ID = E.CUESHEET_ID(+) 
+			     AND E.ITEM_NO(+) = '000' 
+			 GROUP BY B.SERVICE_ID, A.CHNL_NAME, CUESHEET_TITLE, B.PERFORM_DATE, B.PERFORM_TIME, B.ALBUM_ID, E.OMNIVIEW_YN
+			</if>
+			<if test='(pooqYn == "P")'> 
+				ORDER BY  EPG_TYPE, SERVICE_ID, START_TIME
+			</if>
+			<if test='(pooqYn != "P")'>
+			  union all                                                                                             
+			   SELECT '2' AS EPG_TYPE, 
+			           B.CHNL_CD SERVICE_ID , 
+			    	   C.CHNL_NAME, 
+			          B.PRO_CD , 
+			          '' EVENT_ID , 
+			          B.PRO_NAME EVENT_NAME , 
+			   		  '001' AS DUPL_GB, 
+			   		  '' AS CATEGORY_ID, 
+			          B.PRO_GENRE1 , 
+			          B.PRO_GENRE2 , 
+			          B.PRO_DATE||B.PRO_TIME START_TIME, 
+			          case when B.PRO_TIME <![CDATA[>]]> B.PRO_ENDTIME then TO_CHAR(TO_DATE(B.PRO_DATE,'YYYYMMDD')+1, 'YYYYMMDD')||B.PRO_ENDTIME else B.PRO_DATE||B.PRO_ENDTIME end END_TIME
+			          ,C.SERVICE_ID||'.jpg' IMG_FILE_NAME, 'Y' IMAGE_YN, B.VIRTUAL_ID, D.OMNIVIEW_YN, '0' FILTERING_CODE,
+			          <if test='(hdtvViewGb != "M")'> 
+			          '' AS MAIN_PROPERTY,
+                      '' AS SUB_PROPERTY
+                      </if>
+                      <if test='(hdtvViewGb == "M")'> 
+			          MCONUSER.UF_GET_ALBUM_PROPERTY(ALBUM_ID,'P') AS MAIN_PROPERTY,
+                      MCONUSER.UF_GET_ALBUM_PROPERTY(ALBUM_ID,'C') AS SUB_PROPERTY
+                      </if>
+			     FROM IMCSUSER.PT_LE_AV_EPG_VIRTUAL B, IMCSUSER.PT_CD_VIRTUAL_CHNL C, IMCSUSER.PT_LA_ALBUM_SUB D 
+			    WHERE 1 = #{vchSql} AND C.VIRTUAL_TYPE = #{vchType}
+			      AND B.CHNL_CD = C.SERVICE_ID 
+			      and (B.PRO_DATE <![CDATA[>=]]>  TO_CHAR(TO_DATE(#{requestTime}, 'YYYYMMDDHH24MISS')-1, 'YYYYMMDD') and B.PRO_DATE <![CDATA[<=]]> TO_CHAR(TO_DATE(#{requestTime}, 'YYYYMMDDHH24MISS')+1, 'YYYYMMDD')) 
+			      AND (    (case when B.PRO_TIME <![CDATA[>]]> B.PRO_ENDTIME then TO_CHAR(TO_DATE(B.PRO_DATE,'YYYYMMDD')+1, 'YYYYMMDD')||B.PRO_ENDTIME else B.PRO_DATE||B.PRO_ENDTIME end <![CDATA[>]]> #{requestTime} || '0000' 
+				  and case when B.PRO_TIME <![CDATA[>]]> B.PRO_ENDTIME then TO_CHAR(TO_DATE(B.PRO_DATE,'YYYYMMDD')+1, 'YYYYMMDD')||B.PRO_ENDTIME else B.PRO_DATE||B.PRO_ENDTIME end <![CDATA[<=]]>  TO_CHAR(TO_DATE(#{requestTime} || '0000','YYYYMMDDHH24MISS')+ (#{callFlag} / 24), 'YYYYMMDDHH24MISS')) 																														
+				  OR (B.PRO_DATE||B.PRO_TIME <![CDATA[>=]]> #{requestTime} || '0000' 
+				  and B.PRO_DATE||B.PRO_TIME <![CDATA[<]]> TO_CHAR(TO_DATE(#{requestTime} || '0000','YYYYMMDDHH24MISS')+ (#{callFlag} / 24), 'YYYYMMDDHH24MISS'))    ) 
+			      and C.SORT_NO <![CDATA[<>]]> #{testSbcQuery}
+			      AND B.VIRTUAL_ID = D.ALBUM_ID 
+			    ORDER BY EPG_TYPE, SERVICE_ID, START_TIME
+			</if>
+	</select>
+
+	
+	<!-- 이미지 경로 조회 -->
+	<!-- SELECT 'http:'||REPLACE(NVL(A.MAIN_IMG_URL, ''), '\\', '/') IMG_URL, -->
+	<select id="getImgUrl" resultType="StillImageVO" >
+		SELECT 'http:'||REPLACE(REPLACE(NVL(A.MAIN_IMG_URL, ''), '\\', '//'), '\', '/') IMG_URL,
+		       A.MAIN_IMG_FILE_NAME IMG_FILE_NAME 
+		  FROM IMCSUSER.PT_LA_ALBUM_IMG A 
+		 WHERE A.ADI_ALBUM_ID = #{virtualId}
+		   AND A.IMG_FLAG = 'N'
+		 ORDER BY TO_NUMBER(ADI_ALBUM_SEQ)
+	</select>
+	
+
+	<!-- 이미지 파일명 조회 -->
+    <select id="getImgFileName" resultType="String" >
+		SELECT A.CONTENT_VALUE IMG_FILE_NAME 
+		  FROM IMCSUSER.PT_LA_POSTER_ASSET A,
+		       IMCSUSER.PT_LA_PACKAGE_ASSET B 
+		 WHERE B.NSC_ALBUM_ID = #{virtualId}
+		   AND A.ADI_PRODUCT_ID = B.ADI_PRODUCT_ID
+		   AND A.POSTER_TYPE = 'T'
+		   AND ROWNUM = 1
+	</select>
+	
+	<!-- 연령제한 조회 -->
+	<select id="getPrInfo" resultType="GetNSChPGMResponseVO" >
+		SELECT NVL(A.RATING, '') PR_INFO,
+		       DECODE(TO_CHAR(TO_NUMBER(SUBSTR(A.DISPLAY_RUN_TIME, 1, 2)) * 60 + TO_NUMBER(SUBSTR(A.DISPLAY_RUN_TIME, 3, 2))), '0', '1', 
+		       TO_CHAR(TO_NUMBER(SUBSTR(A.DISPLAY_RUN_TIME, 1, 2)) * 60 + TO_NUMBER(SUBSTR(A.DISPLAY_RUN_TIME, 3, 2)))) RUNTIME
+		  FROM IMCSUSER.PT_LA_TITLE_ASSET A,
+		       IMCSUSER.PT_LA_PACKAGE_ASSET B 
+		 WHERE B.NSC_ALBUM_ID = #{virtualId}
+		   AND A.ADI_PRODUCT_ID = B.ADI_PRODUCT_ID
+		   AND ROWNUM = 1
+	</select>
+	
+	<select id="getImgFileInfo" resultType="GetNSChPGMResponseVO" resultMap="mImgFileInfo">
+		SELECT B.CONTENT_VALUE IMG_FILE_NAME, NVL(A.RATING_CD, '') AS PR_INFO, 
+               SUBSTR(A.RUN_TIME,1,6) AS RUNTIME 
+       	  FROM IMCSUSER.PT_LA_ALBUM_SUB A, 
+        	   IMCSUSER.PT_LA_ALBUM_POSTER B 
+         WHERE A.ALBUM_ID = #{virtualId}
+           AND A.ALBUM_ID = B.ALBUM_ID 
+           AND SCREEN_TYPE = 'N' 
+           AND POSTER_TYPE = 'T' 
+           AND SERVICE_YN = 'Y' 
+           AND ROWNUM = 1
+	</select>
+	
+	<select id="getVitualIdInfo" resultType="GetNSChPGMResponseVO" resultMap="mVirtualIdInfo">
+		SELECT VIRTUAL_ID, 
+		       OMNIVIEW_CNT, 
+		       MCONUSER.UF_GET_ALBUM_PROPERTY(VIRTUAL_ID,'P') AS MAIN_PROPERTY,
+		       MCONUSER.UF_GET_ALBUM_PROPERTY(VIRTUAL_ID,'C') AS SUB_PROPERTY  
+		  FROM(
+		        SELECT A.ALBUM_ID VIRTUAL_ID, SUM(CASE WHEN B.OMNIVIEW_YN = 'Y' THEN 1 ELSE 0 END) OMNIVIEW_CNT
+		            FROM IMCSUSER.PT_LB_CUESHEET_MST A, IMCSUSER.PT_LB_CUESHEET_ITEM B
+		           WHERE A.SERVICE_ID = #{serviceId}
+		             AND A.STATUS IN ('0','1')
+		             AND A.PERFORM_DATE||A.PERFORM_TIME||'00' BETWEEN #{startTime} AND #{endTime}
+		             AND A.CUESHEET_ID = B.CUESHEET_ID(+)
+		             AND B.ITEM_NO(+) = '000'
+		             AND A.ALBUM_ID IS NOT NULL
+		           GROUP BY A.ALBUM_ID, A.STATUS, A.PERFORM_DATE, A.PERFORM_TIME
+		           ORDER BY A.STATUS DESC, A.PERFORM_DATE||A.PERFORM_TIME
+		      ) X
+	</select>
+</mapper>
+	
+	
+	

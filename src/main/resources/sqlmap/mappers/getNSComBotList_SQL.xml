@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSComBotList.GetNSComBotListDao">
+
+	<resultMap type="java.util.HashMap" id="mTestSbcInfo">
+		<result property="TEST_SBC" column="TEST_SBC" javaType="java.lang.String" typeHandler="EmptyStringIfNull"/>
+		<result property="VIEWING_FLAG" column="VIEWING_FLAG" javaType="java.lang.String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="java.util.HashMap" id="mEXPInfo">
+		<result property="EXP_INTERVAL" column="EXP_INTERVAL" javaType="java.lang.String" typeHandler="EmptyStringIfNull"/>
+		<result property="EXP_TYPE" column="EXP_TYPE" javaType="java.lang.String" typeHandler="EmptyStringIfNull"/>
+		<result property="EXP_MAX_COUNT" column="EXP_MAX_COUNT" javaType="java.lang.String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+
+
+	<!--검수 STB여부 조회 -->
+	<select id="getTestSbc" parameterType="GetNSComBotListRequestVO" resultMap="mTestSbcInfo">
+        SELECT DECODE(NVL(test_sbc, 'N'), 'Y', 'Y', 'N') AS TEST_SBC,
+               DECODE(NVL(test_sbc, 'N'), 'Y', 'T', 'V') AS VIEWING_FLAG
+          FROM PT_VO_CUSTOM_ID A
+         WHERE A.sa_id    = #{saId}
+           AND A.mac_addr = #{stbMac}
+	</select>
+	
+	<!--컴패니언 봇 정보 조회 -->
+	<select id="getEXPInfo" resultMap="mEXPInfo">
+		SELECT option1 as EXP_INTERVAL, option2 as EXP_TYPE, option3 as EXP_MAX_COUNT
+		  FROM IMCSUSER.PT_CD_SYS_OPTION 
+		 WHERE option_id = 'K10'
+		   AND screen_type = 'N'
+	</select>
+	
+	
+	<!--컴패니언 봇 리스트정보 조회 -->
+	<select id="getNSComBotList" parameterType="GetNSComBotListRequestVO" resultType="GetNSComBotListResponseVO">
+		SELECT result_type,
+		       category_id,
+		       album_id,
+		       app_id,
+		       exp_time,
+		       exp_text,
+		       option_time,
+		       audio_file,
+		       audio_file_ios,
+		       type,
+		       category_type,
+		       category_flag
+		  FROM (SELECT A.comp_type result_type,
+		               A.category_id,
+		               A.album_id,
+		               case when NVL(B.caption_yn, 'X') IN ('A','R','T') then NVL(B.genre, '') else A.app_id end app_id,
+		               A.exp_time,
+		               A.exp_text,
+		               A.option_time,
+		               A.audio_file,
+		               A.audio_file_ios,
+		               case when NVL(B.series_yn, 'N') = 'Y' then 'SER'
+		                    else (case NVL(B.caption_yn, '')
+		                               when 'A' then 'APP'
+		                               when 'R' then 'RCM'
+		                               when 'U' then 'MNU'
+		                               when 'T' then 'TOP'
+		                               when 'D' then 'DIR'
+		                               else '' end) end TYPE,
+		               case when B.actors_display IN ('B','C','P','G','T','E','R','H') then B.actors_display else '' end CATEGORY_TYPE,
+		               case when NVL(B.caption_yn, '') = 'L' then 'L' else DECODE(NVL(B.caption_yn, ''), 'U', Trim(B.point), DECODE(Trim(B.point), 'P', 'P', '')) end category_flag,
+		               A.comp_seq
+		          FROM IMCSUSER.PT_KD_COMBOT_MST A,
+		               (SELECT *
+		                  FROM PT_VO_CATEGORY R
+		                 WHERE R.category_gb = 'NSC'
+		                   AND NVL(R.NSC_GB, 'X') = 'KID'
+		                   AND NVL(R.test_sbc, 'N') IN ('N', #{testSbc})) B
+		         WHERE screen_type = 'N'
+		           AND A.category_id = B.category_id (+)
+		           AND A.comp_type != '10'
+		           AND A.use_yn = 'Y'
+		        UNION
+		        SELECT A.comp_type as result_type,
+		               A.category_id,
+		               A.album_id,
+		               A.app_id,
+		               A.exp_time,
+		               A.exp_text,
+		               A.option_time,
+		               A.audio_file,
+		               A.audio_file_ios,
+		               '' type,
+		               (SELECT case when H.actors_display IN ('B','C','P','G','T','E','R') then H.actors_display else '' end  
+						 FROM PT_VO_CATEGORY H WHERE H.category_id = B.category_id) category_type, 
+		               '' category_flag,
+		               A.comp_seq
+		          FROM IMCSUSER.PT_KD_COMBOT_MST A,
+		               (SELECT M.contents_id, NVL(MAX(R.category_id), 'X') category_id 
+		                  FROM PT_VO_CATEGORY R,
+		                       PT_VO_CATEGORY_MAP M
+		                 WHERE R.category_id = M.category_id
+		                   AND R.category_gb = 'NSC'
+		                   AND NVL(R.NSC_GB, 'X') = 'KID'
+		                   AND NVL(R.test_sbc, 'N') IN ('N', #{testSbc})
+		                   AND NVL(M.viewing_flag, 'V') IN ('V', #{viewingFlag})
+		                 GROUP BY M.contents_id) B
+		         WHERE screen_type = 'N'
+		           AND A.album_id = B.contents_id
+		           AND A.comp_type = '10'
+		           AND A.use_yn = 'Y' ) X
+		ORDER BY result_type, comp_seq
+	</select>
+		
+</mapper> 

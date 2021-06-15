@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.rmNSPresent.RmNSPresentDao">
+
+	<update id="rmNSPresentUpdate" parameterType="rmNSPresentRequestVO">
+		UPDATE PT_VO_PRESENT
+		<if test='presentGb == "G"'>
+			SET DEL_FLG = 'Y'
+		WHERE RCV_SA_ID           = #{saId}
+		  AND RCV_MAC_ADDR        = #{stbMac}
+		  <if test='albumId != "A"'>
+		  AND PRESENT_DATE        = #{presentDate}
+  		  AND CONTENTS_ID         = #{albumId}
+		  </if>
+		  AND NVL(DEL_FLG, 'N')   = 'N'
+		  AND SERVICE_GB          = 'NSC'
+		</if>
+		<if test='presentGb != "G"'>
+			SET PRESENT_GB = 'Y'
+		WHERE SA_ID           = #{saId}
+		  AND MAC_ADDR        = #{stbMac}
+		  <if test='albumId != "A"'>
+		  AND PRESENT_DATE        = #{presentDate}
+  		  AND CONTENTS_ID         = #{albumId}
+		  </if>
+		  AND NVL(PRESENT_GB, 'N')   = 'N'
+		  AND SERVICE_GB          = 'NSC'
+		</if>
+		  
+	</update>
+	
+</mapper> 

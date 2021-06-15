@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.addNSAlert.AddNSAlertDao">
+
+	
+
+<resultMap type="java.util.HashMap" id="ReservedInfo">
+	<result property="PREVIEW_FLAG"	column="PREVIEW_FLAG" javaType="java.lang.String"/>
+	<result property="RESERVED_PRICE" column="RESERVED_PRICE" javaType="java.lang.String"/>
+	<result property="RESERVED_DATE" column="RESERVED_DATE" javaType="java.lang.String"/>
+</resultMap>
+	
+<!-- 1. 알람받기 중복 체크 - Oracle버전 -->
+<select id="getAlertDupChk" parameterType="AddNSAlertRequestVO" resultType="java.lang.Integer">
+ SELECT 1
+   FROM DUAL
+  WHERE EXISTS (
+      SELECT 'X' 
+      FROM PT_VO_ALERT A 
+      WHERE A.SA_ID = #{saId}
+        AND CONTENTS_ID = #{contsId}
+    UNION ALL
+     SELECT 'X' 
+      FROM PT_VO_ALERT A 
+     WHERE A.SA_ID = #{saId}
+       AND CONTENTS_ID IN (
+            SELECT ASSET_ID 
+              FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+             WHERE ADI_ALBUM_ID = #{contsId}
+           )
+    )       
+</select>
+
+
+<!-- 2. 알람받기 인덱스 조회 - Oracle버전 -->
+<select id="getAlertIndex" parameterType="String" resultType="Integer">
+SELECT NVL(TO_CHAR(MAX(TO_NUMBER(TRIM(ALERT_IDX))) + 1), '1')
+  FROM PT_VO_ALERT A
+ WHERE A.SA_ID = #{saId}
+</select>
+
+
+<!-- 3. 알람받기 갯수 조회 - Oracle버전 -->
+<select id="getAlertCount" parameterType="String" resultType="Integer">
+SELECT COUNT(X.IDX) 
+    FROM (SELECT MIN(NVL(A.ALERT_IDX, '')) IDX   
+          FROM PT_VO_ALERT A,         
+               (SELECT DISTINCT E.CATEGORY_ID,          
+                      A.ADI_ALBUM_ID, PA.ASSET_ID       
+                 FROM PT_VO_CATEGORY_MAP E,             
+                      PT_VO_CATEGORY J,                 
+                      IMCSUSER.PT_LA_PACKAGE_ASSET PA , 
+                      IMCSUSER.PT_LA_ALBUM_MST A        
+                WHERE E.CATEGORY_ID = J.CATEGORY_ID     
+                  AND (J.TEST_SBC = 'N' OR J.TEST_SBC IS NULL OR J.TEST_SBC = '') 
+                  AND E.CONTENTS_ID = PA.NSC_ALBUM_ID   
+                  AND PA.NSC_ALBUM_ID = A.ADI_ALBUM_ID  
+                  ) G                                   
+         WHERE A.SA_ID    = #{saId}                     
+           AND (A.CONTENTS_ID = G.ADI_ALBUM_ID OR A.CONTENTS_ID = G.ASSET_ID)  
+         GROUP BY A.ALERT_IDX,  G.ADI_ALBUM_ID                                 
+       ) X
+</select>
+
+
+<!-- 4. 예약정보 조회  -->
+<select id="getReservedInfo" parameterType="String" resultMap="ReservedInfo">
+SELECT DISTINCT NVL(A.PREVIEW_FLAG,'N') PREVIEW_FLAG, 
+       A.RESERVED_PRICE AS RESERVED_PRICE,                              
+       A.RESERVED_DATE AS RESERVED_DATE                                
+  FROM IMCSUSER.PT_LA_ALBUM_MST A                     
+ WHERE A.ADI_ALBUM_ID = #{contsId}                   
+   AND ROWNUM = 1  
+</select>  
+   
+
+<!-- 5. 알람받기 등록 - Oracle버전 -->
+<insert id="addNSAlertInfo" parameterType="AddNSAlertRequestVO">
+INSERT INTO PT_VO_ALERT      
+    (SA_ID, MAC_ADDR, CONTENTS_ID, ALERT_IDX, CONTENTS_NAME, CHA_NUM, PRICE, PR_INFO, CATEGORY_ID,          
+       REG_UPDATE, RESERVED_PRICE, RESERVED_DATE, PUSH_YN, PREVIEW_FLAG )                      
+VALUES 
+    (#{saId}, #{stbMac}, #{contsId}, #{alertIdx}, REPLACE(#{contsName}, '    ', ' '), #{chaNum},
+    NVL(#{buyingPrice}, '0'), #{prInfo}, #{catId}, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{reservedPrice}, #{reservedDate}, #{pushYn}, #{previewFlag})
+</insert> 
+</mapper> 

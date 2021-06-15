@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.api.getNSProdCpInfo.GetNSProdCpInfoDao">
+		
+	<select id="getNSProdCpInfoList" resultType="ComCpnVO" >
+		SELECT SMARTUX.F_GET_SVOD_CPN_POSSIBLE_LIST(#{saId}, 'NSC', #{prodId}, #{uCubeProdIc}) AS CPN_INFO
+		FROM DUAL
+	</select>	
+</mapper>
+	
+	
+	

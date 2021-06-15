@@ -1,0 +1,692 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getFXContStat.GetFXContStatDao">
+	
+	<resultMap type="HashMap" id="mTestSbc">
+		<result property="TEST_SBC" column="TEST_SBC" javaType="String"/>
+		<result property="VOD_USE_YN" column="VOD_USE_YN" javaType="String"/>
+	</resultMap>
+
+	<resultMap type="HashMap" id="mPremium">
+		<result property="ALBUM_ID" column="ALBUM_ID" javaType="String"/>
+		<result property="IMCS_PROD_PROPERTY" column="IMCS_PROD_PROPERTY" javaType="String"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mProdInfo">
+		<result property="IMCS_PROD_ID" column="IMCS_PROD_ID" javaType="String"/>
+		<result property="UFLIX_PROD_YN" column="UFLIX_PROD_YN" javaType="String"/>
+		<result property="IMCS_PRICE" column="IMCS_PRICE" javaType="String"/>
+		<result property="PROD_SUB_YN" column="PROD_SUB_YN" javaType="String"/>
+		<result property="IMCS_VIEW_CTRL" column="IMCS_VIEW_CTRL" javaType="String"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mDupChk">
+		<result property="DATA_CHK" column="DATA_CHK" javaType="Integer"/>
+		<result property="BUY_DATE" column="BUY_DATE" javaType="String"/>
+	</resultMap>
+
+	<resultMap type="HashMap" id="mImcsProdId">
+		<result property="IMCS_PRODUCT_ID" column="IMCS_PRODUCT_ID" javaType="String"/>
+		<result property="IMCS_PRODUCT_PROPERTY" column="IMCS_PRODUCT_PROPERTY" javaType="String"/>
+		<result property="CONCURRENT_COUNT" column="CONCURRENT_COUNT" javaType="String"/>
+	</resultMap>
+	
+	<!-- IMCS 상품여부 조회 -->
+	<select id="getImcsProdId" resultMap="mImcsProdId">
+		 SELECT DISTINCT B.IMCS_PRODUCT_ID, nvl(B.IMCS_PRODUCT_PROPERTY, 'N') IMCS_PRODUCT_PROPERTY, NVL(D.concurrent_count, 0) CONCURRENT_COUNT 
+		   FROM PT_VO_CUSTOM_PRODUCT A, 
+		        imcsuser.PT_PD_PACKAGE_UNITED B, 
+		        PVSUSER.PV_PROD_PRODUCT_TBL C, 
+		        IMCSUSER.PT_PD_PACKAGE_SUB D 
+		  WHERE A.sa_id = #{saId} 
+		    AND A.mac_addr = #{stbMac} 
+		    AND A.PRODUCTCD = B.imcs_product_id 
+		    AND C.product_cd = B.imcs_product_id 
+		    AND B.imcs_product_id = D.product_id 
+		    AND B.imcs_product_type = '4' 
+		    AND nvl(B.IMCS_UFLIX_PROD_YN, 'N') = 'Y' 
+		    AND B.IMCS_USE_SCREEN_MOBILE in ('2', '3', '4', '5', '9', 'A', 'B', 'C') 
+		    --AND nvl(B.IMCS_PRODUCT_PROPERTY, 'N') = 'N' 
+		    AND nvl(C.prod_sub_yn, 'N') = 'N'
+	  <!-- 2020.07.14 - 모바일 영화월정액 체험권 상품.. PC나 IPTV로도 봐야한다고 해서 임시 대처 -->
+		  UNION 
+		 SELECT PROD_CD as IMCS_PRODUCT_ID, 'N' as IMCS_PRODUCT_PROPERTY, 0 as CONCURRENT_COUNT
+		   FROM PT_VO_NSC_PRODUCT A, imcsuser.PT_PD_PACKAGE_UNITED B, imcsuser.PT_CD_COM_CD C 
+		  WHERE A.SBC_CONT_NO = #{saId}
+		    AND TO_CHAR(sysdate , 'yyyymmddhh24miss') between A.buy_date and A.expired_date 
+		    AND A.prod_cd = B.imcs_product_id 
+		    AND B.IMCS_PRODUCT_TYPE = '7' 
+			AND B.IMCS_PRODUCT_KIND = '2' 
+		    AND B.IMCS_NSC_PROD_KIND = '1' 
+		    AND nvl(B.IMCS_UFLIX_PROD_YN, 'N') = 'Y' 
+		    AND B.IMCS_USE_SCREEN_MOBILE in ('2', '3', '4', '5', '9', 'A', 'B', 'C') 
+		    AND B.IMCS_PRODUCT_ID = C.COM_NAME 
+		    AND C.GRP_ID = 'HDTVPRECOU' 		   
+	</select>
+	
+	
+	<!-- 검수STB여부, SAVE요금제 여부 조회 -->
+	<select id="getTestSbc" resultMap="mTestSbc">
+		SELECT CASE WHEN TEST_SBC = 'Y' THEN TEST_SBC ELSE 'N' END AS TEST_SBC,
+		       CASE WHEN VOD_USE_YN = 'E' THEN 'Y' ELSE 'N' END AS VOD_USE_YN 
+		  FROM PT_VO_CUSTOM_ID 
+		 WHERE SA_ID = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	
+	<!-- 프리미엄 여부 조회 -->
+	<select id="getPremiumYn" resultMap="mPremium">
+		SELECT DISTINCT F.ADI_ALBUM_ID AS ALBUM_ID,
+		       NVL(A.IMCS_PRODUCT_PROPERTY, '') AS IMCS_PROD_PROPERTY 
+		  FROM IMCSUSER.PT_PD_PACKAGE_UNITED A,
+		       IMCSUSER.PT_PD_PACKAGE_DETAIL B,
+		       IMCSUSER.PT_PD_CONTENTS_MST C,
+		       IMCSUSER.PT_LA_TITLE_ASSET D,
+		       IMCSUSER.PT_LA_PACKAGE_ASSET F 
+		 WHERE F.ADI_ALBUM_ID = #{albumId}
+		   AND A.IMCS_PRODUCT_ID = B.PRODUCT_ID
+		   AND C.CONTENTS_ID = B.CONTENTS_ID
+		   AND C.ASSET_ID = D.ADI_PRODUCT_ID
+		   AND F.ADI_PRODUCT_ID = D.ADI_PRODUCT_ID
+		   AND NVL(A.IMCS_PRODUCT_PROPERTY, '') = '01'
+		   AND A.IMCS_PRODUCT_TYPE NOT IN('0', '1', '9', '10')
+		   AND NVL(A.IMCS_UFLIX_PROD_YN, 'N') = 'Y'
+		   AND ROWNUM = 1
+	</select>
+	
+	
+	
+	<!-- 컨텐츠정보 조회 -->
+	<select id="getProdInfo" resultType="GetFXContStatResponseVO">
+		SELECT /*+ LEADING (P) */ DISTINCT NVL(P.ADI_PRODUCT_ID||'00', '') AS CONTS_ID,
+		       P.ALBUM_TYPE AS CONTS_GB,
+		       DECODE(T.CP_NOUSE_YN, 'N', '0', '1') AS IN_HOUSE,
+		       DECODE(SUBSTR(UPPER(NVL(C.AUDIO_TYPE, '')), 1, 9), 'DOLBY 5.1', 'Y', 'N') AS IS_51CH 
+		  FROM IMCSUSER.PT_LA_ALBUM_MST A,
+		       IMCSUSER.PT_LA_PACKAGE_ASSET P,
+		       IMCSUSER.PT_LA_TITLE_ASSET T,
+		       IMCSUSER.PT_LA_CONTENT_ASSET C,
+		       (SELECT D.CONTENTS_ID,
+		               MIN(G.PRODUCT_TYPE) PRODUCT_TYPE 
+		          FROM IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+		               IMCSUSER.PT_PD_PACKAGE G 
+		         WHERE D.PRODUCT_ID = G.PRODUCT_ID
+		           AND D.CONTENTS_ID IN (
+		                SELECT ASSET_ID 
+		                  FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+		                 WHERE ADI_ALBUM_ID = #{albumId}
+		               )
+		         GROUP BY D.CONTENTS_ID
+		       ) H 
+		 WHERE P.ADI_ALBUM_ID = #{albumId}
+		   AND P.ADI_ALBUM_ID = A.ADI_ALBUM_ID
+		   AND P.ADI_PRODUCT_ID = T.ADI_PRODUCT_ID
+		   AND P.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID
+		   AND P.ASSET_ID = H.CONTENTS_ID
+		   AND NVL(T.IS_FH, 'N') = 'N'
+		 ORDER BY DECODE(P.ALBUM_TYPE, '3D', '1', 'HD', '2', 'SH', '3', 'SD', '4', 'PR', '5', '6')
+	</select>
+	
+	
+	<!-- 컨텐츠정보 조회 -->
+	<select id="getProdInfo2" resultMap="mProdInfo">
+		SELECT DISTINCT A.IMCS_PRODUCT_ID AS IMCS_PROD_ID, 
+		       NVL(A.IMCS_UFLIX_PROD_YN, 'N') UFLIX_PROD_YN,
+		       A.IMCS_PRICE,
+		       NVL(D.PROD_SUB_YN, 'N') AS PROD_SUB_YN,
+		       NVL(A.IMCS_VIEW_CTRL, '0') AS IMCS_VIEW_CTRL 
+		  FROM IMCSUSER.PT_PD_PACKAGE_DETAIL B,
+		       IMCSUSER.PT_PD_PACKAGE_UNITED A,
+		       IMCSUSER.PT_PD_PACKAGE_RELATION C,
+		       PVSUSER.PV_PROD_PRODUCT_TBL D
+		 WHERE B.CONTENTS_ID IN (SELECT ASSET_ID FROM IMCSUSER.PT_LA_PACKAGE_ASSET WHERE ADI_ALBUM_ID = #{albumId} )
+		   AND C.PRODUCT_ID = B.PRODUCT_ID
+		   AND A.IMCS_PRODUCT_ID = C.P_PRODUCT_ID
+		   AND A.IMCS_PRODUCT_TYPE = '4'
+		   AND A.IMCS_PRODUCT_KIND = '2'
+		   AND A.IMCS_AMOUNT_GB = 'F'
+		   AND ( A.IMCS_PRICE <![CDATA[>]]> 0 OR (A.IMCS_PRICE = 0 and A.IMCS_PRODUCT_ID IN (SELECT Z.PRODUCT_ID FROM IMCSUSER.PT_PD_PACKAGE_SUB Z WHERE Z.PRODUCT_ID = A.IMCS_PRODUCT_ID AND Z.PPV_BLOCK_YN = 'E')) )
+		   AND NVL(A.IMCS_UFLIX_PROD_YN, 'N') = 'Y'
+		   AND A.IMCS_PRODUCT_ID NOT IN (SELECT COM_NAME FROM IMCSUSER.PT_CD_COM_CD WHERE GRP_ID = 'CATCHON')
+		   AND A.IMCS_USE_SCREEN_MOBILE IN ('2', '3', '4', '5', '9', 'A', 'B', 'C')
+		   AND D.PRODUCT_CD = A.IMCS_PRODUCT_ID
+		   AND D.BILLING_TYP = 'P'
+		   AND NVL(D.ATRCT_CHNL_DV_CD, '') = (
+		   		SELECT PVS_ATRT_CHNL_DV_CD FROM NSCN_SBC_TBL 
+		   		WHERE PVS_SBC_CONT_NO = #{saId} AND PVS_MAC_ADDR = #{stbMac} AND ROWNUM = 1)
+		 <!-- ORDER BY A.IMCS_PRICE, A.IMCS_PRODUCT_ID -->
+		 <!-- 2020.07.14 - 모바일 영화월정액 체험권 상품.. PC나 IPTV로도 봐야한다고 해서 임시 대처 -->
+		 UNION 
+		 SELECT DISTINCT A.IMCS_PRODUCT_ID as IMCS_PROD_ID, NVL(A.IMCS_uflix_prod_yn, 'N') UFLIX_PROD_YN, 
+		        A.IMCS_PRICE, 
+		        'N' as PROD_SUB_YN, 
+		        NVL(A.IMCS_VIEW_CTRL, '0') AS IMCS_VIEW_CTRL 
+		  FROM IMCSUSER.PT_PD_PACKAGE_DETAIL B, 
+		       IMCSUSER.PT_PD_PACKAGE_UNITED A, 
+		       IMCSUSER.PT_PD_PACKAGE_RELATION C, 
+		       IMCSUSER.PT_CD_COM_CD D 
+		 WHERE B.CONTENTS_ID in (SELECT ASSET_ID FROM IMCSUSER.PT_LA_PACKAGE_ASSET WHERE ADI_ALBUM_ID = #{albumId} ) 
+		   AND B.PRODUCT_ID = C.PRODUCT_ID 
+		   AND A.IMCS_PRODUCT_ID = C.P_PRODUCT_ID 
+		   AND A.IMCS_PRODUCT_TYPE = '7' 
+		   AND A.IMCS_PRODUCT_KIND = '2' 
+		   AND A.IMCS_NSC_PROD_KIND = '1' 
+		   AND nvl(A.IMCS_UFLIX_PROD_YN, 'N') = 'Y' 
+		   AND A.IMCS_USE_SCREEN_MOBILE in ('2', '3', '4', '5', '9', 'A', 'B', 'C') 
+		   AND A.IMCS_PRODUCT_ID = D.COM_NAME 
+		   AND D.GRP_ID = 'HDTVPRECOU' 
+		 ORDER BY IMCS_PRICE, IMCS_PROD_ID 
+	</select>
+	
+	
+	
+	<!-- 컨텐츠 타입 정보 조회 -->
+	<select id="getContType" resultType="GetFXContStatResponseVO">
+		SELECT DISTINCT DECODE(A.IMCS_AMOUNT_GB, 'F', '0', 'H', '1', '') AS BILL_TYPE,
+		       A.IMCS_PRODUCT_TYPE AS CONTS_TYPE,
+		       D.SUGGESTED_PRICE AS SALE_PRICE,
+		       NVL(D.EVENT_VALUE, '0') AS EVENT_VALUE,
+		       CASE WHEN TRIM(D.DISTRIBUTOR_NAME) = 'SONY' THEN '1' WHEN TRIM(D.DISTRIBUTOR_NAME) = 'SHOWBOX' THEN '1' ELSE '0' END AS EVENT_YN,
+		       CASE WHEN A.IMCS_PRODUCT_TYPE = '2' THEN A.IMCS_EXPIRED_DATE ELSE NVL(SUBSTR(D.MAXIMUM_VIEWING_LENGTH, 1, LENGTH(D.MAXIMUM_VIEWING_LENGTH) - 2), '48') END EXPIRE_TIME,
+		       DECODE(NVL(D.TERR_YN, '0'), '1', '0', '0', '1') AS TERR_YN,
+		       D.TERR_ED_DATE,
+		       D.LICENSING_WINDOW_END,
+		       CASE WHEN A.IMCS_PRODUCT_TYPE = '2' THEN MIN(A.IMCS_PRICE) ELSE NVL(D.SUGGESTED_PRICE, '0') END AS PRICE,
+		       MIN(A.IMCS_PRODUCT_ID) AS SUBS_PROD_ID,
+		       MIN(A.IMCS_PRODUCT_NAME) AS SUBS_PROD_NAME,
+		       MIN(A.IMCS_PRICE) AS SUBS_PROD_PRICE,
+		       MIN(A.IMCS_PRODUCT_DESC) AS SUB_PROD_SUB,
+		       NVL(D.CP_NOUSE_YN, 'N') AS CP_NOUSE_YN,
+		       A.IMCS_ISU_YN AS SUB_PROD_ISU,
+		       A.IMCS_ISU_TYPE AS SUBS_PROD_TYPE,
+		       F.ALBUM_TYPE,
+		       REPLACE(REPLACE(TRIM(NVL(A.IMCS_PPS_PROD_DESC, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n') AS PVOD_PROD_DESC,
+		       NVL(A.IMCS_UFLIX_PROD_YN, 'N') AS UFLIX_PROD_YN,
+		       A.IMCS_PRODUCT_EXPIRY_DATETIME AS EXPIRED_DATE
+		  FROM IMCSUSER.PT_PD_PACKAGE_UNITED A, IMCSUSER.PT_PD_PACKAGE_DETAIL B, IMCSUSER.PT_PD_CONTENTS_MST C,
+		       IMCSUSER.PT_LA_TITLE_ASSET D, IMCSUSER.PT_LA_PACKAGE_ASSET F 
+		 WHERE B.CONTENTS_ID = #{contsId}
+		   AND A.IMCS_PRODUCT_ID = B.PRODUCT_ID
+		   AND C.CONTENTS_ID = B.CONTENTS_ID
+		   AND C.ASSET_ID = D.ADI_PRODUCT_ID
+		   AND F.ADI_PRODUCT_ID = D.ADI_PRODUCT_ID
+		   AND (A.IMCS_PRODUCT_TYPE NOT IN ('3', '9', '10') OR A.IMCS_PRODUCT_ID IN (
+		        SELECT COM_NAME 
+		          FROM IMCSUSER.PT_CD_COM_CD 
+		         WHERE GRP_ID = 'CATCHON'
+		       ))
+		 GROUP BY A.IMCS_AMOUNT_GB, A.IMCS_PRODUCT_TYPE, D.SUGGESTED_PRICE, NVL(D.EVENT_VALUE, '0'), D.DISTRIBUTOR_NAME,
+		       A.IMCS_EXPIRED_DATE, D.MAXIMUM_VIEWING_LENGTH, D.TERR_YN, D.TERR_ED_DATE, D.LICENSING_WINDOW_END, A.IMCS_ISU_YN,
+		       D.CP_NOUSE_YN, A.IMCS_ISU_TYPE, F.ALBUM_TYPE, A.IMCS_PPS_PROD_DESC, A.IMCS_UFLIX_PROD_YN, A.IMCS_PRODUCT_EXPIRY_DATETIME
+		UNION
+		 SELECT DISTINCT DECODE(A.IMCS_AMOUNT_GB, 'F', '0', 'H', '1', '') AS BILL_TYPE,
+		       DECODE(A.IMCS_PRODUCT_TYPE, '9', '1', '10', '0', A.IMCS_PRODUCT_TYPE) PRODUCT_TYPE,
+		       D.SUGGESTED_PRICE AS SALE_PRICE,
+		       NVL(D.EVENT_VALUE, '0') AS EVENT_VALUE,
+		       CASE WHEN TRIM(D.DISTRIBUTOR_NAME) = 'SONY' THEN '1' WHEN TRIM(D.DISTRIBUTOR_NAME) = 'SHOWBOX' THEN '1' ELSE '0' END AS EVENT_YN,
+		       CASE WHEN A.IMCS_PRODUCT_TYPE = '2' THEN A.IMCS_EXPIRED_DATE WHEN (A.IMCS_PRODUCT_TYPE = '9' OR A.IMCS_PRODUCT_TYPE = '10') THEN GH.SAVE_VIEW_LENGTH ELSE NVL(SUBSTR(D.MAXIMUM_VIEWING_LENGTH, 1, LENGTH(D.MAXIMUM_VIEWING_LENGTH) - 2), '48') END EXPIRE_TIME,
+		       DECODE(NVL(D.TERR_YN, '0'), '1', '0', '0', '1') AS TERR_YN,
+		       D.TERR_ED_DATE,
+		       D.LICENSING_WINDOW_END,
+		       CASE WHEN A.IMCS_PRODUCT_TYPE = '2' THEN MIN(A.IMCS_PRICE) WHEN (A.IMCS_PRODUCT_TYPE = '9' AND F.ALBUM_TYPE IN ('HD', 'SH', '3D' )) THEN GH.SAVE_HD_PRICE WHEN (A.IMCS_PRODUCT_TYPE = '9' AND F.ALBUM_TYPE = 'SD') THEN GH.SAVE_SD_PRICE WHEN (A.IMCS_PRODUCT_TYPE = '9' AND F.ALBUM_TYPE = 'PR') THEN '0' WHEN A.IMCS_PRODUCT_TYPE = '10' THEN '0' ELSE NVL(D.SUGGESTED_PRICE, '0') END PRICE,
+		       MIN(A.IMCS_PRODUCT_ID) AS SUBS_PROD_ID,
+		       MIN(A.IMCS_PRODUCT_NAME) AS SUBS_PROD_NAME,
+		       MIN(A.IMCS_PRICE) AS SUBS_PROD_PRICE,
+		       MIN(A.IMCS_PRODUCT_DESC) AS SUB_PROD_SUB,
+		       NVL(D.CP_NOUSE_YN, 'N') AS CP_NOUSE_YN,
+		       A.IMCS_ISU_YN AS SUB_PROD_ISU,
+		       A.IMCS_ISU_TYPE AS SUBS_PROD_TYPE,
+		       F.ALBUM_TYPE,
+		       REPLACE(REPLACE(TRIM(NVL(A.imcs_pps_prod_desc, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n') AS PVOD_PROD_DESC,
+		       NVL(A.IMCS_UFLIX_PROD_YN, 'N') AS UFLIX_PROD_YN,
+		       A.IMCS_PRODUCT_EXPIRY_DATETIME AS EXPIRED_DATE
+		  FROM IMCSUSER.PT_PD_PACKAGE_UNITED A, IMCSUSER.PT_PD_PACKAGE_DETAIL B, IMCSUSER.PT_PD_CONTENTS_MST C,
+		       IMCSUSER.PT_LA_TITLE_ASSET D, IMCSUSER.PT_LA_PACKAGE_ASSET F,
+		       (SELECT H.CONTENTS_ID ,
+		               MAX(G.SAVE_SD_PRICE) SAVE_SD_PRICE,
+		               MAX(G.SAVE_HD_PRICE) SAVE_HD_PRICE ,
+		               MAX(G.SAVE_VIEW_LENGTH) SAVE_VIEW_LENGTH 
+		          FROM PT_VO_CATEGORY G ,
+		               PT_VO_CATEGORY_MAP H 
+		         WHERE G.CATEGORY_ID = H.CATEGORY_ID
+		           AND G.CATEGORY_GB = 'I20'
+		           AND H.CONTENTS_ID = #{albumId}
+		         GROUP BY H.CONTENTS_ID
+		       ) GH 
+		 WHERE B.CONTENTS_ID = #{contsId}
+		   AND A.IMCS_PRODUCT_ID = B.PRODUCT_ID
+		   AND C.CONTENTS_ID = B.CONTENTS_ID
+		   AND C.ASSET_ID = D.ADI_PRODUCT_ID
+		   AND F.ADI_PRODUCT_ID = D.ADI_PRODUCT_ID
+		   AND (GH.CONTENTS_ID = F.ADI_ALBUM_ID OR GH.CONTENTS_ID = F.ASSET_ID)
+		   AND (A.IMCS_PRODUCT_TYPE NOT IN ('3', '9', '10') OR A.IMCS_PRODUCT_ID IN (
+		        SELECT COM_NAME 
+		          FROM IMCSUSER.PT_CD_COM_CD 
+		         WHERE GRP_ID = 'CATCHON'
+		       ))
+		 GROUP BY A.IMCS_AMOUNT_GB, A.IMCS_PRODUCT_TYPE, D.SUGGESTED_PRICE, NVL(D.EVENT_VALUE, '0'), D.DISTRIBUTOR_NAME,
+		       A.IMCS_EXPIRED_DATE, D.MAXIMUM_VIEWING_LENGTH, D.TERR_YN, D.TERR_ED_DATE, D.LICENSING_WINDOW_END, A.IMCS_ISU_YN,
+		       D.CP_NOUSE_YN, F.ALBUM_TYPE, GH.SAVE_SD_PRICE, GH.SAVE_HD_PRICE, GH.SAVE_VIEW_LENGTH, A.IMCS_ISU_TYPE,
+		       F.ALBUM_TYPE, A.IMCS_PPS_PROD_DESC, A.IMCS_UFLIX_PROD_YN, A.IMCS_PRODUCT_EXPIRY_DATETIME
+		 ORDER BY CONTS_TYPE
+	</select>
+	
+	
+	
+	<!-- 쿠폰정보 조회 -->
+	<select id="getCpnInfo" resultType="ComOfferVO">
+		SELECT OFR_SEQ AS OFFER_SEQ, OFFER_CD AS OFFER_CODE, OFFER_NM AS OFFER_NAME,
+		       ALWNCE_UNT, ALWNCE_AMNT, APPL_START_YMD, APPL_END_YMD, ALWNCE_VALUE 
+		  FROM (
+		        SELECT DISTINCT NVL(B.OFR_SEQ, '') OFR_SEQ,
+		               NVL(B.OFFER_CD, '') OFFER_CD,
+		               NVL(B.OFFER_NM, '') OFFER_NM,
+		               CASE WHEN NVL(B.ALWNCE_UNT, '') = '2' THEN '3' WHEN NVL(B.ALWNCE_UNT, '') = '3' THEN '4' ELSE NVL(B.ALWNCE_UNT, '') END ALWNCE_UNT,
+		               NVL(B.ALWNCE_AMNT, '') ALWNCE_AMNT,
+		               NVL(B.APPL_STRT_YMD, '') APPL_START_YMD,
+		               NVL(B.APPL_END_YMD, '') APPL_END_YMD,
+		               NVL(B.ALWNCE_VALUE, '') ALWNCE_VALUE 
+		          FROM PT_VO_CUSTOM_ID A, PT_VO_CUSTOM_OFFER B 
+		         WHERE B.SA_ID = #{saId}
+		           AND A.SA_ID = B.SA_ID
+		           AND B.APPL_STRT_YMD <![CDATA[<=]]> TO_CHAR(SYSDATE, 'YYYYMMDD')
+		           AND B.APPL_END_YMD <![CDATA[>=]]> TO_CHAR(SYSDATE, 'YYYYMMDD')
+		           AND ((TO_NUMBER(NVL(B.ALWNCE_VALUE, '100')) = 100 AND TO_NUMBER(NVL(B.ALWNCE_AMNT, '0')) <![CDATA[>]]> 0) OR TO_NUMBER(NVL(B.ALWNCE_VALUE, '100')) <![CDATA[<]]> 100)
+		           AND SUBSTR(B.CPN_CD, 1, 1) NOT IN ('C', 'M')
+		        UNION ALL
+		        SELECT DISTINCT NVL(B.OFR_SEQ, '') OFR_SEQ,
+		               NVL(B.OFFER_CD, '') OFFER_CD,
+		               NVL(B.OFFER_NM, '') OFFER_NM,
+		               CASE WHEN NVL(B.ALWNCE_UNT, '') = '2' THEN '3' WHEN NVL(B.ALWNCE_UNT, '') = '3' THEN '4' ELSE NVL(B.ALWNCE_UNT, '') END ALWNCE_UNT,
+		               NVL(B.ALWNCE_AMNT, '') ALWNCE_AMNT,
+		               NVL(B.APPL_STRT_YMD, '') APPL_STRT_YMD,
+		               NVL(B.APPL_END_YMD, '') APPL_END_YMD,
+		               NVL(B.ALWNCE_VALUE, '') ALWNCE_VALUE 
+		          FROM PT_VO_CUSTOM_ID A,
+		               PT_VO_CUSTOM_OFFER B,
+		               PT_VO_CATEGORY_OFFER C 
+		         WHERE B.SA_ID = #{saId}
+		           AND A.SA_ID = B.SA_ID
+		           AND B.APPL_STRT_YMD <![CDATA[<=]]> TO_CHAR(SYSDATE, 'YYYYMMDD')
+		           AND B.APPL_END_YMD <![CDATA[>=]]> TO_CHAR(SYSDATE, 'YYYYMMDD')
+		           AND ((TO_NUMBER(NVL(B.ALWNCE_VALUE, '100')) = 100 AND TO_NUMBER(NVL(B.ALWNCE_AMNT, '0')) > 0) OR TO_NUMBER(NVL(B.ALWNCE_VALUE, '100')) <![CDATA[<]]> 100)
+		           AND SUBSTR(B.CPN_CD, 1, 2) = C.CPN_CD
+		           AND C.CATEGORY_GB = #{catGb}
+		           AND C.CATEGORY_ID IN (
+		                SELECT CATEGORY_ID 
+		                  FROM PT_VO_CATEGORY START WITH CATEGORY_ID IN (
+		                        SELECT CATEGORY_ID 
+		                          FROM PT_VO_CATEGORY_MAP 
+		                         WHERE CONTENTS_ID = #{albumId}
+		                       ) CONNECT BY PRIOR PARENT_CATEGORY_ID = CATEGORY_ID
+		               )
+				UNION ALL
+		        SELECT DISTINCT NVL(B.OFR_SEQ, '') OFR_SEQ,
+               		   NVL(B.OFFER_CD, '') OFFER_CD,
+                	   NVL(B.OFFER_NM, '') OFFER_NM,
+                	   CASE WHEN NVL(B.ALWNCE_UNT, '') = '2' THEN '3' WHEN NVL(B.ALWNCE_UNT, '') = '3' THEN '4' ELSE NVL(B.ALWNCE_UNT, '') END ALWNCE_UNT,
+                	   NVL(B.ALWNCE_AMNT, '') ALWNCE_AMNT,
+                	   NVL(B.APPL_STRT_YMD, '') APPL_STRT_YMD,
+                	   NVL(B.APPL_END_YMD, '') APPL_END_YMD,
+                	   NVL(B.ALWNCE_VALUE, '') ALWNCE_VALUE 
+          		   FROM PT_VO_CUSTOM_ID A, PT_VO_CUSTOM_OFFER B 
+         		  WHERE B.SA_ID = #{saId}
+           			AND A.SA_ID = B.SA_ID
+           			AND B.APPL_STRT_YMD <![CDATA[<=]]> TO_CHAR(SYSDATE, 'YYYYMMDD')
+           			AND B.APPL_END_YMD <![CDATA[>=]]> TO_CHAR(SYSDATE, 'YYYYMMDD')
+           			AND ((TO_NUMBER(NVL(B.ALWNCE_VALUE, '100')) = 100 AND TO_NUMBER(NVL(B.ALWNCE_AMNT, '0')) <![CDATA[>]]> 0) OR TO_NUMBER(NVL(B.ALWNCE_VALUE, '100')) <![CDATA[<]]> 100)
+           			AND SUBSTR(B.CPN_CD, 1, 15) = #{albumId}
+		       ) ORDER BY APPL_END_YMD
+	</select>
+	
+	
+	
+	<!-- 상품코드 정보 조회 -->
+	<select id="getProdCd" resultType="String">
+		SELECT 1 AS CNT FROM (
+		        SELECT B.IMCS_PRODUCT_ID PRODUCTCD 
+		          FROM PT_VO_CUSTOM_PRODUCT A,
+		               IMCSUSER.PT_PD_PACKAGE_UNITED B,
+		               IMCSUSER.PT_PD_PACKAGE_DETAIL C 
+		         WHERE A.SA_ID = #{saId}
+		           AND A.MAC_ADDR = #{stbMac}
+		           AND A.PRODUCTCD = B.IMCS_PRODUCT_ID
+		           AND B.IMCS_PRODUCT_ID = C.PRODUCT_ID
+		           AND C.CONTENTS_ID = #{contsId}
+		           AND B.IMCS_PRODUCT_TYPE = '3'
+		           AND NVL(B.IMCS_UFLIX_PROD_YN, 'N') = 'Y'
+		           AND B.IMCS_USE_SCREEN_MOBILE IN ('2', '3', '4', '5', '9', 'A', 'B', 'C')
+		       ) X 
+		 WHERE ROWNUM = 1
+	</select>
+
+
+
+	<!-- 상품코드 정보 조회 -->
+	<select id="getProdCd2" resultType="String">
+		SELECT 1 AS CNT FROM (
+		        SELECT B.IMCS_PRODUCT_ID PRODUCTCD 
+		          FROM PT_VO_CUSTOM_PRODUCT A,
+		               IMCSUSER.PT_PD_PACKAGE_UNITED B,
+		               IMCSUSER.PT_PD_PACKAGE_DETAIL C,
+		               IMCSUSER.PT_PD_PACKAGE_RELATION D 
+		         WHERE A.SA_ID = #{saId}
+		           AND A.MAC_ADDR = #{stbMac}
+		           AND A.PRODUCTCD = D.P_PRODUCT_ID
+		           AND B.IMCS_PRODUCT_ID = C.PRODUCT_ID
+		           AND D.PRODUCT_ID = C.PRODUCT_ID
+		           AND C.CONTENTS_ID = #{contsId}
+		           AND B.IMCS_PRODUCT_TYPE = '3'
+		           AND NVL(B.IMCS_UFLIX_PROD_YN, 'N') = 'Y'
+		           AND B.IMCS_USE_SCREEN_MOBILE IN ('2', '3', '4', '5', '9', 'A', 'B', 'C')
+		       ) X 
+		 WHERE ROWNUM = 1
+	</select>	
+	
+	
+	
+	<!-- FVOD 구매중복 체크 -->
+	<select id="getBuyDupChk1" resultMap="mDupChk">
+		SELECT COUNT(*) AS DATA_CHK,
+		       MAX(A.BUY_DATE) AS BUY_DATE
+		  FROM PT_VO_BUY_FVOD A,
+		       (SELECT K.ASSET_ID 
+		          FROM IMCSUSER.PT_LA_PACKAGE_ASSET K 
+		         WHERE K.ADI_ALBUM_ID = #{albumId}
+		           AND DECODE(K.ALBUM_TYPE, 'SH', 'HD', K.ALBUM_TYPE) = (
+		                SELECT MAX(DECODE(ALBUM_TYPE, 'SH', 'HD', ALBUM_TYPE)) 
+		                  FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+		                 WHERE ASSET_ID = #{contsId}
+		               )
+		       ) P 
+		 WHERE A.SA_ID = #{saId}
+		   AND A.EXPIRED_DATE <![CDATA[>]]> TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS')
+		   AND A.PRODUCT_ID LIKE SUBSTR(P.ASSET_ID, 1, 17)||'%'
+		   AND A.P_IDX_SA = #{pIdxSa}
+	</select>
+	
+	<!-- PPV 구매중복 체크 -->
+	<!-- 메타구조개선 엔스크린 구매 체크 쿼리 -->
+	<select id="getBuyDupChk2" resultMap="mDupChk">
+		SELECT COUNT(*) AS DATA_CHK,
+				MAX(X.BUY_DATE) AS BUY_DATE
+	       FROM (
+				SELECT BUY_DATE
+				  FROM PT_VO_BUY A,
+				       (
+				        SELECT K.ASSET_ID 
+				          FROM IMCSUSER.PT_LA_PACKAGE_ASSET K 
+				         WHERE K.ADI_ALBUM_ID = #{albumId}
+				           AND DECODE(K.ALBUM_TYPE, 'SH', 'HD', K.ALBUM_TYPE) = (
+				                SELECT MAX(DECODE(ALBUM_TYPE, 'SH', 'HD', ALBUM_TYPE)) 
+				                  FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+				                 WHERE ASSET_ID = #{contsId}
+				               )
+				       ) P 
+				 WHERE A.SA_ID = #{saId}
+				   AND A.EXPIRED_DATE <![CDATA[>]]> TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS')
+				   AND A.product_id LIKE SUBSTR(P.ASSET_ID, 1, 17)||'%'
+				   AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+			     UNION ALL
+	            SELECT G.BUY_DATE
+	              FROM PT_VO_BUY G,
+	                (SELECT D.product_id, H.asset_id
+	                               FROM IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+	                                    IMCSUSER.PT_PD_PACKAGE P,
+	                                    (SELECT K.ASSET_ID 
+	                                      FROM IMCSUSER.PT_LA_PACKAGE_ASSET K 
+	                                     WHERE K.ADI_ALBUM_ID = #{albumId}
+	                                       AND DECODE(K.ALBUM_TYPE, 'SH', 'HD', K.ALBUM_TYPE) = (
+	                                            SELECT MAX(DECODE(ALBUM_TYPE, 'SH', 'HD', ALBUM_TYPE)) 
+	                                              FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+	                                             WHERE ASSET_ID = #{contsId}
+	                                    )
+	                           ) H
+	                  WHERE D.contents_id LIKE SUBSTR(H.asset_id, 1, 17) || '%'
+	                    AND D.product_id = P.product_id
+	                    AND P.product_type = '2' 
+	                 ) Z
+	            WHERE G.sa_id = #{saId}
+	              AND G.EXPIRED_DATE <![CDATA[>]]> TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS')
+	              AND G.product_id = Z.product_id
+	              AND NVL(regexp_substr(replace(replace(G.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+           )X
+		   
+	</select>
+
+
+	
+	<!-- PVOD 구매중복 체크 -->
+	<select id="getBuyDupChk3" resultMap="mDupChk">
+		SELECT COUNT(*) AS DATA_CHK,
+		       MAX(G.BUY_DATE) AS BUY_DATE
+		  FROM PT_VO_BUY G,
+             (SELECT D.product_id, H.asset_id
+                            FROM IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+                                 IMCSUSER.PT_PD_PACKAGE P,
+                                 (SELECT K.ASSET_ID 
+                                   FROM IMCSUSER.PT_LA_PACKAGE_ASSET K 
+                                  WHERE K.ADI_ALBUM_ID = #{albumId}
+                                    AND DECODE(K.ALBUM_TYPE, 'SH', 'HD', K.ALBUM_TYPE) = (
+                                         SELECT MAX(DECODE(ALBUM_TYPE, 'SH', 'HD', ALBUM_TYPE)) 
+                                           FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+                                          WHERE ASSET_ID = #{contsId}
+                                 		)
+                       			 ) H
+               WHERE D.contents_id LIKE SUBSTR(H.asset_id, 1, 17) || '%'
+                 AND D.product_id = P.product_id
+                 AND P.product_type = '2' 
+              ) Z
+         WHERE G.sa_id = #{saId}
+           AND G.product_id = Z.product_id
+           AND G.expired_date <![CDATA[>]]> to_char(sysdate, 'yyyymmddhh24miss')
+           AND NVL(regexp_substr(replace(replace(G.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+	</select>
+	
+	
+	
+	<!-- 이벤트 구매중복 체크 -->
+	<select id="getEventChk" resultType="Integer">
+		 SELECT COUNT(*) AS DATA_CHK
+	       FROM (
+	             SELECT A.BUY_DATE
+	               FROM PT_VO_BUY A,
+	                   (
+	                    SELECT K.ASSET_ID 
+	                      FROM IMCSUSER.PT_LA_PACKAGE_ASSET K 
+	                     WHERE K.ADI_ALBUM_ID = #{albumId}
+	                       AND DECODE(K.ALBUM_TYPE, 'SH', 'HD', K.ALBUM_TYPE) = (
+	                            SELECT MAX(DECODE(ALBUM_TYPE, 'SH', 'HD', ALBUM_TYPE)) 
+	                              FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+	                             WHERE ASSET_ID = #{contsId}
+	                           )
+	                   ) P 
+	             WHERE A.SA_ID = #{saId}
+	               AND A.product_id LIKE SUBSTR(P.ASSET_ID, 1, 17)||'%'
+	               AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+	             UNION ALL
+	            SELECT G.BUY_DATE
+	              FROM PT_VO_BUY G,
+	                (SELECT D.product_id, H.asset_id
+	                               FROM IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+	                                    IMCSUSER.PT_PD_PACKAGE P,
+	                                    (SELECT K.ASSET_ID 
+	                                      FROM IMCSUSER.PT_LA_PACKAGE_ASSET K 
+	                                     WHERE K.ADI_ALBUM_ID = #{albumId}
+	                                       AND DECODE(K.ALBUM_TYPE, 'SH', 'HD', K.ALBUM_TYPE) = (
+	                                            SELECT MAX(DECODE(ALBUM_TYPE, 'SH', 'HD', ALBUM_TYPE)) 
+	                                              FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+	                                             WHERE ASSET_ID = #{contsId}
+	                                    )
+	                           ) H
+	                  WHERE D.contents_id LIKE SUBSTR(H.asset_id, 1, 17) || '%'
+	                    AND D.product_id = P.product_id
+	                    AND P.product_type = '2' 
+	                 ) Z
+	            WHERE G.sa_id = #{saId}
+	              AND G.product_id = Z.product_id
+	              AND NVL(regexp_substr(replace(replace(G.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+	           )X
+	</select>	
+	
+	
+
+	<!-- 이벤트 상품 구매내역 체크 -->
+	<select id="getEventDupChk" resultType="Integer">
+		SELECT COUNT(*) AS DATA_CHK,
+	               MAX(X.BUY_DATE) AS BUY_DATE
+	       FROM (
+	             SELECT A.BUY_DATE
+	               FROM PT_VO_BUY A,
+	                   (
+	                    SELECT K.ASSET_ID 
+	                      FROM IMCSUSER.PT_LA_PACKAGE_ASSET K 
+	                     WHERE K.ADI_ALBUM_ID = #{albumId}
+	                       AND DECODE(K.ALBUM_TYPE, 'SH', 'HD', K.ALBUM_TYPE) = (
+	                            SELECT MAX(DECODE(ALBUM_TYPE, 'SH', 'HD', ALBUM_TYPE)) 
+	                              FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+	                             WHERE ASSET_ID = #{contsId}
+	                           )
+	                   ) P 
+	             WHERE A.SA_ID = #{saId}
+	               AND A.EXPIRED_DATE <![CDATA[>]]> TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS')
+				   AND A.BUY_AMT = '0'
+	               AND A.product_id LIKE SUBSTR(P.ASSET_ID, 1, 17)||'%'
+	               AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+	             UNION ALL
+	            SELECT G.BUY_DATE
+	              FROM PT_VO_BUY G,
+	                (SELECT D.product_id, H.asset_id
+	                               FROM IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+	                                    IMCSUSER.PT_PD_PACKAGE P,
+	                                    (SELECT K.ASSET_ID 
+	                                      FROM IMCSUSER.PT_LA_PACKAGE_ASSET K 
+	                                     WHERE K.ADI_ALBUM_ID = #{albumId}
+	                                       AND DECODE(K.ALBUM_TYPE, 'SH', 'HD', K.ALBUM_TYPE) = (
+	                                            SELECT MAX(DECODE(ALBUM_TYPE, 'SH', 'HD', ALBUM_TYPE)) 
+	                                              FROM IMCSUSER.PT_LA_PACKAGE_ASSET 
+	                                             WHERE ASSET_ID = #{contsId}
+	                                    )
+	                           ) H
+	                  WHERE D.contents_id LIKE SUBSTR(H.asset_id, 1, 17) || '%'
+	                    AND D.product_id = P.product_id
+	                    AND P.product_type = '2' 
+	                 ) Z
+	            WHERE G.sa_id = #{saId}
+	              AND G.product_id = Z.product_id
+				  AND G.BUY_AMT = '0'
+	              AND G.expired_date <![CDATA[>]]> to_char(sysdate, 'yyyymmddhh24miss')
+	              AND NVL(regexp_substr(replace(replace(G.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+	           )X
+	</select>
+	
+	
+	
+	<!-- PPM 상품 여부 조회 -->
+	<select id="getPpmProdYn" resultType="String">
+		SELECT DISTINCT PRODUCTCD 
+		  FROM (
+		        SELECT B.IMCS_PRODUCT_ID PRODUCTCD 
+		          FROM PT_VO_CUSTOM_PRODUCT A,
+		               IMCSUSER.PT_PD_PACKAGE_UNITED B 
+		         WHERE A.SA_ID = #{saId}
+		           AND A.MAC_ADDR = #{stbMac}
+		           AND A.PRODUCTCD = B.IMCS_PRODUCT_ID
+		           AND B.IMCS_PRODUCT_ID = #{ppmProdId}
+		           AND B.IMCS_PRODUCT_TYPE = '4'
+		           AND NVL(B.IMCS_UFLIX_PROD_YN, 'N') = 'Y'
+		           AND B.IMCS_USE_SCREEN_MOBILE IN ('2', '3', '4', '5', '9', 'A', 'B', 'C')
+		        UNION ALL
+		         SELECT B.IMCS_PRODUCT_ID PRODUCTCD 
+		          FROM PT_VO_CUSTOM_PRODUCT A,
+		               IMCSUSER.PT_PD_PACKAGE_UNITED B,
+		               IMCSUSER.PT_PD_PACKAGE_RELATION D 
+		         WHERE A.SA_ID = #{saId}
+		           AND A.MAC_ADDR = #{stbMac}
+		           AND A.PRODUCTCD = D.P_PRODUCT_ID
+		           AND B.IMCS_PRODUCT_ID = D.PRODUCT_ID
+		           AND B.IMCS_PRODUCT_ID = #{ppmProdId}
+		           AND B.IMCS_PRODUCT_TYPE = '4'
+		           AND NVL(B.IMCS_UFLIX_PROD_YN, 'N') = 'Y'
+		           AND B.IMCS_USE_SCREEN_MOBILE IN ('2', '3', '4', '5', '9', 'A', 'B', 'C')
+		         <!-- 2020.07.14 - 모바일 영화월정액 체험권 상품.. PC나 IPTV로도 봐야한다고 해서 임시 대처 -->
+		         UNION
+		        SELECT B.imcs_product_id PRODUCTCD
+		          FROM PT_VO_NSC_PRODUCT A,
+		               IMCSUSER.PT_PD_PACKAGE_UNITED B,
+		               imcsuser.PT_CD_COM_CD C
+		         WHERE A.sbc_cont_no = #{saId}
+		           AND A.prod_cd = #{ppmProdId}
+		           AND TO_CHAR(sysdate , 'yyyymmddhh24miss') between A.buy_date and A.expired_date
+		           AND A.prod_cd = B.imcs_product_id
+		           AND B.imcs_product_type = '7'
+		       	   AND B.IMCS_PRODUCT_KIND = '2'
+		           AND B.IMCS_NSC_PROD_KIND = '1'
+		           AND nvl(B.IMCS_uflix_prod_yn, 'N') = 'Y'
+		           AND B.IMCS_USE_SCREEN_MOBILE in ('2', '3', '4', '5', '9', 'A', 'B', 'C')
+		           AND B.imcs_product_id = C.COM_NAME
+		           AND C.GRP_ID = 'HDTVPRECOU'
+		       ) X
+	</select>	
+	
+	
+	
+	<!-- PPM 컨텐츠 코드 조회 -->
+	<select id="getPpmType" resultType="GetFXContStatResponseVO">
+		SELECT X.PPMSTOP_YN, X.BILL_TYPE, X.CONTS_TYPE, X.SALE_PRICE, X.EVENT_VALUE, X.EVENT_YN, X.MAX_VIEWING_LEN AS EXPIRE_TIME,
+		       X.TERR_YN, X.TERR_ED_DATE, X.LICENSING_END AS LICENSING_WINDOW_END, X.SUGGESTED_PRICE AS PRICE,
+		       X.SVOD_PROD_ID AS SUBS_PROD_ID, X.SVOD_PROD_NAME AS SUBS_PROD_NAME, X.SVOD_PROD_PRICE AS SUBS_PROD_PRICE,
+		       X.SVOD_PROD_DESC AS SUBS_PROD_SUB, X.COUPON_NOUSE_YN AS CPN_NOUSE_YN, X.SVOD_PROD_ISU_YN AS SUBS_PROD_ISU,
+		       X.SVOD_PROD_ISU_YN, X.SVOD_PROD_ISU_TYPE AS SUBS_PROD_TYPE, X.ALBUM_TYPE, X.SUBSCRIPTION_CHECK_ID AS SUBS_CHECK_ID
+		  FROM (
+		        SELECT ROWNUM, Z.BILL_TYPE, Z.CONTS_TYPE, Z.SALE_PRICE, Z.EVENT_VALUE, Z.EVENT_YN, Z.MAX_VIEWING_LEN,
+		               Z.TERR_YN, Z.TERR_ED_DATE, Z.LICENSING_END, Z.SUGGESTED_PRICE, Z.SVOD_PROD_ID, Z.SVOD_PROD_NAME,
+		               Z.SVOD_PROD_PRICE, Z.SVOD_PROD_DESC, Z.COUPON_NOUSE_YN, Z.SVOD_PROD_ISU_YN, Z.SVOD_PROD_ISU_TYPE,
+		               Z.ALBUM_TYPE, Z.SUBSCRIPTION_CHECK_ID,
+		               CASE
+		                  WHEN z.ppmstop_yn = 'N'
+		                     THEN 'N'
+		                  ELSE 'Y'
+		               END ppmstop_yn
+		          FROM (
+		                SELECT DECODE(A.AMOUNT_GB, 'F', '0', 'H', '1', '') BILL_TYPE, '7' CONTS_TYPE, A.PRICE SALE_PRICE,
+		                       '0' EVENT_VALUE, '0' EVENT_YN, '' MAX_VIEWING_LEN, DECODE(NVL(D.TERR_YN, '0'), '1', '0', '0', '1') TERR_YN,
+		                       D.TERR_ED_DATE TERR_ED_DATE, D.LICENSING_WINDOW_END LICENSING_END, A.PRICE SUGGESTED_PRICE,
+		                       A.PRODUCT_ID SVOD_PROD_ID, A.PRODUCT_NAME SVOD_PROD_NAME, A.PRICE SVOD_PROD_PRICE, 
+		                       A.PRODUCT_DESC SVOD_PROD_DESC, NVL(D.CP_NOUSE_YN, 'N') COUPON_NOUSE_YN, A.ISU_YN SVOD_PROD_ISU_YN, 
+		                       A.ISU_TYPE SVOD_PROD_ISU_TYPE, F.ALBUM_TYPE ALBUM_TYPE, A.SUBSCRIPTION_CHECK_ID,
+	                         NVL ((SELECT com_name
+	                                 FROM imcsuser.pt_cd_com_cd
+	                                WHERE grp_id = 'PPMSTOP'
+	                                  AND com_name = a.product_id),
+	                              'N'
+	                             ) ppmstop_yn
+		                       
+		                  FROM IMCSUSER.PT_PD_PACKAGE A, IMCSUSER.PT_LA_TITLE_ASSET D, IMCSUSER.PT_LA_PACKAGE_ASSET F 
+		                 WHERE A.PRODUCT_ID = #{ppmProdId}
+		                   AND F.ADI_ALBUM_ID = #{albumId}
+		                   AND F.ADI_PRODUCT_ID = D.ADI_PRODUCT_ID
+		                 ORDER BY DECODE(F.ALBUM_TYPE, '3D', '1', 'U1', '2', 'U2', '3', 'F1', '4', 'F2', '5', 'HD', '6', 'SH', '7', 'SD', '8', 'PR', '9', '99')
+		               ) Z
+		       ) X 
+		 WHERE ROWNUM = 1
+	</select>
+	
+	
+	
+	<!-- SVOD 상품정보 조회 -->
+	<select id="getSvodInfo" resultType="ComSvodVO">
+		SELECT DISTINCT A.PRODUCT_ID SVOD_PROD_ID,
+		       A.PRODUCT_NAME SVOD_PROD_NAME,
+		       A.PRICE SVOD_PROD_PRICE,
+		       A.PRODUCT_DESC SVOD_PROD_DESC,		       
+		       A.ISU_YN SVOD_PROD_ISU_YN,
+		       A.ISU_TYPE SVOD_PROD_ISU_TYPE
+		  FROM IMCSUSER.PT_PD_PACKAGE A,
+		       IMCSUSER.PT_PD_PACKAGE_ADDITORY B
+		 WHERE A.PRODUCT_ID = B.IMCS_M_PRODUCT_ID
+		   AND B.IMCS_PRODUCT_ID = #{svodProdId}
+	</select>	
+	
+</mapper>

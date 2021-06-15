@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+	<mapper namespace="kr.co.wincom.imcs.api.getNSMnuList2.GetNSMnuList2Dao">
+
+	<resultMap type="HashMap" id="mCatLevel">
+		<result property="CATEGORY_LEVEL" column="CATEGORY_LEVEL" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="NSC_GB" column="NSC_GB" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="CATEGORY_NAME" column="CATEGORY_NAME" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+
+	<!-- 테스트 가입자 여부 조회 -->
+	<select id="getTestSbc" resultType="String" >
+		SELECT CASE WHEN TEST_SBC = 'Y' THEN TEST_SBC ELSE 'N' END TEST_SBC
+		  FROM PT_VO_CUSTOM_ID
+		 WHERE SA_ID = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	<!-- 카테고리ID의 카테고리 level 확인 -->
+	<select id="getCateLevel" resultMap="mCatLevel">
+		SELECT TO_CHAR(TO_NUMBER(category_level)+1) CATEGORY_LEVEL, NVL(NSC_GB, 'LTE') NSC_GB, CATEGORY_NAME
+		  FROM PT_VO_CATEGORY
+		 WHERE CATEGORY_ID = #{catId}
+	</select>
+	
+</mapper>
+	
+	
+	

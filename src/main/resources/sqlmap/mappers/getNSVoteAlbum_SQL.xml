@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSVoteAlbum.GetNSVoteAlbumDao">
+
+	<resultMap type="HashMap" id="mTestSbc">
+		<result property="TEST_SBC1" column="TEST_SBC1" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="TEST_SBC2" column="TEST_SBC2" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mCueSheetInfo">
+		<result property="PERFORM_DATE" column="PERFORM_DATE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="PERFORM_TIME" column="PERFORM_TIME" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	
+	<!--  카테고리 조회 -->
+	<select id="getTestSbc" resultMap="mTestSbc">
+		SELECT case when test_sbc = 'Y' then test_sbc else 'N' end AS test_sbc1,
+		       case when test_sbc = 'Y' then 'T' else 'V' end AS test_sbc2
+		  FROM PT_VO_CUSTOM_ID
+		 WHERE SA_ID    = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	<select id="getVoteAlbumDtlList" parameterType="GetNSVoteAlbumRequestVO" resultType="GetNSVoteAlbumResponseVO">
+		SELECT  album_id, 
+			album_name, 
+			run_time, 
+			regexp_substr(MIN(category_info), '[^^]+', 1,2,'i') AS category_id, 
+			case when regexp_substr(MIN(category_info), '[^^]+', 1,1,'i') = '1' then 'Y' else 'N' end AS series_yn, 
+			regexp_substr(MIN(category_info), '[^^]+', 1,3,'i') AS series_no, 
+			case when regexp_substr(MIN(category_info), '[^^]+', 1,1,'i') = '1' then series_desc else '' end AS series_desc, 
+			onair_date, 
+			poster_image, 
+			omniv_yn, 
+			MAX(hq_audio_yn) AS hq_audio_yn, 
+			music_type, 
+			order_no 
+		FROM 
+		( 
+		 SELECT 
+			A.album_id, 
+			A.album_name, 
+			SUBSTR(T.run_time, 1, 6) AS run_time, 
+			case when NVL(R.series_yn, 'N') = 'Y' then '1^' || R.category_id || '^' || M.series_no 
+			else '2^' || R.category_id 
+			end AS category_info, 
+			A.series_no series_desc, 
+			A.onair_date_display AS onair_date, 
+			NVL(T.omniview_yn, 'N') omniv_yn, 
+			E.content_value AS poster_image, 
+			case when substr(asset_id, 16, 2) = 'MN' then 'Y' else 'N' end AS hq_audio_yn, 
+			NVL(T.music_cont_type, '') AS music_type, 
+			N.order_no 
+		FROM PT_VO_CATEGORY R, 
+			PT_VO_CATEGORY_MAP M, 
+			IMCSUSER.PT_LA_ALBUM_INFO A, 
+			IMCSUSER.PT_LA_ALBUM_SUB T, 
+			IMCSUSER.PT_LA_ALBUM_POSTER E, 
+			IMCSUSER.PT_LA_ASSET_INFO S, 
+			IMCSUSER.PT_LA_ALBUM_GROUP G, 
+			IMCSUSER.PT_LA_ALBUM_RELATION N 
+		WHERE A.album_id = M.contents_id 
+			AND M.category_id = R.category_id 
+			AND R.category_gb = 'NSC' 
+			AND A.album_id = T.album_id 
+			AND T.album_id = E.album_id 
+			AND E.album_id = S.album_id 
+			AND E.screen_type = 'N' 
+			AND E.screen_type = S.screen_type 
+			AND E.service_yn = 'Y' 
+			AND E.poster_type = 'P' 
+			AND S.album_id = N.album_id 
+			AND G.album_group_id = #{voteId}
+			AND G.album_group_id = N.album_group_id 
+			AND G.group_type = 'V' 
+			AND G.group_type = N.group_type 
+			AND NVL(R.test_sbc, 'N') IN ('N', #{testSbc1}) 
+			AND ( 
+			   NVL(M.viewing_flag, 'V') IN ('V', #{testSbc2}) OR 
+			   NVL(S.reserved_flag, 'N') IN ('R', 'P', 'X') 
+			  ) 
+		) 
+		GROUP BY album_id, album_name, run_time, 
+				series_desc, onair_date, poster_image, 
+				omniv_yn, hq_audio_yn, music_type, order_no 
+				ORDER BY order_no 
+	</select>
+	
+	<select id="getStillImage" parameterType="GetNSVoteAlbumResponseVO" resultType="String">
+		SELECT A.main_img_file_name AS MAIN_IMG_FILE_NAME       
+		 FROM IMCSUSER.PT_LA_ALBUM_IMG A   
+		WHERE A.adi_album_id = #{albumId}
+		  AND A.img_flag = 'N'             
+		ORDER BY to_number(adi_album_seq)
+	</select>
+	
+	<select id="getCueSheetInfo1" parameterType="GetNSVoteAlbumResponseVO" resultType="GetNSVoteAlbumResponseVO">
+		SELECT A.perform_date AS PERFORM_DATE, 
+			   A.perform_time AS PERFORM_TIME
+		  FROM IMCSUSER.PT_LB_CUESHEET_MST A,
+			   IMCSUSER.PT_LB_CUESHEET_ITEM B
+		WHERE A.cuesheet_id = B.cuesheet_id
+		  AND B.album_id = #{albumId}
+	</select>
+	
+	<select id="getCueSheetInfo2" parameterType="GetNSVoteAlbumResponseVO" resultType="GetNSVoteAlbumResponseVO">
+		SELECT A.perform_date AS PERFORM_DATE, 
+			   A.perform_time AS PERFORM_TIME
+		  FROM IMCSUSER.PT_LB_CUESHEET_MST A
+		 WHERE A.album_id = #{albumId}
+	</select>
+		
+</mapper> 

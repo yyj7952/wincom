@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSKidsEStudy.GetNSKidsEStudyDao">
+
+	<resultMap type="HashMap" id="myLevelReadPersent">
+		<result property="POINT" column="POINT" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="READ_PERSENT" column="READ_PERSENT" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="myCategoryReadPersent">
+		<result property="TWO_DEPTH_CAT_ID" column="TWO_DEPTH_CAT_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="TWO_DEPTH_CAT_NAME" column="TWO_DEPTH_CAT_NAME" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="READ_PERSENT" column="READ_PERSENT" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mySuggestLevel">
+		<result property="ALBUM_ID" column="ALBUM_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="ALBUM_NAME" column="ALBUM_NAME" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="CAT_ID" column="CAT_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="SER_CAT_YN" column="SER_CAT_YN" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="SER_CAT_ID" column="SER_CAT_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="SER_NO" column="SER_NO" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="IMG_FILE_NAME_V" column="IMG_FILE_NAME_V" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<!-- 고객의 레벨별 진행상황 퍼센트율 조회 -->
+	<select id="listLevelReadPersent" resultMap="myLevelReadPersent" parameterType="GetNSKidsEStudyRequestVO">		
+		SELECT
+			a.point
+			, ROUND(NVL(B.custom_cnt, 0) / A.tot_cnt * 100, 1) AS read_persent
+		FROM (
+			SELECT
+				point
+				, COUNT(point) AS tot_cnt
+			FROM pt_vo_category a,
+				pt_vo_category_map b
+			WHERE a.category_gb = 'NSC'
+			AND a.nsc_gb = 'KID'
+			AND nvl(a.test_sbc,'N') = 'N'
+			AND a.actors_display = 'G'
+			AND a.category_id = b.category_id
+			AND a.point is not null
+			GROUP BY point
+		) A, (
+			SELECT
+				point
+				, COUNT(point) AS custom_cnt
+			FROM pt_vo_category a,
+				pt_vo_category_map b,
+				(
+					SELECT /*+ INDEX(Z PK_NPT_VO_WATCH_TIME) */ 
+						album_id 
+					FROM MCUSTUSER.NPT_VO_WATCH_TIME Z
+					WHERE sa_id = #{saId}
+					AND p_idx_sa = MOD(substr(#{saId}, -2), 33)
+					AND watch_type = 'G' AND end_flag = 'Y'
+					AND SUBSTR(watch_date,1,4) = TO_CHAR(sysdate,'YYYY')
+					GROUP BY album_id
+				) c
+			WHERE a.category_gb = 'NSC'
+			AND a.nsc_gb = 'KID'
+			AND a.actors_display = 'G'
+			AND nvl(a.test_sbc,'N') = 'N'
+			AND a.category_id = b.category_id
+			AND a.point is not null
+			AND c.album_id = b.contents_id
+			GROUP BY point
+		) B
+		WHERE A.point = B.point(+)
+		ORDER BY A.point
+	</select>
+	
+	<!-- 고객의 3Depth 카테고리별 진행상황 퍼센트율 조회 -->
+	<select id="listCategoryReadPersent" resultMap="myCategoryReadPersent" parameterType="GetNSKidsEStudyRequestVO">		
+		SELECT
+			X.two_depth_cat_id
+			, two_depth_cat_name
+			, round(NVL(Y.read_cnt,0) / X.tot_cnt * 100,1) AS read_persent
+		FROM (
+			SELECT 
+				REGEXP_SUBSTR(min(two_depth_cat_id), '[^^]+', 1,1,'i') AS two_depth_cat_id
+				, REGEXP_SUBSTR(min(two_depth_cat_id), '[^^]+', 1,2,'i') AS two_depth_cat_name
+				, REGEXP_SUBSTR(min(two_depth_cat_id), '[^^]+', 1,3,'i') AS two_depth_sort_no
+				, COUNT(two_depth_cat_id) AS tot_cnt
+			FROM (
+				SELECT
+					a.category_id
+					, (SELECT c.category_id|| '^' ||c.category_name|| '^' ||c.sort_no
+						FROM pt_vo_category c 
+						WHERE category_level = '4' 
+						START WITH c.category_id = a.category_id 
+						CONNECT BY c.category_id = prior c.parent_category_id) AS two_depth_cat_id
+				FROM pt_vo_category a,
+					pt_vo_category_map b
+				WHERE a.category_gb = 'NSC'
+				AND a.nsc_gb = 'KID'
+				AND a.actors_display = 'G'
+				AND nvl(a.test_sbc,'N') = 'N'
+				AND a.category_id = b.category_id
+			)
+			WHERE two_depth_cat_id is not null
+			GROUP BY two_depth_cat_id
+			) X,
+			(
+				SELECT
+					two_depth_cat_id
+					, sum(read_cnt) AS read_cnt
+				FROM (
+					SELECT
+						X.category_id
+						, X.read_cnt
+						, (SELECT a.category_id FROM pt_vo_category a 
+							WHERE category_level = '4' 
+							START WITH a.category_id = X.category_id 
+							CONNECT BY a.category_id = prior a.parent_category_id) AS two_depth_cat_id
+					FROM (
+						SELECT
+							a.category_id
+							, count(a.category_id) AS read_cnt
+						FROM pt_vo_category a,
+							pt_vo_category_map b,
+							(
+								SELECT /*+ INDEX(Z PK_NPT_VO_WATCH_TIME) */ album_id 
+								FROM MCUSTUSER.NPT_VO_WATCH_TIME Z 
+								WHERE sa_id = #{saId}
+								AND p_idx_sa = mod(substr(#{saId}, -2), 33) 
+								AND watch_type = 'G' 
+								AND end_flag = 'Y' 
+								AND SUBSTR(watch_date,1,4) = TO_CHAR(sysdate,'YYYY')
+								GROUP BY album_id
+							) c
+						WHERE a.category_gb = 'NSC'
+						AND a.nsc_gb = 'KID'
+						AND a.actors_display = 'G'
+						AND nvl(a.test_sbc,'N') = 'N'
+						AND a.category_id = b.category_id
+						AND a.point is not null
+						AND c.album_id = b.contents_id
+						GROUP BY a.category_id
+				) X
+			)
+			GROUP BY two_depth_cat_id
+		) Y
+		WHERE X.two_depth_cat_id = Y.two_depth_cat_id(+)
+		ORDER BY two_depth_sort_no
+	</select>
+	
+	<!-- 고객 level에 가장 많이 시청한 콘텐츠 정보를 제공한다 (6개 제공하며, 전일 기준으로 집계한다.) -->
+	<select id="listSuggestLevel" resultMap="mySuggestLevel" parameterType="GetNSKidsEStudyRequestVO">		
+	<![CDATA[ 	
+		SELECT
+			X.album_id
+			, C.album_name
+			, X.cat_id
+			, X.ser_cat_yn AS ser_cat_yn
+			, REGEXP_SUBSTR(X.ser_cat_id, '[^^]+', 1,1,'i') AS ser_cat_id
+			, REGEXP_SUBSTR(X.ser_cat_id, '[^^]+', 1,2,'i') AS ser_no
+			, D.content_value AS img_file_name_v
+		FROM
+		(
+			SELECT
+				album_id
+				, sa_rank
+				, tot_cnt
+				, MIN(case when a.series_yn = 'N' then a.category_id else '' end) AS cat_id
+				, MAX(case when a.series_yn = 'Y' then 'Y' else 'N' end) AS ser_cat_yn
+				, MIN(case when a.series_yn = 'Y' then a.category_id||b.series_no else '' end) AS ser_cat_id
+			FROM
+			(
+				SELECT
+					rank () over (order by case when p_idx_dd <= to_char(sysdate,'D') then 0 else 1 end, p_idx_dd desc) AS select_data
+					, p_idx_dd
+					, statistics_id AS album_id
+					, rank_info AS sa_rank
+					, tot_cnt
+				FROM MCUSTUSER.npt_vo_kids_statistics
+				WHERE p_idx_sa = MOD(SUBSTR(#{saId}, -2), 33)
+				AND kids_flag = 'G'
+				ORDER BY case when p_idx_dd <= TO_CHAR(sysdate,'D') then 0 else 1 end, p_idx_dd desc, rank_info
+			)  X, PT_VO_CATEGORY A, PT_VO_CATEGORY_MAP B
+			WHERE select_data = '1'
+			AND X.album_id = B.contents_id
+			AND B.category_id = A.category_id
+			AND A.category_gb = 'NSC'
+			AND NVL(A.test_sbc, 'N') = 'N'
+			AND A.nsc_gb = 'KID'
+			AND A.actors_display = 'G'
+			AND A.point is not null
+			GROUP BY album_id, sa_rank, tot_cnt
+			ORDER BY sa_rank
+		) X, IMCSUSER.PT_LA_ALBUM_INFO C, IMCSUSER.PT_LA_ALBUM_POSTER D
+		WHERE ROWNUM <= 6
+		AND X.album_id = C.album_id
+		AND X.album_id = D.album_id
+		AND D.screen_type = 'N'
+		AND D.service_yn = 'Y'
+		AND D.poster_type = 'P'
+	]]>
+	</select>
+	
+</mapper> 

@@ -1,0 +1,539 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.buyNSConts.BuyNSContsDao">
+
+	<resultMap type="HashMap" id="mDupChk">
+		<result property="DUP_CHK" column="DUP_CHK" javaType="Integer"/>
+		<result property="BUY_DATE" column="BUY_DATE" javaType="String"/>
+	</resultMap>
+	
+	
+	<!-- 구매 ID 여부 조회 -->
+	<select id="chkPaymentId" resultType="Integer" >
+		SELECT COUNT(*)
+	      FROM SMARTUX.PT_PAYMENT_INFO
+	     WHERE SA_ID      = #{saId}
+	       AND MAC        = #{stbMac}
+	       <if test='buyTypeFlag == "1"'>
+	       AND PAYMENT_ID = #{paymentId}
+	       AND AMOUNT     = #{buyingPrice}
+	       </if>
+	       <if test='buyTypeFlag == "2"'>
+	       	 <if test='isPayDatafree == "Y"'>
+	       AND PAYMENT_ID = #{datafreeId}
+	       AND AMOUNT     = #{datafreeBuyPrice}
+	       	 </if>
+	       </if>
+	       <if test='buyTypeFlag == "3"'>
+	       	<if test='isPayDatafree == "Y"'>
+	       AND PAYMENT_ID = #{ppvDatafreeId}
+	       AND AMOUNT     = #{ppvDatafreeBuyPrice}
+	       	</if>
+	       	<if test='isPayDatafree != "Y"'>
+	       AND PAYMENT_ID = #{paymentId}
+	       AND AMOUNT     = #{buyingPrice}
+	       	</if>
+	       </if>
+	</select>
+
+
+	<!-- 가입자 상태, 개통여부 조회 -->
+	<select id="getSbcInfo" resultType="ComSbcVO">
+		SELECT DECODE(A.ST_TYP, '1', 'Y', 'N') STATUS_FLAG,
+		       A.VOD_USE_YN YN_VOD_OPEN,
+		       NVL(A.CP_CNT, 0) CP_CNT,
+		       NVL(B.PVS_CTN_NO, '') PVS_CTN_NO,
+		       NVL(B.PVS_ATRT_CHNL_DV_CD, '') PVS_ATRT_CHNL_DV_CD,
+		       NVL((SELECT COM_NAME FROM IMCSUSER.PT_CD_COM_CD WHERE GRP_ID = 'PPVBLOCK' AND MIN_VALUE = 'H' AND COM_NAME = C.PRODUCTCD), 'N') BLOCK_FLAG,
+		       NVL(A.test_sbc, 'N') as TEST_SBC
+		  FROM PT_VO_CUSTOM_ID A,
+		  	   PVSUSER.NSCN_SBC_TBL B,
+		  	   PT_VO_CUSTOM_PRODUCT C
+		 WHERE A.SA_ID = #{saId}
+		   AND A.MAC_ADDR = #{stbMac}
+		   AND A.SA_ID = B.PVS_SBC_CONT_NO
+		   AND A.MAC_ADDR = B.PVS_MAC_ADDR
+		   AND A.sa_id = C.sa_id
+	</select>
+
+
+	<!-- 상품정보(정액/종량) 조회 -->
+	<!-- DISTRIBUTOR (SONY등..) 사용하지 않는 로직 제거 -->
+	<!-- EVENT_VALUE / EVENT_PRICE 사용하지 않는 로직 무의미하게 처리 -->
+	<select id="getBillType" resultType="ComPriceVO">
+		SELECT /*+ LEADING(C D E F B A) USE_NL(C D E F B A) */  DISTINCT NVL(A.AMOUNT_GB, ' ') AS BILL_TYPE,
+		       C.SUGGESTED_PRICE SUGGESTED_PRICE,
+		       A.PRODUCT_TYPE PRODUCT_TYPE,
+		       '0' AS EVENT_VALUE,
+		       C.SUGGESTED_PRICE AS EVENT_PRICE, 
+		       NVL(C.RESERVED_PRICE, '0') RESERVED_PRICE,  
+		       NVL(C.RESERVED_DATE, '') RESERVED_DATE,
+		       DECODE(NVL(D.DATAFREE_BILL_YN, 'Y'), 'N', 'N', 'Y') DATAFREE_BILL_YN,
+		       CASE WHEN (TO_NUMBER(NVL(SUBSTR(D.MAXIMUM_VIEWING_LENGTH, 1, LENGTH(D.MAXIMUM_VIEWING_LENGTH) - 2), '48'))) <![CDATA[>=]]> 2000 THEN 'Y' ELSE 'N' END POSSESSION_YN,
+		       C.ASSET_NAME,
+		       C.HDCONTENT,
+		       E.RATING_CD
+		       <if test='pkgYn != "Y" and  pkgYn != "y"'>
+		   	   <![CDATA[
+		   	   , A.PRODUCT_ID
+		   	   , A.PRODUCT_NAME
+		   	   , A.PRODUCT_KIND
+		   	   , D.CP_ID
+		   	   , D.MAXIMUM_VIEWING_LENGTH
+		   	   , F.SERIES_NO
+		   	   ]]>
+		   	   </if>
+		       ,NVL(D.LICENSING_WINDOW_START, '20000101') license_start,
+		       NVL(D.LICENSING_WINDOW_END, '29991231') license_end
+		  FROM IMCSUSER.PT_PD_PACKAGE A,
+		       IMCSUSER.PT_PD_PACKAGE_DETAIL B,
+		       IMCSUSER.PT_LA_ASSET_INFO C,
+		       IMCSUSER.PT_LA_ALBUM_PLATFORM D,
+		       IMCSUSER.PT_LA_ALBUM_SUB E,
+		       IMCSUSER.PT_LA_ALBUM_INFO F 
+		 WHERE A.PRODUCT_ID = B.PRODUCT_ID
+		   AND B.CONTENTS_ID = C.ASSET_ID
+		   AND C.ALBUM_ID = D.ALBUM_ID
+		   AND D.ALBUM_ID = E.ALBUM_ID
+		   AND E.ALBUM_ID = F.ALBUM_ID
+		   AND C.SCREEN_TYPE = 'N'
+		   AND C.SCREEN_TYPE = D.SCREEN_TYPE
+		   AND C.ALBUM_ID = #{albumId}
+		   <if test='pkgYn == "Y" or pkgYn == "y"'>
+		   AND A.PRODUCT_TYPE = '2' 
+		   </if> 
+		   <if test='pkgYn != "Y" and pkgYn != "y"'> 
+		   AND (A.PRODUCT_TYPE <![CDATA[<>]]> '3' AND A.PRODUCT_TYPE <![CDATA[<>]]> '2') 
+		  </if>
+	</select>
+	
+	<!-- 가입자 구매상품 여부 조회  -->
+	<select id="getCustomerProdChk" resultType="Integer">
+		SELECT 1 FROM DUAL 
+		 WHERE EXISTS (
+		        SELECT /*+ LEADING(E B A D) USE_NL(E B A D C) */ 'x' 
+		          FROM IMCSUSER.PT_PD_PACKAGE A,
+		               IMCSUSER.PT_PD_PACKAGE_DETAIL B,
+		               PT_VO_CUSTOM_PRODUCT C,
+		               IMCSUSER.PT_PD_PACKAGE_RELATION D ,
+		               IMCSUSER.PT_LA_PACKAGE_ASSET E 
+		         WHERE E.NSC_ALBUM_ID = #{albumId}
+		           AND C.SA_ID = #{saId}
+		           AND C.MAC_ADDR = #{stbMac}
+		           AND A.PRODUCT_ID = B.PRODUCT_ID
+		           AND D.P_PRODUCT_ID = C.PRODUCTCD
+		           AND D.PRODUCT_ID = A.PRODUCT_ID
+		           AND B.CONTENTS_ID = E.ASSET_ID
+		       )
+	</select>
+	
+	<!-- 이벤트 구매내역 조회 -->
+	<select id="getEventChk" resultType="Integer">
+	<![CDATA[
+		SELECT DUP_CHK FROM (
+		        SELECT COUNT(A.BUY_DATE) DUP_CHK 
+		          FROM PT_VO_BUY_NSC A,
+		               PT_VO_BUY_DETAIL_NSC B 
+		         WHERE A.SA_ID = #{saId}
+		           AND A.SA_ID = B.SA_ID
+		           AND A.MAC_ADDR = #{stbMac}
+		           AND A.MAC_ADDR = B.MAC_ADDR
+		           AND A.PRODUCT_ID IN ( B.PRODUCT_ID, B.PRODUCT_ID||'_D' )
+		           AND B.CONTENTS_ID = #{albumId}
+		           AND A.BUY_DATE = B.BUY_DATE
+		           AND A.BUY_AMT = '0'
+		           AND NVL(A.REFUND_YN, 'N') <> 'P'
+		           AND NVL(regexp_substr(replace(replace(ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+		       ) X
+    ]]>  
+	</select>
+	
+	
+	<!-- 기존 구매내역 조회 (예약구매) -->
+	<select id="getBuyDupChkR" resultMap="mDupChk">
+		<![CDATA[
+		SELECT /*+ index(A IDX_PT_VO_BUY_02_N) */ 1 AS DUP_CHK, BUY_DATE
+		  FROM PT_VO_BUY_NSC 
+		 WHERE SA_ID = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+		   AND PRODUCT_ID = #{albumId}
+		   AND (EXPIRED_DATE >= TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS') OR EXPIRED_DATE = '0')
+		   AND NVL(REFUND_YN, 'N') <> 'P'
+		   AND NVL(regexp_substr(replace(replace(ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+         ]]>
+	</select>
+	
+	
+	<!-- 기존 구매내역 조회 (FVOD) -->
+	<select id="getBuyDupChkType0" resultMap="mDupChk">
+		<![CDATA[
+		SELECT /*+ INDEX(A IDX_PT_VO_BUY_FVOD_0_N) */ 1 AS DUP_CHK, BUY_DATE
+		  FROM PT_VO_BUY_FVOD_NSC 
+		 WHERE SA_ID = #{saId}
+		   AND MAC_ADDR = #{stbMac}
+		   AND PRODUCT_ID = #{albumId}
+		   AND EXPIRED_DATE >= TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS')
+		   AND P_IDX_SA = MOD(#{pIdxSa}, 33)
+         ]]>
+	</select>
+	
+	
+	<!-- 기존 구매내역 조회 (PPV) -->
+	<select id="getBuyDupChkType1" resultMap="mDupChk">
+		<![CDATA[
+		SELECT /*+ INDEX(A IDX_PT_VO_BUY_02_N) */ 1 AS DUP_CHK, BUY_DATE
+		  FROM PT_VO_BUY_NSC 
+		 WHERE SA_ID        = #{saId}
+		   AND MAC_ADDR     = #{stbMac}
+		   AND PRODUCT_ID   = #{albumId}
+		   AND EXPIRED_DATE >= TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS')
+		   AND NVL(REFUND_YN, 'N') <> 'P'
+		   AND NVL(regexp_substr(replace(replace(ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+         ]]>
+	</select>
+	
+	
+	<!-- 기존 구매내역 조회 (PVOD) -->
+	<select id="getBuyDupChkType2" resultMap="mDupChk">
+		<![CDATA[
+		SELECT /*+ leading(b a e d c) use_nl(b e d c) */ 1 AS DUP_CHK, A.BUY_DATE
+		  FROM PT_VO_BUY_NSC A,
+		       PT_VO_BUY_DETAIL_NSC B,
+		       IMCSUSER.PT_PD_PACKAGE C,
+		       IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+		       IMCSUSER.PT_LA_PACKAGE_ASSET E 
+		 WHERE A.SA_ID = #{saId}
+		   AND A.MAC_ADDR = #{stbMac}
+		   AND A.SA_ID = B.SA_ID
+		   AND A.MAC_ADDR = B.MAC_ADDR
+		   AND A.BUY_DATE = B.BUY_DATE
+		   AND A.PRODUCT_ID = B.PRODUCT_ID
+		   AND A.PRODUCT_ID = C.PRODUCT_ID
+		   AND C.PRODUCT_ID = D.PRODUCT_ID
+		   AND D.CONTENTS_ID = E.ASSET_ID
+		   AND E.NSC_ALBUM_ID = B.CONTENTS_ID
+		   AND B.CONTENTS_ID = #{albumId}
+		   AND A.EXPIRED_DATE >= TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS')
+		   AND C.PRODUCT_TYPE='2'
+		   AND NVL(A.REFUND_YN, 'N') <> 'P'
+		   AND NVL(regexp_substr(replace(replace(ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+         ]]>
+	</select>
+	
+	
+	
+	<!-- 패키지 컨텐츠 보관함 조회 -->
+	<select id="getPkgContent" resultType="ContTypeVO">
+			SELECT /*+ leading(X A B C D) use_nl(X A B C D) */
+		       distinct A.PRODUCT_ID,
+		       D.ALBUM_ID AS CONTS_ID,
+		       B.ASSET_NAME AS CONTS_NAME,
+		       NVL(D.GENRE, ' ') AS CONTS_GENRE,
+		       C.CP_ID
+		  	FROM (SELECT /*+ USE_NL(A B C) */ A.PRODUCT_ID || '' as product_id
+		          FROM IMCSUSER.PT_PD_PACKAGE_DETAIL A,
+		               IMCSUSER.PT_PD_PACKAGE B ,
+		               IMCSUSER.PT_LA_ASSET_INFO C
+		         WHERE C.ALBUM_ID = #{albumId}
+		               AND A.PRODUCT_ID   = B.PRODUCT_ID
+		               AND A.CONTENTS_ID  = C.ASSET_ID
+		               AND C.SCREEN_TYPE = 'N'
+		               AND B.PRODUCT_TYPE = '2'
+		               AND NVL(B.NSC_PROD_KIND,'0') = '1'
+		               AND ROWNUM = 1
+		       )X,
+		       IMCSUSER.PT_PD_PACKAGE_DETAIL A,
+		       IMCSUSER.PT_LA_ASSET_INFO B,
+		       IMCSUSER.PT_LA_ALBUM_PLATFORM C,
+		       IMCSUSER.PT_LA_ALBUM_SUB D
+		 WHERE A.PRODUCT_ID = X.PRODUCT_ID
+		   AND A.CONTENTS_ID = B.ASSET_ID
+		   AND B.ALBUM_ID = C.ALBUM_ID
+		   AND C.ALBUM_ID = D.ALBUM_ID
+		   AND B.SCREEN_TYPE = 'N'
+		   AND B.SCREEN_TYPE = C.SCREEN_TYPE
+	</select>
+	
+	
+	<!-- 패키지 컨텐츠 보관함 저장 -->
+	<insert id="insBuyConts3" parameterType="BuyNSContsRequestVO">
+		INSERT INTO PT_VO_BUY_DETAIL_NSC (SA_ID, MAC_ADDR, BUY_DATE, PRODUCT_ID, CONTENTS_ID, CONTENTS_NAME, LINK_TIME, PRODUCT_NAME)
+		VALUES ( #{saId}, #{stbMac}, #{buyingDate}, #{productId2}, #{contsId2}, REPLACE(#{contsName2}, '	', ' '), '0', REPLACE(#{contsGenre2}, '	', ' '))
+	</insert> 
+
+	
+	<!-- 단품 장르 정보 조회 -->
+	<select id="getGenreType" resultType="ContTypeVO">
+		SELECT DISTINCT NVL(A.GENRE, ' ') CONTS_GENRE,
+		       NVL(SUBSTR(B.MAXIMUM_VIEWING_LENGTH, 1, LENGTH(B.MAXIMUM_VIEWING_LENGTH) - 2), '48') CONTS_TYPE 	/* Event Type */ 
+		  FROM IMCSUSER.PT_LA_ALBUM_SUB A,
+		       IMCSUSER.PT_LA_ALBUM_PLATFORM B 
+		 WHERE A.ALBUM_ID = #{albumId}
+		   AND A.ALBUM_ID = B.ALBUM_ID
+		   AND B.SCREEN_TYPE = 'N'
+	</select>
+	
+	
+	<!-- 단품 컨텐츠 보관함 저장  -->
+	<insert id="insBuyConts4" parameterType="BuyNSContsRequestVO">
+		INSERT INTO 
+		    <if test='prodType == "0"'>PT_VO_BUY_DETAIL_FVOD_NSC </if> 
+		    <if test='prodType != "0"'>PT_VO_BUY_DETAIL_NSC </if> 
+		    (SA_ID, MAC_ADDR, BUY_DATE, PRODUCT_ID, CONTENTS_ID, CONTENTS_NAME, LINK_TIME, PRODUCT_NAME 
+		    <if test='prodType == "0"'>, P_IDX_SA , P_IDX_DAY </if>) 
+		VALUES (#{saId} , #{stbMac} , #{buyingDate} , #{albumId} , #{albumId} , REPLACE(#{albumName}, '', ' '), 
+		    '0' , #{contsGenre} <if test='prodType == "0"'> , MOD(#{pIdxSa}, 33) , SUBSTR(#{buyingDate}, 7, 2) </if>)
+	</insert> 
+	
+	
+	<!-- 구매내역 저장 -->
+	<insert id="insBuyConts1" parameterType="BuyNSContsRequestVO">
+		INSERT INTO 
+		    <if test='prodType == "0"'>PT_VO_BUY_FVOD_NSC </if> 
+		    <if test='prodType != "0"'>PT_VO_BUY_NSC </if> 
+		    
+		(SA_ID, MAC_ADDR,  BUY_DATE, PRODUCT_ID, PRODUCT_NAME, PKG_YN, GENRE_NAME, BUY_AMT, CP_USE_YN, EXPIRED_DATE, APPL_TYPE, 
+		    <if test='prodType == "0"'> P_IDX_SA, P_IDX_DAY </if> 
+		    <!-- 20190425 - 오과금 TO-BE -->
+		    <if test='prodType != "0"'> ALWNCE_CHARGE, PVS_TRANS_NO, BALACE		    
+		    <!-- 20190425 - 오과금 AS-IS -->
+		    <!-- <if test='prodType != "0"'> ALWNCE_CHARGE, BALACE -->
+		    
+		        <if test='prodType == "1" and buyingGb == "R"'> ,REFUND_YN </if> </if>
+		) VALUES (#{saId} , #{stbMac} , #{buyingDate} , #{albumId} , REPLACE(#{albumName}, ' ', ' '), #{pkgYn} , TRIM(#{catId}) , 
+		
+			<if test='buyingGb != "R"'>
+		    	<if test='prodType == "0" and (buyingType != "A" and buyingType != "a")'> NVL(#{buyingPrice}, '0'), </if> 
+		    	<if test='prodType != "0" or (prodType == "0" and (buyingType == "A" or buyingType == "a"))'> NVL(#{suggestedPrice}, '0'), </if>
+		    </if>
+		    <if test='buyingGb == "R"'>
+		    	<if test='prodType == "1"'> NVL(#{reservedPrice}, '0'), </if>
+		    </if>
+		    
+		    <if test='prodType == "0"'> 'N', TO_CHAR(TO_DATE(#{buyingDate}, 'YYYYMMDDHH24MISS') +1, 'YYYYMMDDHH24MISS'), #{appType}, MOD(#{pIdxSa}, 33), SUBSTR(#{buyingDate}, 7, 2) </if> 
+		    <if test='prodType != "0"'>  #{cpUseYn} , 
+		    	<if test='buyingGb != "R"'>
+		    TO_CHAR(TO_DATE(SUBSTR(#{buyingDate}, 1, 12), 'YYYYMMDDHH24MI') + TO_NUMBER(#{eventType})/24, 'YYYYMMDDHH24MI')||SUBSTR(#{buyingDate}, 13, 2), 
+		    	</if>
+		    	<if test='prodType == "1" and buyingGb == "R"'> '0', </if> 
+		    
+		    <!-- 20190425 - 오과금 TO-BE -->	
+		    #{appType}, #{alwnceCharge}, 'V',		    
+		    <!-- 20190425 - 오과금 AS-IS --> 
+		    <!-- #{appType}, #{alwnceCharge}, -->
+		    
+		    	<if test='buyTypeFlag == "3" and cpUseYn == "A"'>NVL(#{approvalPrice}, '0') </if>
+		    	<if test='buyTypeFlag != "3" or cpUseYn != "A"'>NVL(#{balace}, '0') </if>
+		    	
+		        <if test='prodType == "1" and buyingGb == "R"'> , 'R' </if> 
+		    </if>)
+	</insert> 
+	
+	
+	<!-- 패키지 상품정보 조회 -->
+	<select id="getProduct" resultType="ContTypeVO">
+		SELECT DISTINCT A.PRODUCT_ID PRODUCT_ID,
+		       NVL(B.PRODUCT_NAME, ' ') PRODUCT_NAME,
+		       NVL(B.PRICE, '0') PRICE,
+		       <if test='buyingGb != "R"'>
+		       NVL(B.EXPIRED_DATE, '1') EXPIRED_DATE,
+		       </if>
+		       <if test='buyingGb == "R"'>
+		       B.EXPIRED_DATE EXPIRED_DATE,
+		       </if> 
+		       B.PRODUCT_KIND
+		  FROM IMCSUSER.PT_PD_PACKAGE_DETAIL A, 
+		  	   IMCSUSER.PT_PD_PACKAGE B,
+		  	   IMCSUSER.PT_LA_ASSET_INFO C  
+		 WHERE C.ALBUM_ID = #{albumId}
+		   AND C.SCREEN_TYPE = 'N'		 
+		   AND A.CONTENTS_ID  = C.ASSET_ID
+		   AND A.PRODUCT_ID = B.PRODUCT_ID
+		   AND B.PRODUCT_TYPE = '2'
+		   AND NVL(B.NSC_PROD_KIND,'0') = '1'
+		   AND ROWNUM = 1
+	</select>
+	
+	
+	<!-- 구매내역 저장2 -->
+	<insert id="insBuyConts2" parameterType="BuyNSContsRequestVO">
+		INSERT INTO PT_VO_BUY_NSC (SA_ID, MAC_ADDR, BUY_DATE, PRODUCT_ID, PRODUCT_NAME, PKG_YN, GENRE_NAME, 
+		    BUY_AMT, CP_USE_YN, EXPIRED_DATE, APPL_TYPE, ALWNCE_CHARGE, BALACE
+		    <!-- 20190425 - 오과금 TO-BE -->
+		    , PVS_TRANS_NO
+		    
+		    <if test='buyingGb == "R"'> ,REFUND_YN </if>) 
+		VALUES (#{saId}, #{stbMac}, #{buyingDate}, #{productId1}, REPLACE(#{productName1}, '', ' '), #{pkgYn}, 
+		    TRIM(#{catId}), NVL(#{productPrice1}, '0'), #{cpUseYn},
+		    <if test='buyingGb == "R"'> '0', </if>
+		    <if test='buyingGb != "R"'> 
+		    TO_CHAR(TO_DATE(SUBSTR(#{buyingDate}, 1, 12), 'YYYYMMDDHH24MI') + TO_NUMBER(#{expiredDate1}), 'YYYYMMDDHH24MI')||SUBSTR(#{buyingDate}, 13, 2), 
+		    </if>
+		    #{appType}, #{alwnceCharge}, NVL(#{balace}, '0')
+		    <!-- 20190425 - 오과금 TO-BE -->
+		    , 'V' 
+		    
+			<if test='buyingGb == "R"'> ,'R' </if>)
+	</insert> 
+	
+	
+	<!-- 장르 정보 조회 -->
+	<select id="getGenreInfo" resultType="GenreInfoVO">
+		SELECT DISTINCT GENRE_LARGE, GENRE_MID, GENRE_SMALL 
+		  FROM IMCSUSER.PT_LA_PACKAGE_ASSET A,
+		       IMCSUSER.PT_LA_TITLE_ASSET B 
+		 WHERE B.ADI_PRODUCT_ID = A.ADI_PRODUCT_ID
+		   AND A.NSC_ALBUM_ID = #{albumId}
+	</select>
+	
+	
+	
+	<!-- 쿠폰정보 조회 -->
+	<select id="getCpnPossibleList" resultType="ComCpnVO">
+		SELECT SMARTUX.F_GET_CPN_COND_POSSIBLE_LIST(#{catId}, #{albumId}, #{screenType_cpnCondPossible}, #{genreInfo} , DECODE(#{prodType}, '0', '0', #{suggestedPrice} ), DECODE(#{prodType}, '1', 'Y', 'N'), NVL(#{pkgYn},'N'), '1', #{saId} ) cpn_info,
+            REPLACE(SMARTUX.F_GET_CPN_COND_POSSIBLE_LIST(#{catId}, #{albumId}, #{screenType_cpnCondPossible}, #{genreInfo} , DECODE(#{prodType}, '0', '0', #{suggestedPrice} ), DECODE(#{prodType}, '1', 'Y', 'N'), NVL(#{pkgYn},'N'), '1', #{saId} ), '\b', '^') cpn_ins_info
+      	FROM DUAL
+	</select>
+	
+	
+	<!-- 쿠폰정보 저장 -->
+	<insert id="insCpnInfo" parameterType="BuyNSContsRequestVO">
+		INSERT INTO SMARTUX.PT_CPM_COUPON_BOX_ACTION (PT_SAID, PT_DAY, ORD_NO, CPEVT_ID, SA_ID, SYSTEM_GB, CPN_NO, 
+		    BUY_AUTH_NO, REG_DATE, STATUS, RETRY_CNT, BUY_TYPE) 
+		VALUES (MOD(#{pIdxSa}, 33), SUBSTR(TO_CHAR(SYSDATE, 'YYYYMMDD'), 7, 2), SMARTUX.SEQ_PT_CPM_COUPON_BOX_ACTION.NEXTVAL, 
+		    #{cpevtId}, #{saId}, #{systemGb_cpnCondPossible}, '', #{saId}||#{buyingDate}, TO_CHAR(SYSDATE , 'YYYYMMDDHH24MiSS') , 'N', '0', '1')
+	</insert> 
+	
+	
+	<!-- 스탬프 정보 조회 -->
+	<select id="getStmPossibleList" resultType="ComCpnVO">
+		SELECT SMARTUX.F_GET_STM_COND_POSSIBLE(#{saId}, #{catId}, #{albumId}, #{screenType}, #{genreInfo}, DECODE(#{prodType}, '0', '0', #{suggestedPrice} ), DECODE(#{prodType}, '1', 'Y', 'N'), NVL(#{pkgYn},'N'), '1' ) stm_info,
+            REPLACE(smartux.F_GET_STM_COND_POSSIBLE(#{saId}, #{catId}, #{albumId}, #{screenType}, #{genreInfo}, DECODE(#{prodType}, '0', '0', #{suggestedPrice} ), DECODE(#{prodType}, '1', 'Y', 'N'), NVL(#{pkgYn},'N'), '1' ), '\b', '^') stm_ins_info
+      	FROM DUAL
+	</select>
+	
+	
+	<!-- 스탬프 정보 저장 -->
+	<insert id="insStmInfo" parameterType="BuyNSContsRequestVO">
+		INSERT INTO SMARTUX.PT_CPM_STAMP_BOX_ACTION (PT_SAID, PT_DAY, ORD_NO, STAMP_ID, SA_ID, SYSTEM_GB, 
+		    BUY_AUTH_NO, REG_DATE, STATUS, RETRY_CNT, BUY_TYPE) 
+		VALUES (MOD(#{pIdxSa}, 33), SUBSTR(TO_CHAR(SYSDATE, 'YYYYMMDD'), 7, 2), SMARTUX.SEQ_PT_CPM_STAMP_BOX_ACTION.NEXTVAL, 
+		    #{strmpId}, #{saId}, #{systemGb}, #{saId}||#{buyingDate}, TO_CHAR(SYSDATE, 'YYYYMMDDHH24MiSS'), 'N', '0', '1')
+	</insert> 
+
+	<!-- 사용쿠폰 조회 -->
+	<select id="getUseCpnPossibleList" resultType="ComCpnVO">
+		SELECT SMARTUX.F_GET_CPN_USE_POSSIBLE_LIST(#{saId}, #{catId}, #{albumId}, #{screenType}, #{genreInfo}, DECODE(#{prodType}, '0', '0', #{suggestedPrice} ), DECODE(#{prodType}, '1', 'Y', 'N'), nvl(#{pkgYn},'N') ) use_cpn_info
+      	FROM DUAL
+	</select>
+	
+	<!-- 데이터프리 정보 조회 -->
+	<select id="getDatafreeInfo"  parameterType="ComDataFreeVO" resultType="ComDataFreeVO">
+		<![CDATA[
+			SELECT *
+			FROM
+			(
+				SELECT NVL(DATAFREE_PRICE, '0') DATAFREE_PRICE,
+					NVL(APPROVAL_PRICE, '0') APPROVAL_PRICE,
+					NVL(DATAFREE_APPROVAL_PRICE, '0') DATAFREE_APPROVAL_PRICE,
+					NVL(PPV_DATAFREE_APPROVAL_PRICE, '0') PPV_DATAFREE_APPROVAL_PRICE							
+			   	FROM IMCSUSER.PT_LA_APPROVAL_INFO										
+				WHERE TO_NUMBER(TRIM(#{price})) BETWEEN TO_NUMBER(PRICE_FROM)			
+			    AND TO_NUMBER(PRICE_TO)
+			    AND NVL(APPROVAL_GB, 'N') IN (#{approvalGb}, 'N')
+			    ORDER BY DECODE(NVL(APPROVAL_GB, 'N'), #{approvalGb}, 1, 2)
+			)
+		    WHERE ROWNUM = 1
+		]]>
+	</select>
+	
+	<!-- 기존 데이터 프리 구매내역 조회-->
+	<select id="chkDatafreeDup" resultType="ComDupCHk">
+		<![CDATA[
+		SELECT
+			1 DATA_CHK, A.BUY_DATE BUY_DATE			
+		FROM PT_VO_BUY_NSC A
+		WHERE A.SA_ID = #{saId}
+			AND A.MAC_ADDR = #{stbMac}
+			AND A.PRODUCT_ID = '${albumId}_D'
+			AND A.EXPIRED_DATE >= TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS')
+			AND NVL(A.REFUND_YN,'N') <> 'P'
+			AND NVL(regexp_substr(replace(replace(ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+         ]]>
+	</select>
+	
+	<insert id="insertDatafreeContent1" parameterType="BuyNSContsRequestVO">
+	 INSERT INTO PT_VO_BUY_NSC (SA_ID, MAC_ADDR, BUY_DATE, PRODUCT_ID, PRODUCT_NAME, PKG_YN, GENRE_NAME, 
+		    BUY_AMT, CP_USE_YN, EXPIRED_DATE, APPL_TYPE
+		    <!-- 20190425 - 오과금 TO-BE -->
+		    , PVS_TRANS_NO, ALWNCE_CHARGE, BALACE)
+		    <!-- 20190425 - 오과금 AS-IS -->
+		    <!-- , ALWNCE_CHARGE, BALACE) -->
+		     
+		VALUES (#{saId} , #{stbMac} , #{buyingDate} , '${albumId}_D' , REPLACE(#{albumName}, '', ' '), #{pkgYn} , 
+		    TRIM(#{catId}) ,
+		    <if test='buyingType != "A"'> NVL(#{datafreeBuyPrice}, '0'), 		</if>
+		    <if test='buyingType == "A"'> NVL(#{suggestedDatafreePrice}, '0'),  </if>
+		    #{datafreeCpUseYn} , TO_CHAR(TO_DATE(#{buyingDate}, 'YYYYMMDDHH24MISS') + 1 , 'YYYYMMDDHH24MISS'), #{appType} ,
+		    <!-- 20190425 - 오과금 TO-BE --> 
+		    'V', 
+		    <if test='datafreeCpUseYn != "W" and datafreeCpUseYn != "T"'> '0',</if>
+		    <if test='datafreeCpUseYn == "W" or datafreeCpUseYn == "T"'>  #{suggestedDatafreePrice},</if>
+		    <if test='buyingType == "A"'> NVL(#{suggestedDatafreeApprovalPrice}, '0') 	</if>
+		    <if test='buyingType != "A"'> '0'  											</if>
+		    )
+	</insert>
+	
+	<insert id="insertDatafreeContent2" parameterType="BuyNSContsRequestVO">
+	 INSERT INTO PT_VO_BUY_NSC (SA_ID, MAC_ADDR, BUY_DATE, PRODUCT_ID, PRODUCT_NAME, PKG_YN, GENRE_NAME, 
+		    BUY_AMT, CP_USE_YN, EXPIRED_DATE, APPL_TYPE
+		    <!-- 20190425 - 오과금 TO-BE -->
+		    , PVS_TRANS_NO, ALWNCE_CHARGE, BALACE)
+		    <!-- 20190425 - 오과금 AS-IS --> 
+		    <!-- , ALWNCE_CHARGE, BALACE) -->		    
+		VALUES (#{saId} , #{stbMac} , #{buyingDate} , '${albumId}_D' , REPLACE(#{albumName}, '', ' '), #{pkgYn} , 
+		    TRIM(#{catId}) , NVL(#{suggestedDatafreePrice}, '0'), #{datafreeCpUseYn} , 
+		    TO_CHAR(TO_DATE(SUBSTR(#{buyingDate}, 1, 12), 'yyyymmddhh24mi') + TO_NUMBER(#{eventType})/24, 'yyyymmddhh24mi')||SUBSTR(#{buyingDate}, 13, 2), #{appType} ,
+		    <!-- 20190425 - 오과금 TO-BE -->
+		    'V',
+			<if test='datafreeCpUseYn != "W" and datafreeCpUseYn != "T"'> '0',</if>
+		    <if test='datafreeCpUseYn == "W" or datafreeCpUseYn == "T"'>  #{suggestedDatafreePrice},</if>
+		    <if test='buyingType == "A"'> NVL(#{suggestedDatafreeApprovalPrice}, '0') 	</if>
+		    <if test='buyingType != "A"'> '0'  											</if>
+			)
+	</insert>
+	
+	<insert id="insertDatafreeDetail" parameterType="BuyNSContsRequestVO">
+	 INSERT INTO PT_VO_BUY_DETAIL_NSC (SA_ID, MAC_ADDR, BUY_DATE, PRODUCT_ID, CONTENTS_ID, CONTENTS_NAME, LINK_TIME,  PRODUCT_NAME) 
+		VALUES (#{saId} , #{stbMac} , #{buyingDate} , '${albumId}_D' , '${albumId}_D', REPLACE(#{albumName}, '', ' '), '0' , #{contsGenre})
+	</insert>
+	
+	<!-- 구매 콘텐츠 메타 정보 저장 -->
+	<insert id="insBuyMeta" parameterType="BuyNSContsRequestVO">
+	 INSERT INTO ${@kr.co.wincom.imcs.common.util.GlobalCom@getDBMcustUser()}.NPT_VO_BUY_META
+       (
+        P_IDX_MM, P_IDX_SA, SA_ID, MAC_ADDR, BUY_DATE, CONTENTS_ID, CONTENTS_NAME, PRODUCT_ID, PRODUCT_NAME,
+        PRODUCT_KIND, PRODUCT_TYPE, ALBUM_ID, HDCONTENT, RATING_CD, CP_ID, MAXIMUM_VIEWING_LENGTH, SERIES_NO        
+       )
+	   VALUES
+	       (
+	        mod(to_char(to_date(#{buyingDate}, 'YYYYMMDDHH24MISS'), 'MM'), 4),
+	        MOD(#{pIdxSa},33),
+	        #{saId},
+	        #{stbMac},
+	        #{buyingDate},
+	        #{albumId},
+	        #{assetName},
+	        #{productId},
+	        #{productName},
+	        #{productKind},
+	        #{prodType},
+	        #{albumId},
+	        #{hdcontent},
+	        #{ratingCd},
+	        #{cpId},
+	        #{maximumViewingLength},
+	        #{seriesNo}
+	       )
+	</insert>	
+</mapper> 

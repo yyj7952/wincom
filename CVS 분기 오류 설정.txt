@@ -1,0 +1,4 @@
+
+프로젝트 오른쪽 마우스 - 팀 - 다른 분기 또는 버전으로 전환 - 다음 목목에서 태그 선택 - 분기 - 프로젝트 선택 - 완료버튼
+
+프로젝트 오른쪽 마우스 -> Team -> Switch to Another Branch or Version... -> Select the tag from the following list -> Branch -> 프로젝트 선택 -> Finish

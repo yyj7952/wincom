@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom2.imcs.api.setNSPassedTime.SetNSPassedTimeDao2">							
+	
+	<!-- 이어보기 시간 갱신 -->
+	<update id="updateSetTime">
+		UPDATE /*+ index(A IDX_PT_VO_SET_TIME_02_PTT) */ PT_VO_SET_TIME_PTT A
+		  SET LINK_TIME = #{second},
+		      WATCH_DATE = #{sysdate}
+		WHERE SA_ID        = #{shareSaId}
+		  AND ADI_ALBUM_ID = #{albumId}
+		  AND NSCN_CUST_NO = #{nscnCustNo}		  
+		  AND P_IDX_SA = MOD(#{pIdxSa}, 33)
+	</update>
+	
+	
+	<!-- 이어보기 시간 등록 -->
+	<insert id="insertSetTime">
+		INSERT INTO PT_VO_SET_TIME_PTT(P_IDX_SA, P_IDX_DAY, NSCN_CUST_NO, SA_ID, ADI_ALBUM_ID, LINK_TIME, WATCH_DATE)                     
+		VALUES (
+		       MOD(#{pIdxSa}, 33),
+			   SUBSTR(TO_CHAR(SYSDATE,'YYYYMMDD'), 7, 2),
+			   #{nscnCustNo},
+			   #{shareSaId},            
+		       #{albumId},                         
+		       #{second} ,                           
+		       #{sysdate} 
+		       )
+	</insert>
+	
+	<!-- PT_VO_WATCH_HISTORY 등록 - 앤스크린이고 buyingDate가 있을 때 -->
+	<update id="updateWatchHis3" parameterType="kr.co.wincom.imcs.api.setNSPassedTime.SetNSPassedTimeRequestVO">
+		UPDATE PT_VO_WATCH_HISTORY SET
+			watch_edate = TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS'),
+			run_time    = #{runTime},
+			key_log     = #{keyLog},
+			download_byte = #{downloadByte}
+		WHERE sa_id = #{nSaId}
+		AND mac_addr = #{nStbMac}
+		AND buy_date = #{buyingDate}
+		AND (contents_id LIKE SUBSTR((SELECT asset_id
+										FROM IMCSUSER.PT_LA_PACKAGE_ASSET
+										WHERE adi_album_id = #{albumId}
+										AND album_type IN ('HD')
+									), 1, 17) || '%'
+									or
+									contents_id LIKE SUBSTR((select asset_id
+								          from imcsuser.pt_la_package_asset
+							             where adi_album_id = #{albumId}
+							               and album_type IN ('SH')
+							            ), 1, 17)||'%'
+									)									
+		AND watch_fdate = (SELECT MAX(watch_fdate)
+							FROM PT_VO_WATCH_HISTORY A,
+								(SELECT asset_id
+									FROM IMCSUSER.PT_LA_PACKAGE_ASSET
+									WHERE adi_album_id = #{albumId}
+									AND album_type IN ('HD','SH')
+								) B
+							WHERE A.sa_id = #{nSaId}
+							AND A.mac_addr = #{nStbMac}
+							AND A.buy_date = #{buyingDate}
+							AND A.contents_id LIKE SUBSTR(B.asset_id, 1, 17) || '%'
+							AND A.P_IDX_SA = mod(#{pIdxSa}, 33))
+		AND P_IDX_SA = mod(#{pIdxSa}, 33)
+	</update>
+	
+	<!-- PT_VO_WATCH_HISTORY 등록 - 앤스크린이고 buyingDate가 없을 때 -->
+	<update id="updateWatchHis4" parameterType="kr.co.wincom.imcs.api.setNSPassedTime.SetNSPassedTimeRequestVO">
+		UPDATE PT_VO_WATCH_HISTORY SET
+			watch_edate = TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS'),
+			run_time    = #{runTime},
+			key_log     = #{keyLog},
+			download_byte = #{downloadByte}
+		WHERE sa_id    = #{nSaId}
+		AND mac_addr = #{nStbMac}
+		AND buy_date = (SELECT MAX(A.buy_date)
+							FROM PT_VO_WATCH_HISTORY A,
+								(select asset_id
+									from imcsuser.pt_la_package_asset
+									where adi_album_id = #{albumId}
+									and album_type IN ('HD', 'SH')
+								) B
+							WHERE A.sa_id = #{nSaId}
+							AND A.mac_addr = #{nStbMac}
+							AND A.contents_id LIKE SUBSTR(B.asset_id, 1, 17) || '%'
+							AND A.P_IDX_SA = mod(#{pIdxSa}, 33))
+		AND (contents_id LIKE SUBSTR((select asset_id
+										from imcsuser.pt_la_package_asset
+										where adi_album_id = #{albumId}
+										and album_type IN ('HD')
+									), 1, 17) || '%'
+									or
+									contents_id LIKE SUBSTR((select asset_id
+													           from imcsuser.pt_la_package_asset
+												              where adi_album_id = #{albumId}
+												                and album_type IN ('SH')
+												            ), 1, 17)||'%'
+									)
+		AND watch_fdate = (SELECT MAX(A.buy_date)
+								FROM PT_VO_WATCH_HISTORY A,
+									(select asset_id
+										from imcsuser.pt_la_package_asset
+										where adi_album_id = #{albumId}
+										and album_type IN ('HD', 'SH')
+									) B
+								WHERE A.sa_id     = #{nSaId}
+								AND A.mac_addr    = #{nStbMac}
+								AND A.contents_id LIKE SUBSTR(B.asset_id, 1, 17) || '%'
+								AND A.P_IDX_SA = mod(#{pIdxSa}, 33))
+		AND P_IDX_SA = mod(#{pIdxSa}, 33)
+	</update>
+			
+</mapper>
+	
+	
+	

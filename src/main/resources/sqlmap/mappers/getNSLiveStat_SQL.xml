@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSLiveStat.GetNSLiveStatDao">
+	
+	<resultMap type="HashMap" id="mDupMap">
+		<result property="DATA_CHK" column="DATA_CHK" javaType="Integer"/>
+		<result property="BUY_DATE" column="BUY_DATE" javaType="String"/>
+		<result property="EXP_DATE" column="EXP_DATE" javaType="String"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="nScreenPairingInfo">
+		<result property="STB_SA_ID" column="STB_SA_ID" javaType="String"/>
+		<result property="STB_MAC" column="STB_MAC" javaType="String"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="liveStatNScreenBuyChk">
+		<result property="DATA_CHK" column="DATA_CHK" javaType="String"/>
+		<result property="N_BUY_DATE" column="N_BUY_DATE" javaType="String"/>
+		<result property="N_EXPIRED_DATE" column="N_EXPIRED_DATE" javaType="String"/>
+	</resultMap>
+
+	<!-- 월정액상품정보 조회 -->
+	<select id="getPPMProdInfo" parameterType="GetNSLiveStatRequestVO" resultType="GetNSLiveStatResponseVO">
+		SELECT A.IMCS_PRODUCT_TYPE AS CONTS_TYPE,
+			   CASE WHEN A.IMCS_PRODUCT_TYPE ='0' THEN '24'
+		       		WHEN A.IMCS_PRODUCT_TYPE ='2' THEN A.IMCS_EXPIRED_DATE
+		            ELSE NVL(SUBSTR(E.MAXIMUM_VIEWING_LENGTH, 1, LENGTH(E.MAXIMUM_VIEWING_LENGTH) - 2), '48') END AS MAX_VIEWING_LEN,
+		       CASE WHEN A.IMCS_PRODUCT_TYPE = '2' THEN A.IMCS_PRICE ELSE NVL(F.SUGGESTED_PRICE, '0') END AS PRICE,                                     
+		       A.IMCS_PRODUCT_ID AS SUBS_PROD_ID,
+		       A.IMCS_PRODUCT_NAME AS SUBS_PROD_NAME,
+		       ${@kr.co.wincom.imcs.common.util.GlobalCom@getDBMcustUser()}.NUF_GET_NSCREEN_INFO(C.ALBUM_ID, 'N') AS N_SCREEN_YN_TMP,
+		       (
+		       	SELECT NVL(BUY_BGN_DT, 'XXXXX') || '^' || NVL(BUY_END_DT, 'XXXXX') || '^' || NVL(PAY_TYPE_AND, 'XXXXX') || '^' ||
+               		   NVL(PAY_TYPE_IOS, 'XXXXX') || '^' || NVL(PAY_TYPE_WEB, 'XXXXX') || '^' || NVL(CPN_BUY_URL, 'XXXXX') || '^' ||
+               		   NVL(CPN_CANCEL_URL, 'XXXXX')
+          		  FROM IMCSUSER.PT_LB_CUESHEET_PAY_INFO
+         		 WHERE CUESHEET_ID = #{cuesheetId}
+         	   ) AS PAY_INFO,
+		       (SELECT NVL(TO_NUMBER(MIN_VALUE),0) MIN_VALUE  FROM IMCSUSER.PT_CD_COM_CD  WHERE GRP_ID = 'SURTAXRATE' AND ROWNUM = 1) AS SURTAX_RATE,
+		       NVL(SUBSTR(E.MAXIMUM_VIEWING_LENGTH, 1, LENGTH(E.MAXIMUM_VIEWING_LENGTH) - 2), '48') AS MAX_VIEWING_LEN_CON
+		  FROM IMCSUSER.PT_PD_PACKAGE_UNITED A,
+		       IMCSUSER.PT_PD_PACKAGE_DETAIL B,			
+		       IMCSUSER.PT_LA_ALBUM_INFO C,
+		       IMCSUSER.PT_LA_ALBUM_PLATFORM E,
+		       IMCSUSER.PT_LA_ASSET_INFO F
+		 WHERE C.ALBUM_ID = #{albumId}
+		   AND C.ALBUM_ID = E.ALBUM_ID
+		   AND E.ALBUM_ID = F.ALBUM_ID
+		   AND E.SCREEN_TYPE = 'N'
+		   AND E.SCREEN_TYPE = F.SCREEN_TYPE
+		   AND F.ASSET_ID = B.CONTENTS_ID
+		   AND B.PRODUCT_ID = A.IMCS_PRODUCT_ID
+		   AND A.IMCS_PRODUCT_TYPE <![CDATA[<>]]> '3'
+	</select>
+
+	<!-- 구매중복 체크 (FVOD)-->
+	<select id="getBuyDupChk1" parameterType="GetNSLiveStatRequestVO" resultMap="mDupMap">
+		SELECT DATA_CHK, BUY_DATE, EXP_DATE
+		FROM (
+		    SELECT COUNT(A.BUY_DATE) AS DATA_CHK,
+		           NVL(MAX(A.BUY_DATE), '') AS BUY_DATE,
+		           NVL(MAX(A.EXPIRED_DATE), '') AS EXP_DATE
+		      FROM PT_VO_BUY_FVOD_NSC A ,
+		           ( SELECT NSC_ALBUM_ID ASSET_ID
+		               FROM IMCSUSER.PT_LA_PACKAGE_ASSET A
+		              WHERE NSC_ALBUM_ID = #{albumId}
+		           ) X
+		     WHERE A.SA_ID  = #{saId}
+		       AND A.PRODUCT_ID = X.ASSET_ID
+		       AND A.EXPIRED_DATE <![CDATA[>]]> TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS')
+		       AND A.P_IDX_SA = MOD(#{pIdxSa}, 33)
+		   ) X
+	</select>
+
+	<!-- 구매중복 체크 (PPV)-->
+	<select id="getBuyDupChk2" parameterType="GetNSLiveStatRequestVO" resultMap="mDupMap">
+		SELECT DATA_CHK, BUY_DATE, EXP_DATE 
+		  FROM (
+		        SELECT COUNT(A.BUY_DATE) AS DATA_CHK,
+		               NVL(MAX(A.BUY_DATE), '') AS BUY_DATE,
+		               NVL(MAX(A.EXPIRED_DATE), '') AS EXP_DATE 
+		          FROM PT_VO_BUY_NSC A, PT_VO_BUY_DETAIL_NSC B,
+		               (SELECT NSC_ALBUM_ID ASSET_ID 
+		                  FROM IMCSUSER.PT_LA_PACKAGE_ASSET A 
+		                 WHERE NSC_ALBUM_ID = #{albumId}
+		               ) X 
+		         WHERE A.SA_ID = #{saId}
+		           AND A.SA_ID = B.SA_ID
+		           AND A.MAC_ADDR = B.MAC_ADDR
+		           AND A.BUY_DATE = B.BUY_DATE
+		           AND B.CONTENTS_ID = X.ASSET_ID
+		           AND (A.EXPIRED_DATE <![CDATA[>]]> TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS') OR A.EXPIRED_DATE = '0')
+		           AND NVL(A.REFUND_YN, 'N') <![CDATA[<>]]> 'P'
+		           AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+		       ) X
+	</select>
+
+	<!-- 구매중복 체크 (PVOD)-->
+	<select id="getBuyDupChk3" parameterType="GetNSLiveStatRequestVO" resultMap="mDupMap">
+		SELECT DATA_CHK, BUY_DATE, EXP_DATE
+		  FROM (
+		        SELECT COUNT(A.BUY_DATE) DATA_CHK,
+		               NVL(MAX(A.BUY_DATE), '') BUY_DATE,
+		               NVL(MAX(A.EXPIRED_DATE), '') EXP_DATE 
+		          FROM PT_VO_BUY_NSC A,
+		               PT_VO_BUY_DETAIL_NSC B 
+		         WHERE A.SA_ID = #{saId}
+		           AND A.SA_ID = B.SA_ID
+		           AND A.MAC_ADDR = B.MAC_ADDR
+		           AND A.BUY_DATE = B.BUY_DATE
+		           AND A.PRODUCT_ID = (
+		                SELECT DISTINCT A.PRODUCT_ID 
+		                  FROM IMCSUSER.PT_PD_PACKAGE_DETAIL A,
+		                       IMCSUSER.PT_PD_PACKAGE B,
+		                       IMCSUSER.PT_LA_PACKAGE_ASSET C 
+		                 WHERE CONTENTS_ID IN (
+		                        SELECT ASSET_ID 
+		                          FROM IMCSUSER.PT_LA_PACKAGE_ASSET A 
+		                         WHERE NSC_ALBUM_ID = #{albumId}
+		                       )
+		                   AND A.PRODUCT_ID = B.PRODUCT_ID
+		                   AND A.CONTENTS_ID = C.ASSET_ID
+		                   AND B.PRODUCT_TYPE = '2'
+		               )
+		           AND A.PRODUCT_ID = B.PRODUCT_ID
+		           AND B.CONTENTS_ID = #{albumId}
+		           AND A.EXPIRED_DATE <![CDATA[>]]> TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS')
+		           AND NVL(A.REFUND_YN, 'N') <![CDATA[<>]]> 'P'
+		           AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+		       ) X
+	</select>
+
+	<!-- 유료 콘서트 채널 여부 조회 -->
+	<select id="getCuesheetId" parameterType="GetNSLiveStatRequestVO" resultType="String">
+		 SELECT CUESHEET_ID 
+		   FROM IMCSUSER.PT_LB_CUESHEET_MST
+		  WHERE ALBUM_ID = #{albumId}
+		    AND ROWNUM = 1
+	</select>
+	
+	<!-- 데이터프리 정보 조회 -->
+	<select id="getDatafreeInfo" parameterType="ComDataFreeVO" resultType="ComDataFreeVO">
+		SELECT *
+		  FROM
+			  (
+				SELECT APPROVAL_ID APPROVAL_ID,	NVL(APPROVAL_PRICE, '0.00') APPROVAL_PRICE
+		   		  FROM IMCSUSER.PT_LA_APPROVAL_INFO										
+				 WHERE TO_NUMBER(TRIM(#{price})) BETWEEN TO_NUMBER(PRICE_FROM)	  
+		      	   AND TO_NUMBER(PRICE_TO)
+		      	   AND NVL(APPROVAL_GB, 'N') IN (#{approvalGb}, 'N')
+		    	 ORDER BY DECODE(NVL(APPROVAL_GB, 'N'), #{approvalGb}, 1, 2)
+			  )
+		 WHERE ROWNUM = 1              
+	</select>
+	
+	<!-- 엔스크린 기능 제공 단말 및 엔스크린 컨텐츠일 경우 페어링된 가입자의 구매/가입 여부를 확인 -->
+	<select id="getNScreenPairingInfo" parameterType="GetNSLiveStatRequestVO" resultMap="nScreenPairingInfo">
+		SELECT
+			STB_SA_ID
+			, STB_MAC
+		FROM PT_VO_SBC_PAIRING_TBL
+		WHERE M_SA_ID = #{saId}
+		AND M_MAC = #{stbMac}
+		AND FLAG = 'Y'
+	</select>
+	
+	<!-- 엔스크린(NSCREEN) 구매 여부 체크 -->
+	<!-- 메타구조개선 엔스크린 구매 체크 쿼리 -->
+	<select id="getNScreenBuyChk" parameterType="GetNSLiveStatRequestVO" resultMap="liveStatNScreenBuyChk">
+		SELECT
+            SUM(X.buy_cnt) AS DATA_CHK
+            , MAX(X.buy_date) AS N_BUY_DATE
+            , MAX(X.expired_date) AS N_EXPIRED_DATE
+        FROM (
+            SELECT 
+                COUNT(*) buy_cnt
+                , MAX(A.buy_date) buy_date
+                , MAX(expired_date) as expired_date
+            FROM PT_VO_BUY A,
+                (SELECT K.asset_id FROM IMCSUSER.PT_LA_PACKAGE_ASSET K
+                    WHERE K.adi_album_id = #{albumId}
+                    AND album_type IN ('HD','SH')
+                ) P
+            WHERE A.sa_id = #{nSaId}
+            AND A.expired_date <![CDATA[ > ]]> to_char(sysdate, 'yyyymmddhh24miss')
+            AND A.product_id LIKE SUBSTR(P.asset_id, 1, 17) || '%'
+            AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+            UNION
+            SELECT 
+                COUNT(*) buy_cnt
+                , MAX(A.buy_date) buy_date
+                , MAX(A.expired_date) as expired_date
+            FROM PT_VO_BUY A,
+               (SELECT /*+ USE_NL(P D G) */ G.product_id, P.asset_id, NVl(G.pre_sale_yn, 'N') pre_sale_yn,
+                        case when Trim(G.close_date) is null                                      
+                                    then TO_CHAR(sysdate + 1, 'yyyymmddhh24miss')                        
+                                    else TO_CHAR(TO_DATE(SUBSTR(G.close_date, 1, 12), 'yyyymmddhh24mi')  
+                                                         + to_number(G.expired_date), 'yyyymmddhh24mi')  
+                                                         || substr(G.close_date, 13, 2) end expired_date 
+                        FROM IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+                                IMCSUSER.PT_PD_PACKAGE G,
+                                (SELECT K.asset_id FROM IMCSUSER.PT_LA_PACKAGE_ASSET K
+                                    WHERE K.adi_album_id = #{albumId}
+                                    AND album_type IN ('HD','SH')
+                                ) P
+                        WHERE D.contents_id LIKE SUBSTR(P.asset_id, 1, 17) || '%'
+                        AND D.product_id = G.product_id
+                        AND G.product_type = '2')Z
+            WHERE A.sa_id = #{nSaId}
+            AND ((A.expired_date <![CDATA[ > ]]> to_char(sysdate, 'yyyymmddhh24miss') ) or (A.expired_date = '0' AND Z.expired_date <![CDATA[ > ]]> to_char(sysdate, 'yyyymmddhh24miss'))) 
+            AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+            AND A.product_id = Z.product_id
+        ) X
+	</select>
+	
+</mapper> 

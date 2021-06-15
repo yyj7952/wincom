@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.co.wincom.imcs.common.nosql.NoSQLRedisDao">
+	<!--  NoSQL Queue Redis 추가  -->	
+	<insert id="insertQueueRedis" parameterType="RedisRequest">
+		INSERT INTO NOSQL.TB_NOSQL_QUEUE_REDIS
+		( 
+			SEQ_NO, 
+			NOSQL_TABLES_ID,
+			<if test='ver_unit == "R"'> 
+			PK_VALUES, 
+			</if>
+			HDTV_APPLED_FLAG, 
+			IPTV_APPLED_FLAG, 
+			GTV_APPLED_FLAG, 
+			LAST_UPDATED, 
+			LAST_UPDATED_BY, 
+			CREATED, 
+			CREATED_BY, 
+			PARTITION_FLAG
+		)
+		VALUES
+		( 
+			nosql.SEQ_NOSQL_QUEUE_REDIS_01.NEXTVAL,
+			(
+				SELECT nosql_tables_id
+				FROM NOSQL.TB_NOSQL_TABLES
+				WHERE 
+					TABLE_NAME = #{table_name}
+					AND VER_UNIT = #{ver_unit}
+			),
+			<if test='ver_unit == "R"'>
+			#{pk_values},
+			</if>
+			'N', 
+			'N', 
+			'N',
+			SYSTIMESTAMP, 
+			'IMCS_API', 
+			SYSTIMESTAMP, 
+			'IMCS_API', 		
+			DECODE(to_char(SYSTIMESTAMP,'D'),'1','SUN','2','MON','3','TUE','4','WED','5','THU','6','FRI','7','SAT'))
+	</insert>
+
+</mapper>

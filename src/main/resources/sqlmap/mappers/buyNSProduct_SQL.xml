@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.buyNSProduct.BuyNSProductDao">
+
+	<!-- NSCN ID 조회 -->
+	<select id="getNscnId" resultType="String" >
+		SELECT DISTINCT PVS_NSCN_CUST_NO NSCN_ID
+		  FROM NSCN_SBC_TBL
+		WHERE PVS_SBC_CONT_NO = #{saId}
+	</select>
+	
+	<!-- 상품 정보 조회 -->
+	<select id="getProdInfo" resultType="ComProdInfoVO" >
+		SELECT EXPIRED_DATE AS PROD_GB
+		     , CASE WHEN NVL(EXPIRED_TIME, '0') = '0' THEN EXPIRED_DATE ELSE '0' END EXPI_CD
+		     , PRODUCT_TYPE AS PROD_TYPE
+		     , NVL(EXPIRED_TIME, '0') AS EXPIRED_TIME
+		     , PRODUCT_NAME AS PROD_NAME
+		     , PRICE
+		     , PRODUCT_KIND AS PROD_KIND
+		 FROM IMCSUSER.PT_PD_PACKAGE
+		WHERE PRODUCT_ID = #{prodId}
+	</select>
+
+	<!-- 가입자 정보 조회 -->
+	<select id="getCustomerInfo" resultType="ComSbcVO">
+		SELECT DECODE(A.ST_TYP, '1', 'Y', 'N') STATUS_FLAG,      /*서비스 구분*/
+		      A.VOD_USE_YN YN_VOD_OPEN,     /*PPV, PVOD사용유무 - 최초'N', 해피콜완료시'Y' */
+		      NVL(A.CP_CNT, 0) CP_CNT
+		 FROM PT_VO_CUSTOM_ID A
+		WHERE A.SA_ID    = #{saId}
+		  AND A.MAC_ADDR = #{stbMac}
+	</select>
+	
+	
+	<!-- 구매내역 체크 -->
+	<select id="getBuyDupChk" resultType="ComDupCHk">
+		<![CDATA[
+		SELECT 1 AS DATA_CHK, X.BUY_DATE AS BUY_DATE 
+		  FROM (
+		        SELECT 1, BUY_DATE 
+		          FROM PT_VO_NSC_PRODUCT A 
+		         WHERE A.SBC_CONT_NO = #{saId}
+		           AND A.PROD_GB >= (
+		                SELECT P.EXPIRED_DATE 
+		                  FROM IMCSUSER.PT_PD_PACKAGE P 
+		                 WHERE P.PRODUCT_TYPE = '7'
+		                   AND P.NSC_PROD_KIND = '1'
+		                   AND P.PRODUCT_ID = #{prodId} /*변수 : 31060(1일), 31050(7일), 31040(30일) */
+		               )
+		           AND A.PVS_TRNS_YN != 'P'
+		           AND A.EXPIRED_DATE >= #{buyingDate}
+		        UNION ALL
+		         SELECT 1, A.ENTRYDATE||'000000' AS BUY_DATE 
+		          FROM PT_VO_CUSTOM_PRODUCT A 
+		         WHERE A.SA_ID = #{saId}
+		           AND A.MAC_ADDR = #{stbMac}
+		           AND A.XCION_BILLING_TYP = 'P'
+		           AND A.PRODUCTCD IN ('31300', '31400') /*31400은 향후 사용될수 있는 무료 월정기임으로 포함했음*/
+		       ) X
+		   ]]>      
+	</select>
+	
+	<!-- 체험권 상품 구매내역 체크 -->
+	<select id="getBuyFreeCouponChk" resultType="ComDupCHk">
+		<![CDATA[
+		SELECT 1 AS DATA_CHK, X.BUY_DATE AS BUY_DATE 
+          FROM (
+                SELECT 1, BUY_DATE 
+                  FROM PT_VO_NSC_PRODUCT A 
+                 WHERE A.SBC_CONT_NO = #{saId}
+                   AND A.PROD_CD = (
+                        SELECT P.PRODUCT_ID 
+                          FROM IMCSUSER.PT_PD_PACKAGE P 
+                         WHERE P.PRODUCT_TYPE = '7'
+                           AND P.NSC_PROD_KIND = '1'
+                           AND P.PRODUCT_ID = #{prodId}
+                       )
+                   AND A.PVS_TRNS_YN = 'P'
+                   AND A.EXPIRED_DATE >= #{buyingDate}
+            ) X
+		   ]]>      
+	</select>
+	
+	<!-- 구매내역 등록 -->
+	<insert id="insertBuyProduct" parameterType="BuyNSProductRequestVO">
+		INSERT INTO PT_VO_NSC_PRODUCT (NSCN_CUST_NO, SBC_CONT_NO, MAC_ADDR, PROD_GB, PROD_CD, BUY_DATE, EXPIRED_DATE, PVS_TRNS_YN , APPL_TYPE) 
+		VALUES ( #{nscnId}, #{saId}, #{stbMac}, #{prodGb}, #{prodId}, #{buyingDate},
+		 TO_CHAR(TO_DATE(#{buyingDate}, 'yyyymmddhh24miss')
+		         + TO_NUMBER(DECODE(#{expiCd},'0','0','1','1','2','7','3','30'))
+		         + TO_NUMBER(#{expiredTime})/24, 'yyyymmddhh24miss'),
+		<if test="couponFlag.equals('0'.toString())">
+		'N',
+		</if>
+		<if test="!couponFlag.equals('0'.toString())">
+		'P',
+		</if>
+		 #{appType}
+		)
+	</insert> 
+		
+		<!-- 구매 콘텐츠 메타 정보 저장 -->
+	<insert id="insBuyMeta" parameterType="BuyNSProductRequestVO">
+	 INSERT INTO MCUSTUSER.NPT_VO_BUY_META
+       (
+        P_IDX_MM, P_IDX_SA, SA_ID, MAC_ADDR, BUY_DATE, CONTENTS_ID, CONTENTS_NAME, PRODUCT_ID, PRODUCT_NAME,
+        PRODUCT_KIND, PRODUCT_TYPE, ALBUM_ID, HDCONTENT, RATING_CD, CP_ID, MAXIMUM_VIEWING_LENGTH, SERIES_NO        
+       )
+	   VALUES
+	       (
+	        mod(to_char(to_date(#{buyingDate}, 'YYYYMMDDHH24MISS'), 'MM'), 4),
+	        MOD(SUBSTR(#{saId}, -2),33),
+	        #{saId},
+	        #{stbMac},
+	        #{buyingDate},
+	        #{prodId},	-- 기존 UDR 기준으로는 NULL로 하여야하는데, UNIQE KEY라서 상품ID를 넣어준다.
+	        '',
+	        #{prodId},
+	        #{productName},
+	        #{productKind},
+	        #{prodType},
+	        '',
+	        '',
+	        '',
+	        '',
+	        DECODE(#{prodGb}, '1', '2400', '2', '16800', '3', '72000', #{prodGb}*24 || '00'),
+	        ''
+	       )
+	</insert>
+	
+	<!-- 체험권 상품 조회 -->
+	<select id="getFreeCouponId" resultType="String" >
+		SELECT COM_NAME FROM IMCSUSER.PT_CD_COM_CD WHERE GRP_ID = 'HDTVPRECOU'
+	</select>
+	
+	<!-- 가입자 체험권 상품 쿠폰 조회 -->
+	<select id="getFreeCouponCnt" resultType="Integer" >
+		SELECT /*+ INDEX(A PT_CPM_COUPON_BOX_IDX1) */
+		 	   COUNT(1) AS COUNT 
+		  FROM SMARTUX.PT_CPM_COUPON_BOX
+		 WHERE PT_SAID = MOD(NVL(SUBSTR(#{saId},-2),#{saId}),33)
+		   AND PT_YEAR IN (TO_NUMBER(TO_CHAR(ADD_MONTHS(SYSTIMESTAMP,-12),'Y')), TO_NUMBER(TO_CHAR(SYSTIMESTAMP,'Y')), TO_NUMBER(TO_CHAR(ADD_MONTHS(SYSTIMESTAMP,12),'Y')))
+		   AND SA_ID = #{saId}
+		   AND CPN_NO = #{ofrSeq}
+		   AND CPEVT_ID = #{offerCd}
+		   AND TO_CHAR(SYSTIMESTAMP, 'YYYYMMDDHH24') BETWEEN USE_START_TIME AND USE_END_TIME
+		   AND USE_YN != 'Y'
+	</select>
+	
+</mapper> 

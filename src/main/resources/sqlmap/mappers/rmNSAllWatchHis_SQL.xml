@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.rmNSAllWatchHis.RmNSAllWatchHisDao">
+
+	<!-- 시청목록 삭제 (DEL_YN 업데이트) -->
+	<update id="rmNSAllWatchHisUpdate" parameterType="RmNSAllWatchHisRequestVO" >
+		UPDATE PT_VO_WATCH_HISTORY_NSC A
+		  SET DEL_YN = 'Y'
+		WHERE A.SA_ID    = #{saId}
+		  AND (DEL_YN = 'N' OR DEL_YN IS NULL OR DEL_YN = '')
+		  AND (A.CONTENTS_ID IN ( 
+			  	SELECT C.CONTENTS_ID FROM PT_VO_CATEGORY B , PT_VO_CATEGORY_MAP C
+			     WHERE B.CATEGORY_ID = C.CATEGORY_ID
+			       AND B.CATEGORY_GB = #{contsGb} AND NVL(B.NSC_GB, 'LTE') IN ('PAD', 'LTE')  )
+			        OR A.CONTENTS_ID IN ( 
+		        	SELECT ASSET_ID FROM IMCSUSER.PT_LA_PACKAGE_ASSET WHERE ADI_ALBUM_ID IN ( 
+		        			SELECT C.CONTENTS_ID FROM PT_VO_CATEGORY B , PT_VO_CATEGORY_MAP C
+                             WHERE B.CATEGORY_ID = C.CATEGORY_ID AND B.CATEGORY_GB = #{contsGb}
+                               AND NVL(B.NSC_GB, 'LTE') IN ('PAD', 'LTE')  )
+		            ))
+		  AND P_IDX_SA = MOD(#{pIdxSa}, 33)
+	</update>
+	
+	<!-- 이어보기 시간 갱신 -->
+	<update id="updateSetTime">
+		UPDATE /*+ index(A IDX_PT_VO_SET_TIME_02_PTT_N) */ PT_VO_SET_TIME_PTT_NSC A
+		    SET WATCH_DATE = '0'
+		  WHERE A.sa_id = #{saId}
+		   and (A.adi_album_id in ( select C.contents_id from pt_vo_category B , pt_vo_category_map C
+		                            where B.category_id = C.category_id                               
+		                              and B.category_gb = #{contsGb} and nvl(B.nsc_gb, 'LTE') in ('PAD', 'LTE')
+		                         )) 
+			AND A.NSCN_CUST_NO IN ('M','V', 'F')
+		    AND A.P_IDX_SA = mod(#{pIdxSa}, 33)
+	</update>
+	
+</mapper> 

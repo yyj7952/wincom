@@ -1,0 +1,808 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSReposited.GetNSRepositedDao">
+
+	<resultMap type="HashMap" id="mBuyInfo">
+		<result property="CP_USE_YN" column="CP_USE_YN" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="BUYING_PRICE" column="BUYING_PRICE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="EXPIRED_DATE" column="EXPIRED_DATE" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mCustPairingChk">
+		<result property="STB_SA_ID" column="STB_SA_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="STB_MAC" column="STB_MAC" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="TEST_SBC" column="TEST_SBC" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mBuyInfoNScreen">
+		<result property="DATA_CHK" column="DATA_CHK" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="N_BUY_DATE" column="N_BUY_DATE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="N_EXPIRED_DATE" column="N_EXPIRED_DATE" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+
+<!-- 1. FX_TYPE이 N인 시청이력 리스트 -->
+<select id="getWatchingListTypeN" parameterType="GetNSRepositedRequestVO" resultType="GetNSRepositedResponseVO" timeout="10">
+<if test="!pageNo.equals('A'.toString()) and !pageCnt.equals('A'.toString())">
+SELECT * FROM (
+</if>
+<if test="pageNo.equals('A'.toString()) or pageCnt.equals('A'.toString())">
+SELECT * FROM (
+</if>
+	SELECT '10' AS TEMP_CHECK, ALBUM_ID AS CONTS_ID, BUY_DATE AS BUYING_DATE, WATCH_FDATE AS WATCH_DATE, BUY_END_DATE, VIEW_TYPE, UFLIX_YN, CONTENTS_NAME AS CONTS_NAME, PRODUCT_ID,
+	       'Y' AS SET_POINT_YN,
+	       ROWNUM ORD_NUM,
+	       SUM(1) OVER(PARTITION BY 0) TOTAL_CNT,
+	       WATCH_EDATE 
+	  FROM (
+	        SELECT A.CONTENTS_ID,
+	               MAX(A.BUY_DATE) BUY_DATE,
+	               MAX(A.WATCH_FDATE) WATCH_FDATE,
+	               TO_CHAR(TO_DATE(MAX(A.BUY_DATE), 'YYYYMMDDHH24MISS')+1, 'YYYYMMDDHH24MISS') BUY_END_DATE,
+	               MAX(A.VIEW_TYPE) VIEW_TYPE,
+	               MAX(A.UFLIX_YN) UFLIX_YN,
+	               MAX(A.PRODUCT_ID) PRODUCT_ID,
+	               MAX(B.ADI_ALBUM_ID) ALBUM_ID,
+	               MAX(B.ADI_ALBUM_NAME) CONTENTS_NAME,
+	               MAX(A.WATCH_EDATE) WATCH_EDATE, 
+	               MAX(NVL(D.genre_small, ' ')) genre_small
+	          FROM (
+	                SELECT CONTENTS_ID,
+	                       CASE WHEN WATCH_FDATE = MAX(WATCH_FDATE) OVER (PARTITION BY CONTENTS_ID) THEN WATCH_FDATE ELSE '' END WATCH_FDATE,
+	                       CASE WHEN WATCH_FDATE = MAX(WATCH_FDATE) OVER (PARTITION BY CONTENTS_ID) THEN DECODE(BUY_DATE, 'N', '0', BUY_DATE) ELSE '' END BUY_DATE,
+	                       CASE WHEN WATCH_FDATE = MAX(WATCH_FDATE) OVER (PARTITION BY CONTENTS_ID) THEN PRODUCT_ID ELSE '0' END PRODUCT_ID,
+	                       MAX(VIEW_TYPE) VIEW_TYPE,
+	                       MAX(UFLIX_YN) UFLIX_YN,
+	                       MAX(WATCH_EDATE) WATCH_EDATE 
+	                  FROM PT_VO_WATCH_HISTORY_NSC 
+			         WHERE SA_ID    = #{saId}                                                                                                                                
+			           AND MAC_ADDR = #{stbMac}   
+			           AND P_IDX_SA = #{pIdxSa}  
+	                   AND NVL(DEL_YN, 'N') = 'N'
+	                 GROUP BY CONTENTS_ID,
+	                       WATCH_FDATE,
+	                       BUY_DATE,
+	                       PRODUCT_ID
+	               ) A,
+	               PT_VO_CATEGORY_MAP M,
+	               PT_VO_CATEGORY R,
+	               IMCSUSER.PT_LA_ALBUM_MST B,
+	               IMCSUSER.PT_LA_PACKAGE_ASSET C,
+	               IMCSUSER.PT_LA_TITLE_ASSET D 
+	         WHERE A.CONTENTS_ID = M.CONTENTS_ID
+	           AND M.CATEGORY_ID = R.CATEGORY_ID
+	           AND A.CONTENTS_ID = B.ADI_ALBUM_ID
+	           AND R.CATEGORY_GB = 'NSC'
+	           AND C.NSC_ALBUM_ID = B.ADI_ALBUM_ID
+	           AND D.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID
+	           AND NVL(R.NSC_GB, 'LTE') = #{nscGb} 
+	         GROUP BY A.CONTENTS_ID
+	         ORDER BY CASE WHEN 'N' = #{orderGb} THEN '0' ELSE CONTENTS_NAME END,
+	               WATCH_EDATE DESC
+	       ) X
+    		<!-- WHERE X.genre_small not in (
+                   select case when substr(#{sysDate}, 1, 8) >= '20190307' then 'SBS' else 'X' end
+                     from dual
+                   union
+                   select case when substr(#{sysDate}, 1, 8) >= '20190311' then 'KBS' else 'X' end
+                     from dual
+                   union
+                   select case when substr(#{sysDate}, 1, 8) >= '20190315' then 'MBC' else 'X' end
+                     from dual
+                  ) -->
+<if test="!pageNo.equals('A'.toString()) and !pageCnt.equals('A'.toString())">
+	) M                                                                                              
+	WHERE rownum <![CDATA[<=]]> '150' AND ord_num <![CDATA[>=]]> ((TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt})) - (TO_NUMBER(#{pageCnt}) - 1))
+    AND ord_num <![CDATA[<=]]> (TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt}))	
+</if>
+<if test="pageNo.equals('A'.toString()) or pageCnt.equals('A'.toString())">
+	) M                                                                                               
+	WHERE rownum <![CDATA[<=]]> '150'
+</if>
+</select>
+
+
+
+
+<!-- 2. FX_TYPE이 N이 아닌 시청이력 리스트 -->
+<select id="getWatchingListTypeE" parameterType="GetNSRepositedRequestVO" resultType="GetNSRepositedResponseVO" timeout="10">
+<if test="!pageNo.equals('A'.toString()) and !pageCnt.equals('A'.toString())">
+SELECT * FROM (
+</if>
+<if test="pageNo.equals('A'.toString()) or pageCnt.equals('A'.toString())">
+SELECT * FROM (
+</if>
+		SELECT
+			TO_CHAR(FF.chk_no, '00') AS TEMP_CHECK, FF.album_id AS CONTS_ID, FF.buy_date AS BUYING_DATE
+			, FF.watch_fdate AS WATCH_DATE, FF.BUY_END_DATE, FF.VIEW_TYPE, FF.UFLIX_YN
+			, FF.contents_name AS CONTS_NAME, FF.PRODUCT_ID
+			, 'Y' AS SET_POINT_YN
+			, rownum AS ORD_NUM, SUM(1) OVER(PARTITION BY 0) AS TOTAL_CNT
+		FROM
+		(
+			SELECT
+				SUM(F.chk_no) as chk_no, MAX(album_id) as album_id, MAX(F.buy_date) as buy_date, MAX(F.watch_fdate) as watch_fdate,
+				MAX(F.buy_end_date) as buy_end_date, MAX(F.view_type) as view_type, MAX(F.uflix_yn) as uflix_yn,
+				MAX(F.contents_name) as contents_name, MAX(F.product_id) as product_id, MAX(F.watch_edate) as watch_edate,
+				MAX(F.genre_small) genre_small
+			FROM
+			(
+				SELECT MAX(XX.chk_no) as chk_no, XX.album_id,
+					MAX(Y.buy_date) as buy_date, MAX(XX.watch_fdate) as watch_fdate,
+					to_char(to_date(MAX(Y.buy_date), 'yyyymmddhh24miss')+1, 'yyyymmddhh24miss') buy_end_date,
+					MAX(Y.view_type) as view_type, MAX(Y.uflix_yn) as uflix_yn, MAX(B.adi_album_name) as contents_name,
+					case when Y.watch_fdate = max(Y.watch_fdate) over (partition by XX.album_id) then MAX(Y.product_id) else '0' end product_id,
+					MAX(Y.watch_edate) as watch_edate, MAX(NVL(D.genre_small, ' ')) genre_small
+				FROM (
+						SELECT
+							case when length(X.contents_id) = 15 then 10 else 20 end chk_no, X.contents_id, X.watch_fdate, case when length(X.contents_id) = 15 then X.contents_id else B.adi_album_id end album_id
+						FROM (
+							SELECT A.contents_id,
+								max(A.watch_fdate) as watch_fdate
+							FROM PT_VO_WATCH_HISTORY_NSC A
+							WHERE A.sa_id = #{saId}
+							AND A.p_idx_sa = #{pIdxSa}
+							AND NVL(A.del_yn, 'N') = 'N'
+							GROUP BY A.contents_id
+						) X LEFT OUTER JOIN IMCSUSER.PT_LA_PACKAGE_ASSET B ON X.contents_id = B.asset_id
+					) XX,
+					(
+						SELECT A.contents_id, A.watch_fdate, decode(A.buy_date,'N','0',buy_date) as buy_date, product_id,
+								A.view_type, A.uflix_yn, A.watch_edate
+						FROM PT_VO_WATCH_HISTORY_NSC A
+						WHERE A.sa_id = #{saId}
+						AND A.p_idx_sa = #{pIdxSa}
+						AND NVL(A.del_yn, 'N') = 'N'
+					) Y,
+					PT_VO_CATEGORY_MAP M,
+					PT_VO_CATEGORY R,
+					IMCSUSER.PT_LA_ALBUM_MST B,
+					IMCSUSER.PT_LA_PACKAGE_ASSET P,
+					IMCSUSER.PT_LA_TITLE_ASSET D
+				WHERE XX.contents_id = Y.contents_id
+				AND XX.watch_fdate = Y.watch_fdate
+				AND XX.album_id = M.contents_id
+				AND M.category_id = R.category_id
+				AND R.category_gb = 'NSC'
+				AND (NVL(R.NSC_GB, 'LTE') = #{nscGb} or NVL(R.NSC_GB, 'LTE') = 'UFX')
+				AND XX.album_id = B.adi_album_id
+				AND B.adi_album_id = P.nsc_album_id
+				AND P.adi_product_id = D.adi_product_id
+				GROUP BY XX.ALBUM_ID, XX.CHK_NO, Y.WATCH_FDATE
+			) F
+			GROUP BY F.album_id
+			ORDER BY case when 'N' = #{orderGb} then '0' else contents_name end, watch_edate desc
+		) FF
+		 <!-- WHERE FF.genre_small not in (
+                select case when substr(#{sysDate}, 1, 8) >= '20190307' then 'SBS' else 'X' end
+                  from dual
+                union
+                select case when substr(#{sysDate}, 1, 8) >= '20190311' then 'KBS' else 'X' end
+                  from dual
+                union
+                select case when substr(#{sysDate}, 1, 8) >= '20190315' then 'MBC' else 'X' end
+                  from dual
+               ) -->
+<if test="!pageNo.equals('A'.toString()) and !pageCnt.equals('A'.toString())">
+	) M                                                                                               
+	WHERE rownum <![CDATA[<=]]> '150' and ord_num <![CDATA[>=]]> ((TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt})) - (TO_NUMBER(#{pageCnt}) - 1))
+    AND ord_num <![CDATA[<=]]> (TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt}))
+</if> 
+<if test="pageNo.equals('A'.toString()) or pageCnt.equals('A'.toString())">
+	) M                                                                                               
+	WHERE rownum <![CDATA[<=]]> '150'
+</if>                                                                                              
+</select> 
+    
+    
+    
+<!-- 3. 이어보기 정보 조회 -->
+<select id="getLinkTime" parameterType="GetNSRepositedRequestVO" resultType="String">
+	SELECT
+<choose>
+	<when test="linkTimeNScreenYn.equals('Y'.toString())">
+		 /*+ INDEX(A IDX_PT_VO_SET_TIME_02_PTT) */                                           
+		       NVL(A.LINK_TIME, '')                                                                
+		  FROM PT_VO_SET_TIME_PTT A 
+			WHERE A.SA_ID = TRIM(#{nSaId}) AND A.ADI_ALBUM_ID= #{contsId} AND A.P_IDX_SA = #{nIdxSa}
+	</when>
+	<otherwise>
+		 /*+ INDEX(A IDX_PT_VO_SET_TIME_02_PTT_N) */                                           
+		       NVL(A.LINK_TIME, '')                                                                
+		  FROM PT_VO_SET_TIME_PTT_NSC A
+			WHERE A.SA_ID = TRIM(#{saId}) AND A.ADI_ALBUM_ID= #{contsId} AND A.P_IDX_SA = #{pIdxSa}
+	</otherwise>
+</choose>
+
+ AND A.NSCN_CUST_NO = 'M'
+ ORDER BY A.WATCH_DATE DESC
+</select>
+
+
+
+
+<!-- 4. 카테고리 정보 조회 -->
+<select id="getCateInfo" parameterType="GetNSRepositedRequestVO" resultType="CateInfoVO">
+<!-- SELECT R.COUNT, NVL(FNC_GET_CATE_ID_LIST(#{contsId} , #{contsGb} , #{nscGb}, 'N'), '') CATE_LIST,                     
+       R.CATEGORY_ID, R.IS_NEW, R.CHA_NUM, R.AUTH_YN, R.CATE_INFO, R.SERIES_YN,
+       R.CATE_GB1, R.CATE_GB2, R.CATE_GB3,    
+       (SELECT MAX(CATEGORY_NAME) FROM PT_VO_CATEGORY WHERE CATEGORY_LEVEL = '1'                                       
+         START WITH CATEGORY_ID = R.CATEGORY_ID                                                                        
+         CONNECT BY PRIOR PARENT_CATEGORY_ID = CATEGORY_ID) AS BELONGING_NAME                                         
+  FROM                                                                                                                 
+  (                                                                                                                    
+    SELECT COUNT(*) COUNT,                                                                                             
+           MAX(P.CATEGORY_ID) CATEGORY_ID, RPAD(MAX(P.CREATE_DATE), 10, '0') IS_NEW,                                   
+           MAX(Q.CHA_NUM) CHA_NUM, MAX(NVL(Q.AUTH_YN, 'N')) AUTH_YN,                                                   
+           NVL(MAX(K.CATE_INFO), '|') CATE_INFO, NVL(MAX(K.SERIES_YN), 'N') SERIES_YN,                                 
+           MAX(G.CATE_GB1) CATE_GB1, MAX(G.CATE_GB2) CATE_GB2, MAX(G.CATE_GB3) CATE_GB3                                
+      FROM PT_VO_CATEGORY_MAP P,                                                                                       
+           PT_VO_CATEGORY Q,                                                                                           
+           (SELECT C.CONTENTS_ID, NVL(C.CATEGORY_ID||'|'||C.SERIES_NO, '|') CATE_INFO, 'Y' SERIES_YN                   
+              FROM PT_VO_CATEGORY_MAP C,                                                                               
+                   PT_VO_CATEGORY D                                                                                    
+             WHERE C.CATEGORY_ID = D.CATEGORY_ID                                                                       
+               AND C.CONTENTS_ID = #{contsId}                                                                        
+               AND D.SERIES_YN = 'Y'                                                                                   
+               AND D.CATEGORY_GB = #{contsGb}                                                                         
+               AND NVL(D.NSC_GB, 'LTE') = #{nscGb}                                                                 
+               AND (D.TEST_SBC = 'N' OR D.TEST_SBC IS NULL OR D.TEST_SBC = '')                                         
+               AND ROWNUM = 1) K,                                                                                      
+           (SELECT A.CONTENTS_ID,                                                                                      
+                   MAX(DECODE(B.CATEGORY_GB, 'NSC', B.CATEGORY_GB)) CATE_GB1,                                          
+                   MAX(DECODE(B.CATEGORY_GB, 'I20', B.CATEGORY_GB)) CATE_GB2,                                          
+                   MAX(DECODE(B.CATEGORY_GB, 'PCT', B.CATEGORY_GB)) CATE_GB3                                           
+              FROM PT_VO_CATEGORY_MAP A,                                                                               
+                   PT_VO_CATEGORY B                                                                                    
+             WHERE A.CATEGORY_ID = B.CATEGORY_ID                                                                       
+               AND A.CONTENTS_ID = #{contsId}                                                                        
+             GROUP BY A.CONTENTS_ID                                                                                    
+           ) G                                                                                                         
+      WHERE P.CATEGORY_ID = Q.CATEGORY_ID                                                                              
+         AND P.CONTENTS_ID = #{contsId}                                                                               
+         AND Q.CATEGORY_GB = 'NSC' -->
+         
+       SELECT R.count, NVL(FNC_GET_CATE_ID_LIST(#{contsId}, #{contsGb} , #{nscGb}, 'N'), '') cate_list,
+	        R.category_id, R.is_new, R.cha_num, R.auth_yn, R.cate_info, R.series_yn, R.cate_gb1, R.cate_gb2, R.cate_gb3,
+	        (SELECT MAX(category_name) FROM PT_VO_CATEGORY WHERE category_level = '1'
+	          START WITH category_id = R.category_id
+	          CONNECT BY PRIOR parent_category_id = category_id) as BELONGING_NAME
+	          , R.cate_gb4, R.iptv_test_sbc, R.nsc_test_sbc
+	   FROM
+	   (
+	     SELECT count(*) count,
+	            max(P.category_id) category_id, RPAD(max(P.create_date), 10, '0') is_new,
+	            max(Q.cha_num) cha_num, max(NVL(Q.auth_yn, 'N')) auth_yn,
+	            NVL(max(K.cate_info), '|') cate_info, NVL(max(K.series_yn), 'N') series_yn,
+	            max(G.cate_gb1) cate_gb1, max(G.cate_gb2) cate_gb2, max(G.cate_gb3) cate_gb3, max(G.cate_gb4) cate_gb4,
+				 min(G.iptv_test_sbc) iptv_test_sbc, min(G.nsc_test_sbc) nsc_test_sbc
+	       FROM PT_VO_CATEGORY_MAP P,
+	            PT_VO_CATEGORY Q,
+	            (SELECT C.contents_id, NVL(C.category_id||'|'||C.series_no, '|') cate_info, 'Y' series_yn
+	               FROM PT_VO_CATEGORY_MAP C,
+	                    PT_VO_CATEGORY D
+	              WHERE C.category_id = D.category_id
+	                AND C.contents_id = #{contsId}
+	                AND D.series_yn = 'Y'
+	                AND D.category_gb = #{contsGb}
+	                AND nvl(D.nsc_gb, 'LTE') = #{nscGb}
+	                AND (D.test_sbc = 'N' or D.test_sbc is null or D.test_sbc = '')
+	                AND rownum = 1) K,
+	            (SELECT A.contents_id,
+	                    MAX(DECODE(B.category_gb, 'NSC', B.category_gb)) cate_gb1,
+	                    MAX(DECODE(B.category_gb, 'I20', B.category_gb)) cate_gb2,
+	                    MAX(DECODE(B.category_gb, 'PCT', B.category_gb)) cate_gb3,
+	                    MAX(DECODE(B.category_gb, 'I30', B.category_gb)) cate_gb4,
+						MIN(DECODE(B.category_gb, 'I30', B.TEST_SBC)) iptv_test_sbc,
+						MIN(DECODE(B.category_gb, 'NSC', B.TEST_SBC)) nsc_test_sbc
+	               FROM PT_VO_CATEGORY_MAP A,
+	                    PT_VO_CATEGORY B
+	              WHERE A.category_id = B.category_id
+	                AND A.contents_id = #{contsId}
+	              GROUP BY A.contents_id
+	            ) G
+	       WHERE P.category_id = Q.category_id
+	          AND P.contents_id = #{contsId}
+	          AND Q.category_gb = 'NSC'
+		<if test="nscListYn.equals('Y'.toString()) and testSbc.equals('N'.toString())">
+			AND NVL(Q.TEST_SBC, 'N') = 'N'
+		</if>
+         
+         <if test="tempCheck.equals('20'.toString()) ">
+         AND NVL(Q.NSC_GB, #{nscGb}) = 'UFX' 
+         </if>          
+         
+         <if test="tempCheck.equals('30'.toString()) ">
+         AND (NVL(Q.NSC_GB, 'LTE') = 'UFX' OR NVL(Q.NSC_GB, 'LTE') = #{nscGb})
+         </if>     
+         
+         <if test="!tempCheck.equals('20'.toString()) and !tempCheck.equals('30'.toString())">
+         AND NVL(Q.NSC_GB, 'LTE') = #{nscGb} 
+         </if>     
+         
+         AND P.CONTENTS_ID = K.CONTENTS_ID (+)
+		 AND P.CONTENTS_ID = G.CONTENTS_ID (+)
+	 ) R                                                                 
+</select>
+
+
+
+
+<!-- 5. 앨범 정보 조회 -->
+<select id="getAlbumInfo" parameterType="GetNSRepositedRequestVO" resultType="AlbumInfoVO">
+<!-- SELECT A.ADI_ALBUM_NAME AS CONTS_NAME, A.ONAIR_DATE, A.SERIES_NO AS SERIES_DESC, NVL(A.IS_RH, 'N') AS REAL_HD,
+       TO_CHAR(ROUND(TO_NUMBER(NVL(A.POINT_SUM, '0')) / (CASE WHEN NVL(A.POINT_CNT, '0')= '0' THEN 1 ELSE TO_NUMBER(NVL(A.POINT_CNT, '0')) END), 0)) POINT,
+       CASE WHEN MAX(NVL(C.RATING, '')) = '06' THEN '05' ELSE MAX(NVL(C.RATING, '')) END AS PR_INFO,
+       MAX(D.HDCONTENT) AS IS_HD, MAX(C.DISPLAY_RUN_TIME) AS RUNTIME,
+       MAX(C.LICENSING_WINDOW_END) AS LICENSING_END, CASE WHEN MAX(NVL(C.GENRE_LARGE, '')) = '방송' THEN 'T' ELSE 'V' END AS GENRE_GB,
+       CASE WHEN #{uflixYn} IN ('M', 'P', 'T', 'H') THEN MAX(A.SERVICE_ICON_UFLIX) ELSE MAX(A.SERVICE_ICON_HDTV) END AS SERVICE_ICON,
+       MAX(P.MIN_VALUE) AS TEMP_MIN_VALUE, MAX(P.MAX_VALUE) AS TEMP_MAX_VALUE,
+       NVL((SELECT NVL(N.FM_YN, 'N') || '|' || M.ADI_PRODUCT_ID
+              FROM IMCSUSER.PT_LA_PACKAGE_ASSET M, IMCSUSER.PT_LB_BRO_MATERIAL R, IMCSUSER.PT_LA_CONTENT_ASSET N
+             WHERE M.NSC_ALBUM_ID = #{contsId}
+               AND M.ADI_PRODUCT_ID = N.ADI_PRODUCT_ID
+               AND N.ASSET_ID = R.ASSET_ID
+               AND SUBSTR(N.ASSET_ID, 16, 2) = 'M2'
+               AND (NVL(R.QD_YN, 'N') = 'N' OR (NVL(R.QD_YN, 'N') = 'Y' AND NVL(R.QD_FLAG, 'N') = '2'))
+               AND NVL(N.FM_YN, 'N') = 'Y'
+           ), 'N'||'|') AS FM_INFO
+		, MAX(decode(C.version_major, 'Y', 'Y', 'N')) AS nScreenYn
+  FROM IMCSUSER.PT_LA_ALBUM_MST A,
+       IMCSUSER.PT_LA_PACKAGE_ASSET B,
+       IMCSUSER.PT_LA_TITLE_ASSET C,
+       IMCSUSER.PT_LA_CONTENT_ASSET D,
+       (SELECT #{contsId} AS ALBUM_ID, MIN(CONTENT_VALUE) MIN_VALUE, MAX(CONTENT_VALUE) MAX_VALUE
+          FROM IMCSUSER.PT_LA_POSTER_ASSET
+         WHERE ADI_PRODUCT_ID IN
+         (SELECT ADI_PRODUCT_ID FROM IMCSUSER.PT_LA_PACKAGE_ASSET-->
+         
+   SELECT A.adi_album_name AS CONTS_NAME, A.onair_date, A.series_no AS SERIES_DESC, NVL(A.is_rh, 'N') AS REAL_HD,
+        TO_CHAR(round(TO_NUMBER(NVL(A.point_sum, '0')) / (case when NVL(A.point_cnt, '0')= '0' then 1 else TO_NUMBER(NVL(A.point_cnt, '0')) end), 0)) point,
+        case when MAX(NVL(C.rating, '')) = '06' THEN '05' ELSE MAX(NVL(C.rating, '')) end AS PR_INFO,
+        MAX(D.hdcontent) AS IS_HD, MAX(C.display_run_time) AS RUNTIME,
+        MAX(C.licensing_window_end) AS LICENSING_END, CASE WHEN MAX(NVL(C.genre_large, '')) = '방송' THEN 'T' ELSE 'V' END AS GENRE_GB,
+        case when #{uflixYn} in ('M', 'P', 'T', 'H') then max(A.service_icon_uflix) else max(A.service_icon_hdtv) end AS SERVICE_ICON,
+        MAX(P.min_value) AS TEMP_MIN_VALUE, MAX(P.max_value) AS TEMP_MAX_VALUE,
+        nvl((SELECT nvl(N.fm_yn, 'N') || '|' || M.adi_product_id
+               FROM IMCSUSER.PT_LA_PACKAGE_ASSET M, IMCSUSER.PT_LB_BRO_MATERIAL R, IMCSUSER.PT_LA_CONTENT_ASSET N
+              WHERE M.NSC_ALBUM_ID = #{contsId}
+                AND M.ADI_PRODUCT_ID = N.ADI_PRODUCT_ID
+                AND N.ASSET_ID = R.ASSET_ID
+                AND SUBSTR(N.ASSET_ID, 16, 2) = 'M2'
+                AND (nvl(R.QD_YN, 'N') = 'N' or (nvl(R.QD_YN, 'N') = 'Y' and nvl(R.QD_flag, 'N') = '2'))
+                AND nvl(N.fm_yn, 'N') = 'Y'
+            ), 'N'||'|') AS FM_INFO,
+    		SUBSTR(MCUSTUSER.NUF_GET_NSCREEN_INFO(#{contsId}, #{testSbc}), 1, 1) AS NSCREEN_YN
+   FROM IMCSUSER.PT_LA_ALBUM_MST A,
+        IMCSUSER.PT_LA_PACKAGE_ASSET B,
+        IMCSUSER.PT_LA_TITLE_ASSET C,
+        IMCSUSER.PT_LA_CONTENT_ASSET D,
+        (SELECT #{contsId} album_id, MIN(content_value) min_value, max(content_value) max_value
+           FROM IMCSUSER.PT_LA_POSTER_ASSET
+          WHERE adi_product_id IN (SELECT adi_product_id FROM IMCSUSER.PT_LA_PACKAGE_ASSET         
+         	<where>
+			<if test="tempCheck.equals('10'.toString()) ">
+			NSC_ALBUM_ID = #{contsId})
+			</if>
+			<if test="tempCheck.equals('20'.toString()) ">
+			ADI_ALBUM_ID = #{contsId})
+			</if>
+			<if test="!tempCheck.equals('10'.toString()) and !tempCheck.equals('20'.toString())">
+			NSC_ALBUM_ID = #{contsId} OR ADI_ALBUM_ID = #{contsId})
+			</if>
+			</where>                                                                
+         ) P,
+        IMCSUSER.PT_LA_RESERVE_ASSET E,
+		IMCSUSER.PT_CD_CP_MST F
+ WHERE A.ADI_ALBUM_ID = #{contsId}
+	<if test="rGrade.equals('Y'.toString())">
+	AND C.RATING = '06'
+	</if>          
+	<if test="rGrade.equals('N'.toString())">
+	AND C.RATING <![CDATA[<>]]> '06'
+	</if>       
+	
+  
+	<if test="tempCheck.equals('10'.toString()) ">
+	AND A.ADI_ALBUM_ID = B.NSC_ALBUM_ID
+	</if>
+	<if test="tempCheck.equals('20'.toString()) ">
+	AND A.ADI_ALBUM_ID = B.ADI_ALBUM_ID
+	</if>
+	<if test="!tempCheck.equals('10'.toString()) and !tempCheck.equals('20'.toString())">
+	AND (A.ADI_ALBUM_ID = B.NSC_ALBUM_ID OR A.ADI_ALBUM_ID = B.ADI_ALBUM_ID) 
+	</if>
+   AND B.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID
+   AND B.ADI_PRODUCT_ID = D.ADI_PRODUCT_ID
+   AND A.ADI_ALBUM_ID = P.ALBUM_ID (+)
+   AND D.ADI_PRODUCT_ID = E.ADI_PRODUCT_ID(+)
+   AND E.CP_ID = F.CP_ID(+)
+ GROUP BY A.ADI_ALBUM_NAME, A.ONAIR_DATE, A.SERIES_NO, A.IS_RH, A.POINT_SUM, A.POINT_CNT
+</select>
+
+
+
+<!-- 6. 이미지 스틸컷 정보 조회 -->
+<select id="getStillFileName" parameterType="GetNSRepositedRequestVO" resultType="String">
+SELECT  MIN(A.CONTENT_VALUE)                   
+  FROM  IMCSUSER.PT_LA_POSTER_ASSET A,         
+        IMCSUSER.PT_LA_PACKAGE_ASSET C         
+  WHERE A.ADI_PRODUCT_ID = C.ADI_PRODUCT_ID    
+    AND C.NSC_ALBUM_ID = #{contsId}                                   
+</select>
+
+
+
+<!-- 7. 상품 타입 정보 조회 -->
+<select id="getProductTypeInfo1" parameterType="GetNSRepositedRequestVO" resultType="GetNSRepositedResponseVO">
+<!-- SELECT NVL(MIN(PRODUCT_TYPE), 'X') PRODUCT_TYPE                                                                
+  FROM IMCSUSER.PT_PD_PACKAGE A,                                                                               
+       IMCSUSER.PT_PD_PACKAGE_DETAIL B                                                                         
+ WHERE A.PRODUCT_ID = B.PRODUCT_ID                                                                             
+   AND B.CONTENTS_ID IN (SELECT ASSET_ID FROM IMCSUSER.PT_LA_PACKAGE_ASSET WHERE NSC_ALBUM_ID = #{contsId})   
+   AND A.PRODUCT_TYPE IN ('0', '1')  --> 
+   
+ SELECT NVL(min(product_type), 'X') product_type,
+        case when MIN(NVL(NSC_PROD_KIND,'0')) = '0' then 'IPT' else 'NSC' END SCREEN_GUBUN
+   FROM IMCSUSER.PT_PD_PACKAGE A,
+        IMCSUSER.PT_PD_PACKAGE_DETAIL B
+  WHERE A.product_id = B.product_id
+    AND B.contents_id IN (SELECT asset_id FROM IMCSUSER.PT_LA_PACKAGE_ASSET WHERE nsc_album_id = #{contsId} or (adi_album_id = #{contsId} and ALBUM_TYPE IN ('HD','SH')))
+    AND A.product_type in ('0', '1')
+  GROUP BY NVL(NSC_PROD_KIND, '0')
+  ORDER BY SCREEN_GUBUN                                                         
+</select>
+
+
+<!-- 8. 상품 타입 정보 조회2 -->
+<select id="getProductTypeInfo2" parameterType="GetNSRepositedRequestVO" resultType="GetNSRepositedResponseVO">
+<!-- SELECT NVL(MIN(PRODUCT_TYPE), 'X') 
+  FROM IMCSUSER.PT_PD_PACKAGE      
+ WHERE PRODUCT_ID = #{productId} -->
+ 
+ SELECT NVL(min(product_type), 'X') PRODUCT_TYPE,
+        'NSC' AS SCREEN_GUBUN
+   FROM IMCSUSER.PT_PD_PACKAGE
+ WHERE product_id = #{productId} 
+</select>
+
+
+
+<!-- 9. 구매 정보 조회 -->
+<select id="getBuyInfo" parameterType="GetNSRepositedRequestVO" resultMap="mBuyInfo">
+SELECT NVL(CP_USE_YN, 'N') AS CP_USE_YN,
+       TO_CHAR(NVL(A.BUY_AMT, 0)) AS BUYING_PRICE,
+       NVL(A.EXPIRED_DATE, '') AS EXPIRED_DATE
+  FROM PT_VO_BUY_NSC A
+ WHERE A.SA_ID = #{saId}
+   AND A.PRODUCT_ID = TRIM(#{id})
+   AND A.BUY_DATE = TRIM(#{buyingDate})
+   AND NVL(A.REFUND_YN,'N') <![CDATA[<>]]> 'P' 
+   AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'                                                               
+</select>
+
+
+<!-- 9-1. 선물함 정보 조회 -->
+<select id="getPresentInfo" parameterType="GetNSRepositedRequestVO" resultMap="mBuyInfo">
+SELECT 'P' AS CP_USE_YN,
+       TO_CHAR(NVL(A.PRESENT_PRICE, 0)) AS BUYING_PRICE,
+       NVL(A.EXPIRED_DATE, '') AS EXPIRED_DATE
+  FROM PT_VO_PRESENT A
+ WHERE A.RCV_SA_ID    = #{saId}
+   AND A.RCV_MAC_ADDR = #{stbMac}
+   AND A.CONTENTS_ID  = TRIM(#{id})
+   AND A.PRESENT_DATE = TRIM(#{buyingDate})
+   AND NVL(A.DEL_FLG,'N') = 'N'
+   AND NVL(A.USE_YN,'N')  = 'Y'                                                             
+</select>
+
+
+<!-- 10. 이미지 정보 조회  -->
+<select id="getImageFileName" parameterType="GetNSRepositedRequestVO" resultType="StillImageVO">
+SELECT 'http:'||REPLACE(NVL(A.MAIN_IMG_URL, ''), '\', '/') AS IMG_URL, 
+       A.MAIN_IMG_FILE_NAME AS IMG_FILE_NAME,                                           
+       A.IMG_FLAG                                                      
+  FROM IMCSUSER.PT_LA_ALBUM_IMG A                                      
+ WHERE A.ADI_ALBUM_ID = #{contsId}
+   AND A.IMG_FLAG = 'N'                                                
+ ORDER BY TO_NUMBER(ADI_ALBUM_SEQ) DESC                                                                 
+</select>
+
+
+<!-- 11. 데이터프리 구매 여부 조회  -->
+<select id="getBuyDataFreeInfo" parameterType="GetNSRepositedRequestVO" resultType="String">
+SELECT 1
+	  FROM PT_VO_BUY_NSC
+		 WHERE SA_ID = #{saId}
+	   AND MAC_ADDR = #{stbMac}
+	   AND EXPIRED_DATE  <![CDATA[>=]]> TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS')
+	   AND PRODUCT_ID   = #{contsId} || '_D'
+	   AND nvl(REFUND_YN,'N') <![CDATA[<>]]> 'P'
+	   AND NVL(regexp_substr(replace(replace(ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'                                                        
+</select>
+
+	<!-- 12. 엔스크린 구매연동 여부 및 테스트 계정 확인  -->
+	<select id="getCustPairingChk" parameterType="GetNSRepositedRequestVO" resultMap="mCustPairingChk">
+		SELECT
+			A.STB_SA_ID
+			, A.STB_MAC
+			, B.TEST_SBC
+		FROM PT_VO_SBC_PAIRING_TBL A,
+			( SELECT NVL(TEST_SBC,'N') TEST_SBC
+				FROM PT_VO_CUSTOM_ID
+				WHERE SA_ID = #{saId}
+				AND MAC_ADDR = #{stbMac}
+			) B
+		WHERE A.M_SA_ID = #{saId}
+		AND A.M_MAC = #{stbMac}
+		AND A.FLAG = 'Y'
+	</select>
+
+	<!-- 엔스크린 인 경우 시청이력 리스트 -->
+	<select id="getWatchingListTypeNScreen" parameterType="GetNSRepositedRequestVO" resultType="GetNSRepositedResponseVO" timeout="10">
+		<if test="!pageNo.equals('A'.toString()) and !pageCnt.equals('A'.toString())">
+		SELECT * FROM (
+		</if>
+		<if test="pageNo.equals('A'.toString()) or pageCnt.equals('A'.toString())">
+		SELECT * FROM (
+		</if>
+			<!-- SELECT
+				'10' AS TEMP_CHECK, album_id AS CONTS_ID, buy_date AS BUYING_DATE
+				, watch_fdate AS WATCH_DATE, buy_end_date, view_type, uflix_yn, contents_name AS CONTS_NAME,
+				case when length(product_id) = 5 then product_id else album_id end PRODUCT_ID,
+				'Y' AS SET_POINT_YN,
+				rownum ORD_NUM, SUM(1) OVER(PARTITION BY 0) AS TOTAL_CNT, watch_edate AS WATCH_EDATE
+			FROM
+			(
+				SELECT /*+ USE_NL(A B C M R D) */
+					MAX(A.contents_id) contents_id , MAX(A.buy_date) buy_date, MAX(A.watch_fdate) watch_fdate,
+					to_char(to_date(MAX(A.buy_date), 'yyyymmddhh24miss')+1, 'yyyymmddhh24miss') buy_end_date,
+					MAX(A.view_type) view_type, max(A.uflix_yn) uflix_yn, MAX(A.product_id) product_id,
+					B.adi_album_id album_id, MAX(B.adi_album_name) contents_name,
+					MAX(A.watch_edate) watch_edate
+				FROM
+					(
+						SELECT
+							A.contents_id,
+							case when A.watch_fdate = max(A.watch_fdate) over (partition by A.contents_id) then A.watch_fdate else '' end watch_fdate,
+							case when A.watch_fdate = max(A.watch_fdate) over (partition by A.contents_id) then decode(A.buy_date,'N','0',A.buy_date) else '' end buy_date,
+							case when A.watch_fdate = max(A.watch_fdate) over (partition by A.contents_id) then A.product_id else '0' end product_id,
+							max(A.view_type) view_type, max(A.uflix_yn) uflix_yn,
+							max(A.watch_edate) watch_edate,
+							B.ADI_ALBUM_ID ADI_ALBUM_ID
+						FROM PT_VO_WATCH_HISTORY A,
+							IMCSUSER.PT_LA_PACKAGE_ASSET B
+						WHERE A.sa_id = #{nSaId}
+						AND A.p_idx_sa = #{nIdxSa}
+						AND NVL(A.del_yn, 'N') = 'N'
+						AND B.ASSET_ID like SUBSTR(A.CONTENTS_ID, 1, 17) || '%'
+						AND B.ADI_ALBUM_ID IS NOT NULL
+						GROUP BY A.contents_id, A.watch_fdate, A.buy_date, A.product_id, B.ADI_ALBUM_ID
+					) A,
+					PT_VO_CATEGORY_MAP M,
+					PT_VO_CATEGORY R,
+					IMCSUSER.PT_LA_ALBUM_MST B,
+					IMCSUSER.PT_LA_PACKAGE_ASSET C,
+					IMCSUSER.PT_LA_TITLE_ASSET D
+				WHERE A.ADI_ALBUM_ID = M.contents_id
+				AND M.category_id = R.category_id
+				AND A.adi_album_id = B.adi_album_id
+				AND R.category_gb = 'NSC'
+				AND C.NSC_ALBUM_ID = B.ADI_ALBUM_ID
+				AND C.ADI_PRODUCT_ID = D.ADI_PRODUCT_ID
+				AND NVL(R.NSC_GB, 'LTE') = #{nscGb}
+				AND SUBSTR(NVL(D.version_major, 'N'), 1, 1) = 'Y'
+				
+				<if test="nscListYn.equals('Y'.toString()) and testSbc.equals('N'.toString())">
+					AND NVL(TEST_SBC, 'N') = 'N'
+				</if>
+				GROUP BY B.adi_album_id
+				ORDER BY case when 'N' = #{orderGb} 
+						then '0' else contents_name end, watch_edate desc
+			) X -->
+			
+	       	SELECT '10' temp_check, album_id conts_id, buy_date buying_date, watch_fdate watch_date, buy_end_date, view_type, uflix_yn, 
+	       			contents_name conts_name,
+			         case when length(product_id) = 5 then product_id else album_id end product_id,
+			        'Y' as set_point_yn,
+			        rownum ord_num, SUM(1) OVER(PARTITION BY 0) total_cnt, watch_edate, nscreen_yn
+			   FROM
+			   (
+			     SELECT /*+ LEADING(A M R B C D E F) USE_NL(A M R B C D E F) */ MAX(A.contents_id) contents_id, MAX(A.buy_date) buy_date, MAX(A.watch_fdate) watch_fdate,
+			            to_char(to_date(MAX(A.buy_date), 'yyyymmddhh24miss')+1, 'yyyymmddhh24miss') buy_end_date,
+			            MAX(A.view_type) view_type, max(A.uflix_yn) uflix_yn, MAX(A.product_id) product_id,
+			            B.adi_album_id album_id, MAX(B.adi_album_name) contents_name,
+			            MAX(A.watch_edate) watch_edate, MAX(NVL(D.genre_small, ' ')) genre_small, MAX(A.nscreen_yn) nscreen_yn
+			       FROM
+			       (
+			         SELECT /*+ LEADING( A B C D ) USE_NL(A B C D) */ A.contents_id,
+			                case when A.watch_fdate = max(A.watch_fdate) over (partition by A.contents_id) then A.watch_fdate else '' end watch_fdate,
+			                case when A.watch_fdate = max(A.watch_fdate) over (partition by A.contents_id) then decode(A.buy_date,'N','0',A.buy_date) else '' end buy_date,
+			                case when A.watch_fdate = max(A.watch_fdate) over (partition by A.contents_id) then A.product_id else '0' end product_id,
+			                max(A.view_type) view_type, max(A.uflix_yn) uflix_yn,
+			                max(A.watch_edate) watch_edate,
+			 	       B.ADI_ALBUM_ID ADI_ALBUM_ID,
+			 	       MCUSTUSER.NUF_GET_NSCREEN_INFO(B.ADI_ALBUM_ID,  #{testSbc}) AS NSCREEN_YN
+			           FROM PT_VO_WATCH_HISTORY A,
+			 	       IMCSUSER.PT_LA_PACKAGE_ASSET B,
+			 	       PT_VO_CATEGORY_MAP C,
+			 	       PT_VO_CATEGORY D
+			          WHERE A.sa_id    = #{nSaId}
+			            AND A.p_idx_sa = #{nIdxSa}
+			            AND NVL(A.del_yn, 'N') = 'N'
+			 	        AND B.ASSET_ID like SUBSTR(A.CONTENTS_ID, 1, 17) || '%%'
+			 	        AND B.adi_album_id not like 'T%'
+			 	        AND B.ADI_ALBUM_ID IS NOT NULL
+			            AND B.ADI_ALBUM_ID = C.CONTENTS_ID
+			            AND C.CATEGORY_ID = D.CATEGORY_ID
+			            AND D.CATEGORY_GB = 'I30'
+			          GROUP BY A.contents_id, A.watch_fdate, A.buy_date, A.product_id, B.ADI_ALBUM_ID
+			         ) A,
+			         PT_VO_CATEGORY_MAP M,
+			         PT_VO_CATEGORY R,
+			         IMCSUSER.PT_LA_ALBUM_MST B,
+			         IMCSUSER.PT_LA_PACKAGE_ASSET C,
+			         IMCSUSER.PT_LA_TITLE_ASSET D,
+			         IMCSUSER.PT_LA_RESERVE_ASSET E,
+			         IMCSUSER.PT_CD_CP_MST F
+			      WHERE A.ADI_ALBUM_ID = M.contents_id
+			        AND M.category_id = R.category_id
+			        AND A.adi_album_id = B.adi_album_id
+			        AND R.category_gb = 'NSC'
+			        AND C.NSC_ALBUM_ID = B.ADI_ALBUM_ID
+			        AND C.ADI_PRODUCT_ID = D.ADI_PRODUCT_ID
+			        AND NVL(R.NSC_GB, 'LTE') = #{nscGb}
+			        AND D.ADI_PRODUCT_ID = E.ADI_PRODUCT_ID(+)
+			        AND E.CP_ID = F.CP_ID(+)
+			        AND A.NSCREEN_YN like 'Y%'
+					<if test="nscListYn.equals('Y') and testSbc.equals('N')">
+					AND NVL(R.TEST_SBC, 'N') = 'N'
+					</if>
+			      GROUP BY B.adi_album_id
+			      ORDER BY case when 'N' = #{orderGb} then '0' else contents_name end, watch_edate desc
+			   ) X 
+			 <!-- WHERE X.genre_small not in (
+                   select case when substr(#{sysDate}, 1, 8) >= '20190307' then 'SBS' else 'X' end
+                     from dual
+                   union
+                   select case when substr(#{sysDate}, 1, 8) >= '20190311' then 'KBS' else 'X' end
+                     from dual
+                   union
+                   select case when substr(#{sysDate}, 1, 8) >= '20190315' then 'MBC' else 'X' end
+                     from dual
+                  ) -->
+		<if test="!pageNo.equals('A'.toString()) and !pageCnt.equals('A'.toString())">
+			) M
+			WHERE rownum <![CDATA[<=]]> '150' and ord_num <![CDATA[>=]]> ((TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt})) - (TO_NUMBER(#{pageCnt}) - 1))
+		    AND ord_num <![CDATA[<=]]> (TO_NUMBER(#{pageNo}) * TO_NUMBER(#{pageCnt}))	
+		</if>
+		<if test="pageNo.equals('A'.toString()) or pageCnt.equals('A'.toString())">
+			) M
+			WHERE rownum <![CDATA[<=]]> '150'
+		</if>
+	</select>
+	
+	<!-- 구매 정보 조회 - 엔스크린 -->
+	<select id="getBuyInfoNScreen" parameterType="GetNSRepositedRequestVO" resultMap="mBuyInfo">
+		SELECT
+            MAX(X.CP_USE_YN) AS CP_USE_YN
+            , MAX(X.BUYING_PRICE) AS BUYING_PRICE
+            , MAX(X.EXPIRED_DATE) AS EXPIRED_DATE
+        FROM (     
+             SELECT MAX(nvl(cp_use_yn, 'N')) AS CP_USE_YN,
+                    MAX(TO_NUMBER(TO_CHAR(NVL(A.buy_amt, 0)))) AS BUYING_PRICE,
+                    MAX(NVL(A.expired_date, '')) AS EXPIRED_DATE
+               FROM PT_VO_BUY A
+              WHERE A.sa_id = #{nSaId}
+                AND A.product_id = trim(#{id})
+                AND nvl(A.REFUND_YN,'N') <![CDATA[ <> ]]> 'P'
+                AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+             UNION
+             SELECT MAX(nvl(cp_use_yn, 'N')) AS CP_USE_YN,
+                    MAX(TO_NUMBER(TO_CHAR(NVL(A.buy_amt, 0)))) AS BUYING_PRICE,
+                    MAX(NVL(A.expired_date, '')) AS EXPIRED_DATE
+               FROM PT_VO_BUY A,
+                   (SELECT P.product_id, D.contents_id
+                                      FROM IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+                                           IMCSUSER.PT_PD_PACKAGE P
+                                     WHERE D.contents_id = trim(#{id})
+                                       AND D.product_id = P.product_id
+                                       AND P.product_type = '2' 
+                    )F
+              WHERE A.sa_id = #{nSaId}
+                AND A.product_id = F.product_id
+                AND nvl(A.REFUND_YN,'N') <![CDATA[ <> ]]> 'P'
+                AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+            )X
+	</select>
+	
+	<!-- 선물함 정보 조회 - 엔스크린 -->
+	<select id="getPresentInfoNScreen" parameterType="GetNSRepositedRequestVO" resultMap="mBuyInfo">
+		SELECT
+			'P' AS CP_USE_YN,
+			MAX(TO_NUMBER(TO_CHAR(NVL(A.PRESENT_PRICE, 0)))) AS BUYING_PRICE,
+			MAX(NVL(A.EXPIRED_DATE, '')) AS EXPIRED_DATE
+		FROM PT_VO_PRESENT A
+		WHERE A.RCV_SA_ID = #{saId}
+		AND A.RCV_MAC_ADDR = #{stbMac}
+		AND A.CONTENTS_ID  = trim(#{id})
+		AND NVL(A.DEL_FLG,'N') = 'N'
+		AND NVL(A.USE_YN,'N')  = 'Y'                                                            
+	</select>
+	
+	<!-- 엔스크린 구매만료 여부check -->
+	<select id="getNScreenBuyChk" parameterType="GetNSRepositedRequestVO" resultMap="mBuyInfoNScreen">
+		SELECT
+			COUNT(*) AS DATA_CHK
+			, max(BUY_DATE) AS N_BUY_DATE
+			, max(EXPIRED_DATE) AS N_EXPIRED_DATE
+		FROM (
+			SELECT NVL(A.EXPIRED_DATE,'') EXPIRED_DATE, A.BUY_DATE
+			FROM PT_VO_BUY A,
+				( select asset_id
+					from imcsuser.pt_la_package_asset
+					where adi_album_id = #{id}
+					and album_type IN ('HD','SH')
+				) C
+			WHERE A.sa_id = #{nSaId}
+			AND A.buy_date = #{buyingDate}
+			AND A.product_id LIKE SUBSTR(C.asset_id, 1, 17) || '%'
+			AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+			UNION
+			SELECT (CASE WHEN A.expired_date = '0' THEN NVL(Z.expired_date,'')
+                    ELSE NVL(A.expired_date,'') END) AS expired_date, A.BUY_DATE
+			FROM PT_VO_BUY A,
+			(
+				SELECT /*+ USE_NL(C D G) */ 
+                    G.product_id, NVl(G.pre_sale_yn, 'N') pre_sale_yn,
+                    case when Trim(G.close_date) is null                                      
+                                then ''                      
+                                else TO_CHAR(TO_DATE(SUBSTR(G.close_date, 1, 12), 'yyyymmddhh24mi')  
+                                                     + to_number(G.expired_date), 'yyyymmddhh24mi')  
+                                                     || substr(G.close_date, 13, 2) end expired_date 
+               FROM IMCSUSER.PT_PD_PACKAGE_DETAIL D,
+					IMCSUSER.PT_PD_PACKAGE G,
+					( select asset_id
+						from imcsuser.pt_la_package_asset
+						where adi_album_id = #{id}
+						and album_type IN ('HD','SH')
+					) C
+				WHERE D.contents_id LIKE SUBSTR(C.asset_id, 1, 17) || '%'
+				AND D.product_id = G.product_id
+				AND G.product_type = '2'
+			)Z
+			WHERE A.sa_id = #{nSaId}
+			AND A.buy_date = #{buyingDate}
+            AND ((A.expired_date <![CDATA[ > ]]> to_char(sysdate, 'yyyymmddhh24miss') ) or (A.expired_date = '0' AND Z.expired_date <![CDATA[ > ]]> to_char(sysdate, 'yyyymmddhh24miss'))) 
+            AND NVL(regexp_substr(replace(replace(A.ERROR_MSG, '||', '|Z|'), '|', '^'), '[^^]+', 1,4,'i'), 'N') != 'X'
+            AND A.product_id = Z.product_id
+		)
+	</select>
+	
+		<!--  검수 STB여부 조회 -->
+	<select id="getTestSbc" parameterType="GetNSRepositedRequestVO" resultType="String">
+		SELECT NVL(A.TEST_SBC, 'N') TEST_SBC
+			FROM PT_VO_CUSTOM_ID A
+		WHERE A.SA_ID = #{saId}
+			AND A.MAC_ADDR = #{stbMac}
+	</select>
+
+</mapper> 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

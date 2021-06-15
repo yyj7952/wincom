@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="kr.co.wincom.imcs.api.getNSContInfo.GetNSContInfoDao">
+
+<!-- 	<resultMap type="HashMap" id="mCatInfo">
+		<result property="CATE_LEVEL" column="CATE_LEVEL" javaType="String"/>
+		<result property="NSC_GB" column="NSC_GB" javaType="String"/>
+		<result property="CATE_NAME" column="CATE_NAME" javaType="String"/>
+	</resultMap> -->
+
+	<resultMap type="HashMap" id="mTestSbc">
+		<result property="TEST_SBC" column="TEST_SBC" javaType="String"/>
+		<result property="CUST_FLAG" column="CUST_FLAG" javaType="String"/>
+	</resultMap>
+
+ 	<resultMap type="HashMap" id="mChkCate">
+		<result property="LCHECKCOUNT" column="LCHECKCOUNT" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="CAT_ID" column="CAT_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="CATEGORY_ID_CHK" column="CATEGORY_ID_CHK" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="CATEGORY_ID_ALL" column="CATEGORY_ID_ALL" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="CATEGORY_ID" column="CATEGORY_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="VIEW_FLAG" column="VIEW_FLAG" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="IS_NEW" column="IS_NEW" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="IS_UPDATE" column="IS_UPDATE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="NSC_GB" column="NSC_GB" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mCueInfo">
+		<result property="PERFORM_DATE" column="PERFORM_DATE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="PERFORM_TIME" column="PERFORM_TIME" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="STATUS" column="STATUS" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="CONFIRM_YN" column="CONFIRM_YN" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="VOD_ONLY_YN" column="VOD_ONLY_YN" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="VIEW_FLAG" column="VIEW_FLAG" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="CUESHEET_YN" column="CUESHEET_YN" javaType="String" typeHandler="EmptyStringIfNull"/>
+
+		<result property="CHNL_IMG_FILE" column="CHNL_IMG_FILE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<!-- <result property="IMAGE_URL" column="IMAGE_URL" javaType="String" typeHandler="EmptyStringIfNull"/> -->
+		<result property="IMAGE_FOLDER" column="IMAGE_FOLDER" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="MAIN_IMG_FILE" column="MAIN_IMG_FILE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="OMNI_IMG_FILE" column="OMNI_IMG_FILE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="LOGO_IMG_FILE" column="LOGO_IMG_FILE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="PAY_FLAG" column="PAY_FLAG" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mGenreInfo">
+		<result property="VOD_CATEGORY_NAME" column="VOD_CATEGORY_NAME" javaType="String"/>
+		<result property="VOD_SORT_NO" column="VOD_SORT_NO" javaType="String"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mOSTInfo">
+		<result property="OST" column="OST" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="RESERVED_SEQ" column="RESERVED_SEQ" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="OST_TYPE" column="OST_TYPE" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="OST_ID" column="OST_ID" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="OST_SINGER" column="OST_SINGER" javaType="String" typeHandler="EmptyStringIfNull"/>
+		<result property="OST_TITLE" column="OST_TITLE" javaType="String" typeHandler="EmptyStringIfNull"/>
+	</resultMap>
+
+	<resultMap type="HashMap" id="mImgInfo">
+		<result property="MAIN_IMG_FILE_NAME" column="MAIN_IMG_FILE_NAME" javaType="String"/>
+		<result property="IMG_FLAG" column="IMG_FLAG" javaType="String"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mAlbumTypeInfo">
+		<result property="CHK_VOD_TYPE" column="CHK_VOD_TYPE" javaType="String"/>
+		<result property="CHK_CON_TYPE" column="CHK_CON_TYPE" javaType="String"/>
+	</resultMap>
+	
+	<resultMap type="HashMap" id="mCinePointCnt">
+		<result property="cine_avg_point" column="CINE_AVG_POINT" javaType="String" typeHandler="EmptyStringIfNull" />
+		<result property="cine_count" column="CINE_COUNT" javaType="String" typeHandler="EmptyStringIfNull" />
+		<result property="cine_id" column="CINE_ID" javaType="String" typeHandler="EmptyStringIfNull" />
+	</resultMap>
+			
+	<!--  검수 STB여부 조회 -->
+	<select id="getTestSbc" parameterType="GetNSContInfoRequestVO" resultMap="mTestSbc">
+	    SELECT DECODE(NVL(test_sbc, 'N'), 'Y', 'Y', 'N') TEST_SBC,
+	           DECODE(NVL(test_sbc, 'N'), 'Y', 'T', 'V') CUST_FLAG
+	      FROM PT_VO_CUSTOM_ID
+         WHERE SA_ID    = #{saId}
+           AND MAC_ADDR = #{stbMac}
+	</select>
+	
+	<!--  부가요율 조회 -->
+	<select id="getVatRate" resultType="String">
+		SELECT MIN_VALUE VAT_RATE
+		  FROM IMCSUSER.PT_CD_COM_CD
+		 WHERE GRP_ID = 'SURTAXRATE'
+	</select>
+
+	<!--  카테고리 유효성 체크 및 편성 여부 체크 -->	
+	<select id="getChkCate" parameterType="GetNSContInfoRequestVO" resultMap="mChkCate">
+	    SELECT NVL(M.viewing_flag, 'V') VIEW_FLAG, RPAD(M.create_date, 10, '0') IS_NEW, SUBSTR(M.create_date, 1, 10) IS_UPDATE, NVL(R.nsc_gb, 'LTE') NSC_GB
+	      FROM PT_VO_CATEGORY R,
+	           PT_VO_CATEGORY_MAP M
+	     WHERE R.category_id = M.category_id
+	       AND R.category_id = #{catId}
+	       AND M.contents_id = #{albumId}
+	       AND R.category_gb = #{catGb}
+		   AND DECODE(R.actors_display, 'M', 'M', 'V') = #{rqsType}
+           AND NVL(R.test_sbc, 'N') = 'N'	       
+	</select>
+
+	<!--  카테고리 유효성 체크 및 편성 여부 체크2 -->	
+	<select id="getChkCate2" parameterType="GetNSContInfoRequestVO" resultMap="mChkCate">
+	    SELECT COUNT(*) lCheckCount, MIN(R.category_id) CATEGORY_ID_ALL,
+	    	   MIN(case when NVL(R.test_sbc, 'N') = 'N' then R.category_id else '' end) CATEGORY_ID_CHK,
+               MIN(case when NVL(R.test_sbc, 'N') = 'N' and NVL(R.series_yn, 'N') = 'Y' then R.category_id else '' end) CATEGORY_ID,
+	    	   MAX(NVL(M.viewing_flag, 'V')) VIEW_FLAG, MAX(RPAD(M.create_date, 10, '0')) IS_NEW, 
+	    	   MAX(SUBSTR(M.create_date, 1, 10)) IS_UPDATE, MAX(NVL(R.nsc_gb, 'LTE')) NSC_GB
+	      FROM PT_VO_CATEGORY R,
+	           PT_VO_CATEGORY_MAP M
+	     WHERE R.category_id = M.category_id
+	       AND M.contents_id = #{albumId}
+	       AND R.category_gb = #{catGb}
+	       AND DECODE(R.actors_display, 'M', 'M', 'V') = #{rqsType}
+	</select>
+	
+	<!--  컨텐츠 정보 가져오기 -->	
+	<select id="getContInfoList" parameterType="GetNSContInfoRequestVO" resultType="AlbumInfo">
+		SELECT K.*,
+        	    CASE WHEN 'M' = #{rqsType} THEN
+       				 case when (select album_id from imcsuser.pt_la_asset_info where album_id = #{albumId} and screen_type = 'N' and substr(asset_id, 16, 2) = 'MN') is not null then 'Y' else 'N' end
+               ELSE 'N' END hq_audio_yn
+          FROM
+        (SELECT /*+LEADING(A T P) USE_NL(C I S W)*/
+		       A.album_id,
+		       A.album_name,
+		       A.series_no,
+		       A.onair_date_display onair_date_temp,
+		       NVL(A.release_date, '') release_date,
+               DECODE(NVL(A.encoding_format, 'N'), 'N','N','Y','Y','0','N','1','Y','N') real_hd,
+		       SUBSTR(T.run_time, 1, 6) run_time,
+		       NVL(T.rating_cd, '') pr_info,
+		       NVL(T.producer, '') producer,
+		       NVL(T.actors_display, '') actors_display,
+		       T.genre_large,
+		       T.genre_mid,
+		       T.genre_small,
+		       (SELECT K.name FROM IMCSUSER.PT_CD_IMCS_CD K WHERE K.gid = 'UXTEN' and K.code = P.genre_uxten_cd) GENRE_UXTEN,
+		       (SELECT D.com_cd FROM IMCSUSER.PT_CD_COM_CD D
+		         WHERE D.grp_id = 'PUBLICCH'
+		           AND D.com_name = T.category) terr_ch,
+		       SUBSTR(P.terr_ed_date, 1, 10) terr_ed_date,
+		       P.service_icon service_icon_hdtv,
+		       P.service_icon_uflix,
+		       NVL(P.mycut_yn, '') mycut_yn,
+		       NVL(P.datafree_bill_yn, '') datafree_bill_yn,
+		       I.smi_language,
+		       (SELECT Y.cp_property FROM IMCSUSER.PT_CD_CP_MST Y WHERE Y.cp_id = P.cp_id) cp_property,
+		       (SELECT Y.cp_property FROM IMCSUSER.PT_CD_CP_MST Y WHERE Y.cp_id = P.cp_id_uflix) cp_property_ufx,
+		       SUBSTRB(REPLACE(REPLACE(TRIM(NVL(P.summary_long, '')), CHR(13)||CHR(10), '\n'), CHR(10), '\n'), 1, 1024) synopsis,
+		       case when NVL(W.avg_rating, '') is not null then SUBSTR(Trim(W.avg_rating), 1, 3) else '' end watcha_point,
+		       TO_CHAR(W.tot_rating_count) watcha_count,
+		       TO_CHAR(W.comment_cnt) comment_cnt,
+		       NVL(T.music_cont_type, '') music_type,
+		       NVL(T.omniview_yn, 'N') omniview_yn,
+		       T.link_url,
+		       T.vr_type,
+               MAX(NVL(C.present_yn, 'N')) present_yn,
+               MAX(case when NVL(C.present_price, '0') = '0' then C.suggested_price else C.present_price end) present_price,
+		       MAX(case when SUBSTR(NVL(UPPER(C.audio_type), 'N'), 9) = 'DOLBY 5.1' then 'Y' else 'N' end) is_51ch,
+		       MAX(case when S.poster_type = 'P' and S.service_yn = 'Y' then S.content_value else '' end) poster_p,
+		       MAX(NVL(C.reserved_flag, 'N')) service_flag,
+		       MAX(C.reserved_date) service_date,
+		       MAX(R.pr_album_id) pr_album_id,
+        	   MAX(T.sub_title) sub_title,
+        	   MAX(T.year) year,
+        	   MAX(T.nfc_code) nfc_code,
+        	   MAX(A.vod_type) vod_type,
+			   MAX(T.player) player,
+        	   MAX(T.studio) studio,
+        	   MAX(P.promotion_copy) promotion_copy,
+			   MAX(T.kids_grade) AS kids_grade,
+			   MAX(T.cine_id) AS cine_id,
+			   MAX(T.director_display) as director_display
+			   <if test="rqsType.equals('M'.toString())">
+	        	   , MAX(MCONUSER.UF_GET_ALBUM_PROPERTY( A.album_id, 'P' )) as MAIN_GRP_TYPE
+	        	   , MAX(MCONUSER.UF_GET_ALBUM_PROPERTY( A.album_id, 'C' )) as SUB_GRP_TYPE
+	           </if>
+		  FROM IMCSUSER.PT_LA_ALBUM_INFO A,       
+		       IMCSUSER.PT_LA_ALBUM_SUB T,        
+		       IMCSUSER.PT_LA_ALBUM_PLATFORM P,   
+		       IMCSUSER.PT_LA_ASSET_INFO C,       
+		       IMCSUSER.PT_LA_ALBUM_SMI I,        
+		       IMCSUSER.PT_WC_WATCHA_RATING W,    
+		       IMCSUSER.PT_LA_ALBUM_POSTER S,     
+		       (SELECT adi_album_id, pr_album_id  
+		          FROM IMCSUSER.PT_LA_ALBUM_PR    
+		         WHERE adi_album_id = #{albumId} 
+		           AND svc_type = 'NSC'           
+		           AND pr_type = 'P'              
+		           AND rownum = 1) R              
+		 WHERE 1 = 1                              
+		   AND A.album_id = P.album_id            
+		   AND A.album_id = T.album_id            
+		   AND A.album_id = I.album_id            
+		   AND A.album_id = C.album_id            
+		   AND P.screen_type = 'N'                
+		   AND P.screen_type = C.screen_type      
+		   AND P.screen_type = I.screen_type      
+		   AND A.album_id = S.album_id            
+		   AND P.screen_type = S.screen_type      
+		   AND A.album_id = #{albumId}           
+		   AND A.album_id = W.album_id (+)        
+		   AND A.album_id = R.adi_album_id (+)    
+		 GROUP BY A.album_id, A.album_name, A.series_no, A.onair_date_display, A.release_date, A.encoding_format, T.run_time, 
+		          T.rating_cd, T.producer, T.actors_display, T.genre_large, T.genre_mid, T.genre_small, T.category, T.link_url,
+		          T.vr_type, T.music_cont_type, T.omniview_yn, P.terr_ed_date, P.service_icon, P.service_icon_uflix, P.mycut_yn, P.genre_uxten_cd, 
+		          P.datafree_bill_yn, P.cp_id, P.cp_id_uflix, I.smi_language, P.summary_long, W.avg_rating, W.tot_rating_count, W.comment_cnt,
+		          T.sub_title, T.year, T.nfc_code, A.vod_type, T.player, T.studio
+		 ) K
+	</select>
+	
+	<!--  큐시트 정보 가져오기기 -->	
+	<select id="getCueSheetInfo1" parameterType="AlbumInfo" resultMap="mCueInfo">
+		SELECT /*+USE_NL(B C A H) */
+		       A.perform_date, A.perform_time,
+		       NVL(A.status, '0') status,
+		       NVL(A.viewing_flag, 'N') view_flag,
+		       DECODE(NVL(A.status, '0'), '2', 'Y', 'N') confirm_yn,
+		       'N' vod_only_yn,
+               NVL(H.icon_file_name, '') chnl_img_file,
+               A.cuesheet_img_url IMAGE_FOLDER, A.main_img_file_name main_img_file, A.omni_img_file_name omni_img_file, A.logo_img_file_name logo_img_file,
+               A.pay_flag
+		  FROM IMCSUSER.PT_LB_CUESHEET_MST A,
+		       IMCSUSER.PT_LB_CUESHEET_ITEM B,
+               IMCSUSER.PT_LA_ALBUM_INFO C,
+               IMCSUSER.PT_CD_PLAY_CHNL H
+		 WHERE A.cuesheet_id = B.cuesheet_id
+		   AND B.album_id = C.album_id
+		   AND B.album_id = #{albumId}
+		   AND A.channel_id = H.service_id (+)
+	</select>
+	
+	<select id="getCueSheetInfo2" parameterType="AlbumInfo" resultMap="mCueInfo">
+		SELECT A.perform_date, A.perform_time,
+		       NVL(A.status, '0') status,
+		       NVL(A.viewing_flag, 'N') view_flag,
+		       NVL(A.confirm_yn, 'N') confirm_yn,
+		       NVL(A.vod_only_yn, 'N') vod_only_yn,
+		       NVL(H.icon_file_name, '') chnl_img_file,
+		       A.cuesheet_img_url IMAGE_FOLDER, A.main_img_file_name main_img_file, A.omni_img_file_name omni_img_file, A.logo_img_file_name logo_img_file,
+		       A.pay_flag
+		  FROM IMCSUSER.PT_LB_CUESHEET_MST A,
+		       IMCSUSER.PT_LA_ALBUM_INFO B,
+               IMCSUSER.PT_CD_PLAY_CHNL H
+		 WHERE A.album_id = B.album_id
+		   AND A.album_id = #{albumId}
+		   AND A.channel_id = H.service_id (+)
+	</select>	
+	
+	<!--  장르 정보 가져오기기 -->	
+	<select id="getGenreInfoList" parameterType="AlbumInfo" resultMap="mGenreInfo">
+		SELECT DISTINCT A.vod_category_name, A.vod_sort_no
+		  FROM PT_VO_CATEGORY_UNITED_NSC A                
+		 WHERE A.vod_category_level = '2'                 
+		   AND A.vod_category_gb = 'NSC'                  
+		   AND NVL(A.vod_nsc_gb, 'LTE') = 'UFX'           
+		   AND SUBSTR(A.vod_category_id, 2, 1) = 'B'      
+		 START WITH A.vod_category_id in (SELECT category_id FROM PT_VO_CATEGORY_MAP
+		                                   WHERE contents_id = #{albumId})         
+		 CONNECT BY PRIOR A.vod_parent_category_id = A.vod_category_id              
+		 ORDER BY A.vod_sort_no
+	</select>
+	
+	<!--  다운로드 체크 -->	
+	<select id="getDownCheck" parameterType="AlbumInfo" resultType="String">
+		SELECT case when COUNT(*) > 0 then 'Y' else 'N' end as down_yn
+		  FROM IMCSUSER.PT_LA_ASSET_INFO A,
+		       IMCSUSER.PT_LB_BRO_MATERIAL B
+		 WHERE A.adi_product_id||'08' = B.asset_id
+		   AND A.album_id = #{albumId}
+		   AND SUBSTR(A.asset_id, 16, 2) in ('M2','M9')
+		   AND (NVL(B.qd_yn, 'N') = 'N' OR (NVL(B.qd_yn, 'N') = 'Y' AND NVL(B.qd_flag, 'N') = '2'))
+	</select>
+	
+	<!--  OST 정보 가져오기 -->	
+	<select id="getOSTInfo" parameterType="AlbumInfo" resultMap="mOSTInfo">
+        SELECT DISTINCT 'OST' OST, B.reserved_seq, B.ost_type, B.ost_id, B.ost_singer, B.ost_title 
+          FROM IMCSUSER.PT_LA_ASSET_INFO A,        
+               IMCSUSER.PT_LA_OST_ASSET B          
+         WHERE A.adi_product_id = B.adi_product_id 
+           AND A.screen_type = 'N'                 
+           AND A.album_id = #{albumId}
+         ORDER BY B.reserved_seq
+	</select>
+	
+	<!--  앨범이미지 정보 가져오기 -->	
+	<select id="getImgInfo" parameterType="AlbumInfo" resultMap="mImgInfo">
+		SELECT A.main_img_file_name, A.img_flag
+		  FROM IMCSUSER.PT_LA_ALBUM_IMG A      
+		 WHERE A.adi_album_id = #{albumId}    
+		   AND A.img_flag IN (#{flag},'N')         
+		 ORDER BY A.img_flag, TO_NUMBER(A.adi_album_seq)
+	</select>
+	
+		<!--  공연앨범인 경우 타입 체크 -->
+	<select id="getAlbumTypeCheck" parameterType="AlbumInfo" resultMap="mAlbumTypeInfo">
+        SELECT NVL(A.vod_type, 'M') CHK_VOD_TYPE, NVL(B.music_cont_type, '') CHK_CON_TYPE
+          FROM IMCSUSER.PT_LA_ALBUM_INFO A,
+               IMCSUSER.PT_LA_ALBUM_SUB B
+         WHERE A.album_id = B.album_id
+           AND A.album_id = #{albumId}
+	</select>
+
+	<select id="getOmniviewAlbumId1" parameterType="AlbumInfo" resultType="String">
+        SELECT B.album_id MAIN_ALBUM_ID
+          FROM IMCSUSER.PT_LB_CUESHEET_ITEM_DETAIL A,
+               IMCSUSER.PT_LB_CUESHEET_ITEM B
+         WHERE A.cuesheet_id = B.cuesheet_id
+           AND A.item_no = B.item_no
+           AND A.album_id = #{albumId}
+	</select>
+
+	<select id="getOmniviewAlbumId2" parameterType="AlbumInfo" resultType="String">
+        SELECT B.album_id MAIN_ALBUM_ID
+          FROM IMCSUSER.PT_LB_CUESHEET_ITEM_DETAIL A,
+               IMCSUSER.PT_LB_CUESHEET_ITEM B
+         WHERE A.cuesheet_id = B.cuesheet_id
+           AND A.item_no = '000'
+           AND A.album_id = #{albumId}
+	</select>
+	
+	<select id="getCinePointCnt" parameterType="AlbumInfo" resultMap="mCinePointCnt">
+		SELECT
+			NVL(CINE_AVG_POINT,'0') AS cine_avg_point
+		    , NVL(CINE_COUNT, '0') AS cine_count
+		    , cine_id
+		FROM IMCSUSER.PT_WC_CINE_RATING
+		WHERE CINE_ID = #{cineId}
+	</select>
+	
+	<select id="getConsertInfo" parameterType="AlbumInfo" resultType="ComConcertInfoVO">
+        SELECT PERFORM_DATE, PERFORM_TIME, PERFORM_END_DATE, PERFORM_END_TIME, GUIDE_TEXT 
+  		  FROM IMCSUSER.PT_LB_CUESHEET_MST A,
+      		   IMCSUSER.PT_LB_CUESHEET_PAY_INFO B
+ 	   	 WHERE A.CUESHEET_ID = B.CUESHEET_ID
+ 	   	   AND A.ALBUM_ID = #{albumId}
+	</select>
+    
+</mapper> 
